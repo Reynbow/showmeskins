@@ -946,57 +946,396 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
 
 /* ================================================================
    Fountain-style Platform (Model Viewer mode)
-   Multi-tiered stone podium inspired by the Summoner's Rift fountain.
+   Multi-tiered stone podium with Runeterra-inspired runic engravings,
+   procedural stone textures, and gold trim accents.
    ================================================================ */
+
+/** Creates a procedural stone bump texture (grayscale noise + hairline cracks) */
+function makeStoneTexture(size: number, repeatX: number, repeatY: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, size, size);
+  // Fine-grain noise
+  for (let i = 0; i < 6000; i++) {
+    const v = Math.floor(Math.random() * 50 + 105);
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * size, Math.random() * size, Math.random() * 2.5 + 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Hairline cracks
+  for (let i = 0; i < 14; i++) {
+    ctx.strokeStyle = `rgba(50,50,50,${Math.random() * 0.25 + 0.1})`;
+    ctx.lineWidth = Math.random() * 1.5 + 0.5;
+    ctx.beginPath();
+    let x = Math.random() * size, y = Math.random() * size;
+    ctx.moveTo(x, y);
+    for (let j = 0; j < 6; j++) {
+      x += (Math.random() - 0.5) * 70;
+      y += (Math.random() - 0.5) * 70;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repeatX, repeatY);
+  return tex;
+}
+
+/** Creates a roughness variation texture */
+function makeRoughnessTexture(size: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#999';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 3000; i++) {
+    const v = Math.floor(Math.random() * 80 + 90);
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * size, Math.random() * size, Math.random() * 4 + 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 1);
+  return tex;
+}
+
+/**
+ * Creates a Runeterra-style runic emissive texture (white on black)
+ * for use as an emissiveMap. The emissive colour tints the result.
+ */
+function makeRuneTexture(): THREE.CanvasTexture {
+  const size = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const cx = size / 2, cy = size / 2;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+
+  const full = 'rgba(255,255,255,1.0)';
+  const bright = 'rgba(255,255,255,0.9)';
+  const mid = 'rgba(255,255,255,0.6)';
+  const dim = 'rgba(255,255,255,0.32)';
+  const faint = 'rgba(255,255,255,0.16)';
+
+  /* ── Helper: draw a poly shape (hexagon, triangle, etc.) ── */
+  const drawPoly = (x: number, y: number, r: number, sides: number, rot: number, lw: number, col: string) => {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + rot;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  };
+
+  /* ── Helper: ring + tick marks + rune glyphs ── */
+  const drawRuneRing = (r: number, count: number, gs: number, lw: number) => {
+    ctx.strokeStyle = mid;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Fine tick marks
+    for (let i = 0; i < count * 3; i++) {
+      const a = (i / (count * 3)) * Math.PI * 2;
+      ctx.strokeStyle = dim;
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * (r - 5), cy + Math.sin(a) * (r - 5));
+      ctx.lineTo(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5));
+      ctx.stroke();
+    }
+
+    // Runic glyphs
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.strokeStyle = bright;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const s = gs;
+      switch (i % 8) {
+        case 0: ctx.moveTo(0, -s); ctx.lineTo(0, s);
+                ctx.moveTo(-s * 0.4, -s * 0.3); ctx.lineTo(s * 0.4, -s * 0.3); break;
+        case 1: ctx.moveTo(0, -s); ctx.lineTo(s * 0.5, 0);
+                ctx.lineTo(0, s); ctx.lineTo(-s * 0.5, 0); ctx.closePath(); break;
+        case 2: ctx.moveTo(-s * 0.4, 0); ctx.lineTo(0, -s); ctx.lineTo(s * 0.4, 0);
+                ctx.moveTo(0, -s); ctx.lineTo(0, s); break;
+        case 3: ctx.moveTo(-s * 0.4, -s); ctx.lineTo(s * 0.4, -s);
+                ctx.moveTo(0, -s); ctx.lineTo(0, s * 0.7); break;
+        case 4: ctx.moveTo(-s * 0.3, -s); ctx.lineTo(s * 0.3, -s * 0.3);
+                ctx.lineTo(-s * 0.3, s * 0.3); ctx.lineTo(s * 0.3, s); break;
+        case 5: ctx.moveTo(s * 0.4, -s); ctx.lineTo(-s * 0.2, 0); ctx.lineTo(s * 0.4, s); break;
+        case 6: ctx.moveTo(-s * 0.4, -s * 0.7); ctx.lineTo(s * 0.4, s * 0.7);
+                ctx.moveTo(s * 0.4, -s * 0.7); ctx.lineTo(-s * 0.4, s * 0.7); break;
+        case 7: ctx.moveTo(0, s); ctx.lineTo(0, -s * 0.2);
+                ctx.lineTo(-s * 0.4, -s); ctx.moveTo(0, -s * 0.2);
+                ctx.lineTo(s * 0.4, -s); break;
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  /* ══ 1. Full-length radial spokes (from near-center to outer edge) ══ */
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.strokeStyle = i % 2 === 0 ? dim : faint;
+    ctx.lineWidth = i % 3 === 0 ? 1.6 : 0.9;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * size * 0.10, cy + Math.sin(a) * size * 0.10);
+    ctx.lineTo(cx + Math.cos(a) * size * 0.46, cy + Math.sin(a) * size * 0.46);
+    ctx.stroke();
+  }
+
+  /* ══ 2. Additional secondary spokes (24 finer lines, mid→outer) ══ */
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2 + Math.PI / 24;
+    ctx.strokeStyle = faint;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * size * 0.22, cy + Math.sin(a) * size * 0.22);
+    ctx.lineTo(cx + Math.cos(a) * size * 0.44, cy + Math.sin(a) * size * 0.44);
+    ctx.stroke();
+  }
+
+  /* ══ 3. Concentric runic rings ══ */
+  drawRuneRing(size * 0.44, 24, 14, 2.0);
+  drawRuneRing(size * 0.33, 16, 11, 1.5);
+  drawRuneRing(size * 0.22, 8, 9, 1.2);
+
+  /* ══ 4. Extra thin accent circles for density ══ */
+  for (const r of [0.18, 0.27, 0.38, 0.47]) {
+    ctx.strokeStyle = faint;
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  /* ══ 5. BIG central Runeterra symbol ══ */
+
+  // Outer hexagonal frame
+  drawPoly(cx, cy, size * 0.13, 6, -Math.PI / 6, 3.0, full);
+
+  // Inner rotated hexagon (star-of-david overlap feel)
+  drawPoly(cx, cy, size * 0.10, 6, 0, 2.2, bright);
+
+  // Diamond / eye shape in the very center
+  const dr = size * 0.065;
+  ctx.strokeStyle = full;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - dr);       // top
+  ctx.lineTo(cx + dr, cy);       // right
+  ctx.lineTo(cx, cy + dr);       // bottom
+  ctx.lineTo(cx - dr, cy);       // left
+  ctx.closePath();
+  ctx.stroke();
+
+  // Filled inner circle (the "eye" core)
+  const coreR = size * 0.025;
+  ctx.fillStyle = full;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ring around the core
+  ctx.strokeStyle = bright;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.04, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 4 cardinal spikes extending from diamond to inner hex
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    ctx.strokeStyle = bright;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * dr * 0.9, cy + Math.sin(a) * dr * 0.9);
+    ctx.lineTo(cx + Math.cos(a) * size * 0.095, cy + Math.sin(a) * size * 0.095);
+    ctx.stroke();
+  }
+
+  // 6 lines from outer hex vertices to inner ring
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+    ctx.strokeStyle = mid;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * size * 0.13, cy + Math.sin(a) * size * 0.13);
+    ctx.lineTo(cx + Math.cos(a) * size * 0.215, cy + Math.sin(a) * size * 0.215);
+    ctx.stroke();
+  }
+
+  // Small triangular accents at hex vertices
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+    const vx = cx + Math.cos(a) * size * 0.135;
+    const vy = cy + Math.sin(a) * size * 0.135;
+    drawPoly(vx, vy, size * 0.012, 3, a, 1.5, mid);
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+/** Creates an engraved-band bump texture for cylinder sides */
+function makeEngraveBumpTexture(): THREE.CanvasTexture {
+  const w = 1024, h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, w, h);
+
+  // Horizontal groove lines
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  for (const y of [h * 0.15, h * 0.5, h * 0.85]) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // Repeating diamond motifs along the band
+  const seg = 32;
+  for (let i = 0; i < seg; i++) {
+    const x = (i / seg) * w + w / seg / 2;
+    const s = h * 0.18;
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.5 - s);
+    ctx.lineTo(x + s * 0.5, h * 0.5);
+    ctx.lineTo(x, h * 0.5 + s);
+    ctx.lineTo(x - s * 0.5, h * 0.5);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
 function HexPlatform() {
   const glowRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Subtle pulsing glow
+    // Pulsing runic glow
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = 0.3 + Math.sin(t * 1.2) * 0.15;
+      mat.emissiveIntensity = 0.5 + Math.sin(t * 1.2) * 0.2;
     }
   });
+
+  /* ── Procedural textures (created once, cached) ── */
+  const stoneBump = useMemo(() => makeStoneTexture(512, 3, 1), []);
+  const stoneRough = useMemo(() => makeRoughnessTexture(256), []);
+  const engraveBump = useMemo(() => makeEngraveBumpTexture(), []);
+  const runeEmissive = useMemo(() => makeRuneTexture(), []);
 
   const stoneColor = '#1a2030';
   const stoneLight = '#232d40';
   const glowColor = '#1e6091';
+  const trimGold = '#8b7340';
 
   return (
     <group position={[0, -2.05, 0]}>
-      {/* ── Tier 1: Wide base step ── */}
+      {/* ── Tier 1: Wide base step (rough stone with bump) ── */}
       <mesh position={[0, -0.08, 0]} receiveShadow>
         <cylinderGeometry args={[3.0, 3.2, 0.16, 64]} />
         <meshStandardMaterial
           color="#0e1520"
           metalness={0.7}
           roughness={0.35}
+          bumpMap={stoneBump}
+          bumpScale={0.015}
+          roughnessMap={stoneRough}
         />
       </mesh>
 
-      {/* ── Tier 2: Middle step ── */}
+      {/* Gold trim ring between tier 1 and 2 */}
+      <mesh position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.55, 0.018, 8, 64]} />
+        <meshStandardMaterial
+          color={trimGold}
+          metalness={0.92}
+          roughness={0.18}
+          emissive={trimGold}
+          emissiveIntensity={0.12}
+        />
+      </mesh>
+
+      {/* ── Tier 2: Middle step (engraved diamond band) ── */}
       <mesh position={[0, 0.06, 0]} receiveShadow>
         <cylinderGeometry args={[2.4, 2.55, 0.14, 64]} />
         <meshStandardMaterial
           color={stoneColor}
-          metalness={0.75}
-          roughness={0.3}
+          metalness={0.78}
+          roughness={0.28}
+          bumpMap={engraveBump}
+          bumpScale={0.025}
+          roughnessMap={stoneRough}
         />
       </mesh>
 
-      {/* ── Tier 3: Top platform ── */}
+      {/* Gold trim ring between tier 2 and 3 */}
+      <mesh position={[0, 0.125, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.92, 0.018, 8, 64]} />
+        <meshStandardMaterial
+          color={trimGold}
+          metalness={0.92}
+          roughness={0.18}
+          emissive={trimGold}
+          emissiveIntensity={0.12}
+        />
+      </mesh>
+
+      {/* ── Tier 3: Top platform (fine stone bump) ── */}
       <mesh position={[0, 0.19, 0]} receiveShadow>
         <cylinderGeometry args={[1.8, 1.9, 0.12, 64]} />
         <meshStandardMaterial
           color={stoneLight}
-          metalness={0.8}
-          roughness={0.25}
+          metalness={0.82}
+          roughness={0.22}
+          bumpMap={stoneBump}
+          bumpScale={0.012}
+          roughnessMap={stoneRough}
         />
       </mesh>
 
-      {/* ── Inner glow disc (blue energy on top surface) ── */}
+      {/* Top edge gold trim */}
+      <mesh position={[0, 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.8, 0.014, 8, 64]} />
+        <meshStandardMaterial
+          color={trimGold}
+          metalness={0.92}
+          roughness={0.18}
+          emissive={trimGold}
+          emissiveIntensity={0.1}
+        />
+      </mesh>
+
+      {/* ── Runic glow disc (emissiveMap with Runeterra rune engravings) ── */}
       <mesh
         ref={glowRef}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -1006,11 +1345,12 @@ function HexPlatform() {
         <meshStandardMaterial
           color="#0a1520"
           emissive={glowColor}
-          emissiveIntensity={0.3}
+          emissiveIntensity={0.5}
+          emissiveMap={runeEmissive}
           metalness={0.6}
-          roughness={0.4}
+          roughness={0.35}
           transparent
-          opacity={0.85}
+          opacity={0.9}
         />
       </mesh>
 
@@ -1193,13 +1533,15 @@ function SplashFallback({ url }: { url: string }) {
 function ModelViewerLighting() {
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 8, 5]} intensity={1} color="#f0e6d2" />
-      <directionalLight position={[-5, 4, -3]} intensity={0.3} color="#0ac8b9" />
-      <pointLight position={[-4, 3, -3]} intensity={0.5} color="#0ac8b9" />
-      <pointLight position={[4, 3, -3]} intensity={0.5} color="#c8aa6e" />
-      <pointLight position={[0, -1, 4]} intensity={0.3} color="#0ac8b9" />
-      <spotLight position={[0, 8, 0]} intensity={0.6} color="#f0e6d2" angle={0.5} penumbra={0.8} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[5, 8, 5]} intensity={1.3} color="#f0e6d2" />
+      <directionalLight position={[-5, 4, -3]} intensity={0.45} color="#0ac8b9" />
+      <pointLight position={[-4, 3, -3]} intensity={0.7} color="#0ac8b9" />
+      <pointLight position={[4, 3, -3]} intensity={0.7} color="#c8aa6e" />
+      <pointLight position={[0, -1, 4]} intensity={0.5} color="#0ac8b9" />
+      <spotLight position={[0, 8, 0]} intensity={0.9} color="#f0e6d2" angle={0.5} penumbra={0.8} />
+      {/* Uplight hitting the platform from below-front to brighten the stone tiers */}
+      <pointLight position={[0, -1.5, 2.5]} intensity={0.4} color="#f0e6d2" />
     </>
   );
 }
@@ -1424,10 +1766,10 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
               enableRotate={viewMode !== 'ingame'}
               enablePan={false}
               enableZoom
-              minDistance={viewMode === 'ingame' ? 4 : 2}
+              minDistance={viewMode === 'ingame' ? 4 : 0.5}
               maxDistance={viewMode === 'ingame' ? 20 : 12}
-              minPolarAngle={viewMode === 'ingame' ? 0 : 0.2}
-              maxPolarAngle={viewMode === 'ingame' ? Math.PI : Math.PI / 2}
+              minPolarAngle={0}
+              maxPolarAngle={Math.PI}
               autoRotate={false}
               enableDamping
               dampingFactor={0.05}
