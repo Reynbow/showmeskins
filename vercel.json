@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/model-cdn/:path*",
+      "destination": "https://cdn.modelviewer.lol/:path*"
+    },
+    {
+      "source": "/map-tiles/:path*",
+      "destination": "https://summonersrift.mvilim.dev/:path*"
+    },
+    {
+      "source": "/cdragon/:path*",
+      "destination": "https://raw.communitydragon.org/:path*"
+    }
+  ]
+}
