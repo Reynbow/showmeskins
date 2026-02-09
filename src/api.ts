@@ -85,28 +85,90 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
 }
 
 /**
- * Build candidate URLs for a chroma's diffuse texture on CommunityDragon.
- *
- * Chroma IDs follow the pattern: championKey * 1000 + skinIndex.
- * E.g. for Braum (key 201), chroma "Amethyst" = 201004 → skin04
- *
- * File naming varies across champions — some use `_tx_cm.png`, others
- * `_tx_cm_update.png`, etc. We return multiple candidates in priority order
- * so the loader can try each until one succeeds.
- *
- * @param championId  Data Dragon champion ID (e.g. "Braum", "LeeSin")
- * @param chromaId    Numeric chroma ID (e.g. 201004)
+ * In-memory cache of directory listings from CommunityDragon.
+ * Key = directory path (e.g. "/cdragon/latest/game/assets/characters/aatrox/skins/skin04/")
+ * Value = array of filenames in that directory
  */
-export function getChromaTextureUrls(championId: string, chromaId: number): string[] {
+const dirListingCache = new Map<string, string[]>();
+
+/** Keywords that identify accessory textures (not the main body texture) */
+const ACCESSORY_KEYWORDS = [
+  'sword', 'wings', 'wing', 'banner', 'recall', '_ult', 'vfx',
+  'mask', 'particle', 'weapon', 'shield', 'cape', 'hair', 'tail',
+  'loadscreen', 'materialmask',
+];
+
+/**
+ * Fetch a CommunityDragon directory listing and extract filenames.
+ * Results are cached so each directory is only fetched once.
+ */
+async function fetchDirListing(dirUrl: string): Promise<string[]> {
+  const cached = dirListingCache.get(dirUrl);
+  if (cached) return cached;
+
+  const res = await fetch(dirUrl);
+  if (!res.ok) {
+    dirListingCache.set(dirUrl, []);
+    return [];
+  }
+  const html = await res.text();
+
+  // Parse <a href="filename"> links from the HTML directory listing
+  const filenames: string[] = [];
+  const linkRegex = /<a\s+href="([^"]+)"/gi;
+  let match;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const href = match[1];
+    // Skip parent directory links, subdirectory links, and query params
+    if (href.startsWith('?') || href.startsWith('/') || href.endsWith('/')) continue;
+    filenames.push(decodeURIComponent(href));
+  }
+
+  dirListingCache.set(dirUrl, filenames);
+  return filenames;
+}
+
+/**
+ * Resolve the actual URL for a chroma's body diffuse texture on CommunityDragon.
+ *
+ * Fetches the directory listing for the chroma's skin folder, parses it to find
+ * the body color-map texture (filtering out sword/wings/banner/etc.), and returns
+ * the full URL. Results are cached per directory.
+ *
+ * @param championId  Data Dragon champion ID (e.g. "Aatrox", "LeeSin")
+ * @param chromaId    Numeric chroma ID (e.g. 266004)
+ * @returns Full proxy URL to the texture, or null if not found
+ */
+export async function resolveChromaTextureUrl(
+  championId: string,
+  chromaId: number,
+): Promise<string | null> {
   const alias = championId.toLowerCase();
   const skinNum = String(chromaId % 1000).padStart(2, '0');
-  const base = `/cdragon/latest/game/assets/characters/${alias}/skins/skin${skinNum}/${alias}_skin${skinNum}`;
-  return [
-    `${base}_tx_cm.png`,
-    `${base}_tx_cm_update.png`,
-    `${base}_base_tx_cm.png`,
-    `${base}_body_tx_cm.png`,
-  ];
+  const dirPath = `/cdragon/latest/game/assets/characters/${alias}/skins/skin${skinNum}/`;
+
+  const files = await fetchDirListing(dirPath);
+  if (files.length === 0) return null;
+
+  // Find all PNG files containing "_tx_cm" (color map textures)
+  const txCmFiles = files.filter(
+    (f) => f.endsWith('.png') && f.toLowerCase().includes('_tx_cm'),
+  );
+  if (txCmFiles.length === 0) return null;
+
+  // Filter out accessory textures (sword, wings, banner, etc.)
+  const bodyFiles = txCmFiles.filter((f) => {
+    const lower = f.toLowerCase();
+    return !ACCESSORY_KEYWORDS.some((kw) => lower.includes(kw));
+  });
+
+  // Pick the best match: prefer the simplest name (shortest), fall back to first txCm file
+  const best =
+    bodyFiles.length > 0
+      ? bodyFiles.sort((a, b) => a.length - b.length)[0]
+      : txCmFiles.sort((a, b) => a.length - b.length)[0];
+
+  return best ? `${dirPath}${best}` : null;
 }
 
 /**

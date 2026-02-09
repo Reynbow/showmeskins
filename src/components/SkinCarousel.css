@@ -12,6 +12,8 @@
   align-items: center;
   gap: 12px;
   padding: 0 24px 10px;
+  position: relative;
+  z-index: 5;
 }
 
 .skin-carousel-line {
@@ -77,7 +79,8 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 4px 0;
+  padding: 60px 0 4px 0;
+  margin-top: -56px;
   scroll-behavior: smooth;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -107,6 +110,7 @@
 .skin-card:hover {
   border-color: var(--lol-gold-dark);
   background: rgba(200, 170, 110, 0.03);
+  z-index: 20;
 }
 
 .skin-card.active {
@@ -172,22 +176,70 @@
   bottom: 0;
   left: 0;
   right: 0;
-  font-size: 18px;
-  color: var(--lol-gold-light);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--lol-gold);
   text-align: center;
   line-height: 1.2;
-  padding: 20px 8px 6px;
+  padding: 20px 8px 8px;
   background: linear-gradient(to top, rgba(1, 10, 19, 0.95) 0%, rgba(1, 10, 19, 0.7) 50%, transparent 100%);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
 }
 
 .skin-card.active .skin-card-name {
+  opacity: 1;
+}
+
+/* Skin hover tooltip — matches emote/chroma tooltip style */
+.skin-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: rgb(1, 10, 19);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+.skin-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: var(--lol-border-gold);
+}
+
+.skin-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgb(1, 10, 19);
+  z-index: 1;
+}
+
+.skin-card:hover .skin-tooltip {
   opacity: 1;
 }
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, ALTERNATE_FORMS, getChampionChromas, getChromaTextureUrls } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, ALTERNATE_FORMS, getChampionChromas, resolveChromaTextureUrl } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -37,9 +37,20 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
   }, []);
 
   const skinChromas = chromaMap[selectedSkin.id] ?? [];
-  const chromaTextureUrls = selectedChromaId != null
-    ? getChromaTextureUrls(champion.id, selectedChromaId)
-    : null;
+
+  // Resolve the actual chroma texture URL asynchronously via directory listing
+  const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedChromaId == null) {
+      setChromaTextureUrl(null);
+      return;
+    }
+    let cancelled = false;
+    resolveChromaTextureUrl(champion.id, selectedChromaId).then((url) => {
+      if (!cancelled) setChromaTextureUrl(url);
+    });
+    return () => { cancelled = true; };
+  }, [champion.id, selectedChromaId]);
 
   /* ── Alternate form toggle (Elise spider, Nidalee cougar, etc.) ── */
   const [useAltForm, setUseAltForm] = useState(false);
@@ -244,7 +255,7 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
             viewMode={viewMode}
             chromas={skinChromas}
             selectedChromaId={selectedChromaId}
-            chromaTextureUrls={chromaTextureUrls}
+            chromaTextureUrl={chromaTextureUrl}
             onChromaSelect={handleChromaSelect}
           />
         </div>

@@ -64,7 +64,7 @@ interface Props {
   viewMode: ViewMode;
   chromas: ChromaInfo[];
   selectedChromaId: number | null;
-  chromaTextureUrls: string[] | null;
+  chromaTextureUrl: string | null;
   onChromaSelect: (chromaId: number | null) => void;
 }
 
@@ -312,7 +312,7 @@ interface ChampionModelProps {
   url: string;
   viewMode: ViewMode;
   emoteRequest: EmoteRequest | null;
-  chromaTextureUrls: string[] | null;
+  chromaTextureUrl: string | null;
   facingRotationY: number;
   onChromaLoading: (loading: boolean) => void;
   onEmotesAvailable: (emotes: EmoteType[]) => void;
@@ -322,7 +322,7 @@ interface ChampionModelProps {
   onModelHeight: (height: number) => void;
 }
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingRotationY, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -692,7 +692,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingR
     // Always restore first
     restoreOriginals();
 
-    if (!chromaTextureUrls || chromaTextureUrls.length === 0) {
+    if (!chromaTextureUrl) {
       onChromaLoading(false);
       return;
     }
@@ -700,27 +700,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingR
     // Signal loading started
     onChromaLoading(true);
 
-    /**
-     * Try each candidate URL in order. The first one that loads successfully
-     * wins. This handles CommunityDragon's inconsistent file naming
-     * (_tx_cm.png vs _tx_cm_update.png vs _body_tx_cm.png, etc.)
-     */
-    async function loadFirstAvailable(urls: string[]): Promise<THREE.Texture> {
-      let lastError: unknown;
-      for (const url of urls) {
-        if (cancelled) throw new Error('cancelled');
-        try {
-          return await loadTextureWithRetry(url, 2, 10_000);
-        } catch (err) {
-          lastError = err;
-          if ((err as Error).message === 'cancelled') throw err;
-          // Try next URL
-        }
-      }
-      throw lastError;
-    }
-
-    loadFirstAvailable(chromaTextureUrls)
+    loadTextureWithRetry(chromaTextureUrl, 3, 15_000)
       .then((texture) => {
         if (cancelled) { texture.dispose(); return; }
 
@@ -763,7 +743,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingR
       })
       .catch((err) => {
         if ((err as Error).message === 'cancelled') return;
-        console.warn('Failed to load chroma texture from all candidate URLs:', chromaTextureUrls, err);
+        console.warn('Failed to load chroma texture:', chromaTextureUrl, err);
         onChromaLoading(false);
       });
 
@@ -771,7 +751,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingR
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, chromaTextureUrls]);
+  }, [scene, chromaTextureUrl]);
 
   /* ══════════════════════════════════════════════════════════════
      Emote Playback Effect
@@ -1648,7 +1628,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrls, onChromaSelect }: Props) {
+export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrl, onChromaSelect }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -1759,7 +1739,7 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
                 url={modelUrl}
                 viewMode={viewMode}
                 emoteRequest={emoteRequest}
-                chromaTextureUrls={chromaTextureUrls}
+                chromaTextureUrl={chromaTextureUrl}
                 facingRotationY={facingRotationY}
                 onChromaLoading={handleChromaLoading}
                 onEmotesAvailable={handleEmotesAvailable}

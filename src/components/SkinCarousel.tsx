@@ -71,6 +71,7 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
                   <span className="skin-card-name">{name}</span>
                   {isActive && <div className="skin-card-glow" />}
                 </div>
+                {!isActive && <div className="skin-tooltip">{name}</div>}
                 {isActive && <div className="skin-card-indicator" />}
               </button>
             );
