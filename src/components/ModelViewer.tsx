@@ -1354,11 +1354,6 @@ function HexPlatform() {
         />
       </mesh>
 
-      {/* ── Outer ground fade (dark circle extending beyond the podium) ── */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15, 0]} renderOrder={-2}>
-        <circleGeometry args={[6, 64]} />
-        <meshStandardMaterial color="#010a13" />
-      </mesh>
     </group>
   );
 }
