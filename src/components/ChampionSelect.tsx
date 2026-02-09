@@ -58,7 +58,7 @@ export function ChampionSelect({ champions, version, onSelect }: Props) {
             <path d="M20 8L31 14v12L20 32 9 26V14L20 8z" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
           </svg>
         </div>
-        <h1 className="champion-select-title">Champion Vault</h1>
+        <h1 className="champion-select-title">Show me skins!</h1>
         <p className="champion-select-subtitle">Select a champion to explore their skins in 3D</p>
       </div>
 
