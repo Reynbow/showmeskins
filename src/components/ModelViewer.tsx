@@ -717,7 +717,8 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           for (const mat of mats) {
             const m = mat as THREE.MeshStandardMaterial;
             if (m.map?.image) {
-              const size = (m.map.image.width ?? 0) * (m.map.image.height ?? 0);
+              const img = m.map.image as { width?: number; height?: number };
+              const size = (img.width ?? 0) * (img.height ?? 0);
               if (size > maxSize) {
                 maxSize = size;
                 primaryMats.length = 0;
