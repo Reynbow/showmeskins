@@ -85,20 +85,28 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
 }
 
 /**
- * Build the URL for a chroma's diffuse texture (color map) on CommunityDragon.
+ * Build candidate URLs for a chroma's diffuse texture on CommunityDragon.
  *
  * Chroma IDs follow the pattern: championKey * 1000 + skinIndex.
  * E.g. for Braum (key 201), chroma "Amethyst" = 201004 → skin04
- * The texture lives at:
- *   /game/assets/characters/{alias}/skins/skin{nn}/{alias}_skin{nn}_tx_cm.png
+ *
+ * File naming varies across champions — some use `_tx_cm.png`, others
+ * `_tx_cm_update.png`, etc. We return multiple candidates in priority order
+ * so the loader can try each until one succeeds.
  *
  * @param championId  Data Dragon champion ID (e.g. "Braum", "LeeSin")
  * @param chromaId    Numeric chroma ID (e.g. 201004)
  */
-export function getChromaTextureUrl(championId: string, chromaId: number): string {
+export function getChromaTextureUrls(championId: string, chromaId: number): string[] {
   const alias = championId.toLowerCase();
   const skinNum = String(chromaId % 1000).padStart(2, '0');
-  return `/cdragon/latest/game/assets/characters/${alias}/skins/skin${skinNum}/${alias}_skin${skinNum}_tx_cm.png`;
+  const base = `/cdragon/latest/game/assets/characters/${alias}/skins/skin${skinNum}/${alias}_skin${skinNum}`;
+  return [
+    `${base}_tx_cm.png`,
+    `${base}_tx_cm_update.png`,
+    `${base}_base_tx_cm.png`,
+    `${base}_body_tx_cm.png`,
+  ];
 }
 
 /**

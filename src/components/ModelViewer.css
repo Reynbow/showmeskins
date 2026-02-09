@@ -30,15 +30,15 @@
 
 .emote-tooltip {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 5px 10px;
+  padding: 6px 12px;
   background: rgba(1, 10, 19, 0.92);
   border: 1px solid var(--lol-border-gold);
   color: var(--lol-gold);
   font-family: var(--font-body);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.5px;
   white-space: nowrap;
   pointer-events: none;
@@ -46,7 +46,29 @@
   transition: opacity 0.15s ease;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   z-index: 10;
+}
+
+.emote-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: var(--lol-border-gold);
+}
+
+.emote-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgba(1, 10, 19, 0.92);
+  z-index: 1;
 }
 
 .emote-btn-wrapper:hover .emote-tooltip {
@@ -311,6 +333,57 @@
   gap: 5px;
   z-index: 5;
   animation: fadeIn 0.4s ease 0.8s both;
+}
+
+.chroma-swatch-wrapper {
+  position: relative;
+}
+
+.chroma-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: rgba(1, 10, 19, 0.92);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+.chroma-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: var(--lol-border-gold);
+}
+
+.chroma-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgba(1, 10, 19, 0.92);
+  z-index: 1;
+}
+
+.chroma-swatch-wrapper:hover .chroma-tooltip {
+  opacity: 1;
 }
 
 .chroma-swatch {

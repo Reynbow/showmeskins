@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, ALTERNATE_FORMS, getChampionChromas, getChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, ALTERNATE_FORMS, getChampionChromas, getChromaTextureUrls } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -37,8 +37,8 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
   }, []);
 
   const skinChromas = chromaMap[selectedSkin.id] ?? [];
-  const chromaTextureUrl = selectedChromaId != null
-    ? getChromaTextureUrl(champion.id, selectedChromaId)
+  const chromaTextureUrls = selectedChromaId != null
+    ? getChromaTextureUrls(champion.id, selectedChromaId)
     : null;
 
   /* ── Alternate form toggle (Elise spider, Nidalee cougar, etc.) ── */
@@ -244,7 +244,7 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
             viewMode={viewMode}
             chromas={skinChromas}
             selectedChromaId={selectedChromaId}
-            chromaTextureUrl={chromaTextureUrl}
+            chromaTextureUrls={chromaTextureUrls}
             onChromaSelect={handleChromaSelect}
           />
         </div>

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
+import { OrbitControls, useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ChromaInfo } from '../types';
 import './ModelViewer.css';
@@ -64,7 +64,7 @@ interface Props {
   viewMode: ViewMode;
   chromas: ChromaInfo[];
   selectedChromaId: number | null;
-  chromaTextureUrl: string | null;
+  chromaTextureUrls: string[] | null;
   onChromaSelect: (chromaId: number | null) => void;
 }
 
@@ -312,7 +312,7 @@ interface ChampionModelProps {
   url: string;
   viewMode: ViewMode;
   emoteRequest: EmoteRequest | null;
-  chromaTextureUrl: string | null;
+  chromaTextureUrls: string[] | null;
   facingRotationY: number;
   onChromaLoading: (loading: boolean) => void;
   onEmotesAvailable: (emotes: EmoteType[]) => void;
@@ -322,7 +322,7 @@ interface ChampionModelProps {
   onModelHeight: (height: number) => void;
 }
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrls, facingRotationY, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -692,7 +692,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     // Always restore first
     restoreOriginals();
 
-    if (!chromaTextureUrl) {
+    if (!chromaTextureUrls || chromaTextureUrls.length === 0) {
       onChromaLoading(false);
       return;
     }
@@ -700,7 +700,27 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     // Signal loading started
     onChromaLoading(true);
 
-    loadTextureWithRetry(chromaTextureUrl)
+    /**
+     * Try each candidate URL in order. The first one that loads successfully
+     * wins. This handles CommunityDragon's inconsistent file naming
+     * (_tx_cm.png vs _tx_cm_update.png vs _body_tx_cm.png, etc.)
+     */
+    async function loadFirstAvailable(urls: string[]): Promise<THREE.Texture> {
+      let lastError: unknown;
+      for (const url of urls) {
+        if (cancelled) throw new Error('cancelled');
+        try {
+          return await loadTextureWithRetry(url, 2, 10_000);
+        } catch (err) {
+          lastError = err;
+          if ((err as Error).message === 'cancelled') throw err;
+          // Try next URL
+        }
+      }
+      throw lastError;
+    }
+
+    loadFirstAvailable(chromaTextureUrls)
       .then((texture) => {
         if (cancelled) { texture.dispose(); return; }
 
@@ -743,7 +763,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       })
       .catch((err) => {
         if ((err as Error).message === 'cancelled') return;
-        console.warn('Failed to load chroma texture after retries:', chromaTextureUrl, err);
+        console.warn('Failed to load chroma texture from all candidate URLs:', chromaTextureUrls, err);
         onChromaLoading(false);
       });
 
@@ -751,7 +771,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, chromaTextureUrl]);
+  }, [scene, chromaTextureUrls]);
 
   /* ══════════════════════════════════════════════════════════════
      Emote Playback Effect
@@ -1354,6 +1374,33 @@ function HexPlatform() {
         />
       </mesh>
 
+      {/* ── Easter egg: stamped on the bottom of the base tier ── */}
+      <group position={[0, -0.165, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <Text
+          position={[0, 0, -0.003]}
+          fontSize={0.16}
+          color="#3a3020"
+          anchorX="center"
+          anchorY="middle"
+          letterSpacing={0.15}
+          scale={[1, -1, 1]}
+        >
+          REYNBOW
+        </Text>
+        {/* Border frame */}
+        {[
+          { pos: [0, 0.12, -0.003] as const, sz: [1.14, 0.012, 0.001] as const },
+          { pos: [0, -0.12, -0.003] as const, sz: [1.14, 0.012, 0.001] as const },
+          { pos: [-0.57, 0, -0.003] as const, sz: [0.012, 0.252, 0.001] as const },
+          { pos: [0.57, 0, -0.003] as const, sz: [0.012, 0.252, 0.001] as const },
+        ].map((edge, i) => (
+          <mesh key={i} position={edge.pos}>
+            <boxGeometry args={edge.sz} />
+            <meshBasicMaterial color="#3a3020" />
+          </mesh>
+        ))}
+      </group>
+
     </group>
   );
 }
@@ -1529,14 +1576,16 @@ function ModelViewerLighting() {
   return (
     <>
       <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 8, 5]} intensity={1.3} color="#f0e6d2" />
-      <directionalLight position={[-5, 4, -3]} intensity={0.45} color="#0ac8b9" />
-      <pointLight position={[-4, 3, -3]} intensity={0.7} color="#0ac8b9" />
-      <pointLight position={[4, 3, -3]} intensity={0.7} color="#c8aa6e" />
-      <pointLight position={[0, -1, 4]} intensity={0.5} color="#0ac8b9" />
+      <directionalLight position={[8.2, 8, -2.0]} intensity={1.3} color="#f0e6d2" />
+      <directionalLight position={[-0.1, 4, -5.9]} intensity={0.45} color="#0ac8b9" />
+      <pointLight position={[0.9, 3, -4.9]} intensity={0.7} color="#0ac8b9" />
+      <pointLight position={[5.3, 3, 2.2]} intensity={0.7} color="#c8aa6e" />
+      <pointLight position={[-3.6, -1, 1.5]} intensity={0.5} color="#0ac8b9" />
       <spotLight position={[0, 8, 0]} intensity={0.9} color="#f0e6d2" angle={0.5} penumbra={0.8} />
       {/* Uplight hitting the platform from below-front to brighten the stone tiers */}
-      <pointLight position={[0, -1.5, 2.5]} intensity={0.4} color="#f0e6d2" />
+      <pointLight position={[-2.5, -1.5, 1.1]} intensity={0.4} color="#f0e6d2" />
+      {/* Pink accent light from the opposite side */}
+      <pointLight position={[-5, 4, 4]} intensity={0.6} color="#ff69b4" />
     </>
   );
 }
@@ -1599,7 +1648,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrl, onChromaSelect }: Props) {
+export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrls, onChromaSelect }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -1710,7 +1759,7 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
                 url={modelUrl}
                 viewMode={viewMode}
                 emoteRequest={emoteRequest}
-                chromaTextureUrl={chromaTextureUrl}
+                chromaTextureUrls={chromaTextureUrls}
                 facingRotationY={facingRotationY}
                 onChromaLoading={handleChromaLoading}
                 onEmotesAvailable={handleEmotesAvailable}
@@ -1840,16 +1889,18 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
       {chromas.length > 0 && !modelError && (
         <div className="chroma-bar">
           {/* Base skin (no chroma) */}
-          <button
-            className={`chroma-swatch${selectedChromaId === null ? ' active' : ''}`}
-            onClick={() => onChromaSelect(null)}
-            title="Default"
-          >
-            <svg viewBox="0 0 20 20" className="chroma-reset-icon">
-              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              <line x1="4" y1="16" x2="16" y2="4" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </button>
+          <div className="chroma-swatch-wrapper">
+            <button
+              className={`chroma-swatch${selectedChromaId === null ? ' active' : ''}`}
+              onClick={() => onChromaSelect(null)}
+            >
+              <svg viewBox="0 0 20 20" className="chroma-reset-icon">
+                <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="4" y1="16" x2="16" y2="4" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <div className="chroma-tooltip">Default</div>
+          </div>
           {chromas.map((chroma) => {
             const c1 = chroma.colors[0] ?? '#888';
             const c2 = chroma.colors[1] ?? c1;
@@ -1857,14 +1908,18 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
               c1 === c2
                 ? c1
                 : `linear-gradient(135deg, ${c1} 50%, ${c2} 50%)`;
+            // Extract the colour name from brackets, e.g. "Ahri (Ruby)" → "Ruby"
+            const bracketMatch = chroma.name.match(/\(([^)]+)\)/);
+            const tooltipLabel = bracketMatch ? bracketMatch[1] : chroma.name;
             return (
-              <button
-                key={chroma.id}
-                className={`chroma-swatch${selectedChromaId === chroma.id ? ' active' : ''}`}
-                style={{ background: bg }}
-                onClick={() => onChromaSelect(chroma.id)}
-                title={chroma.name}
-              />
+              <div key={chroma.id} className="chroma-swatch-wrapper">
+                <button
+                  className={`chroma-swatch${selectedChromaId === chroma.id ? ' active' : ''}`}
+                  style={{ background: bg }}
+                  onClick={() => onChromaSelect(chroma.id)}
+                />
+                <div className="chroma-tooltip">{tooltipLabel}</div>
+              </div>
             );
           })}
         </div>
