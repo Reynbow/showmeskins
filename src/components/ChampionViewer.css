@@ -257,3 +257,14 @@
   height: 100%;
   position: relative;
 }
+
+/* ── Mobile: hide splash panel, model takes full width ────── */
+@media (max-width: 768px) {
+  .viewer-splash-panel {
+    display: none;
+  }
+
+  .viewer-model-panel {
+    width: 100%;
+  }
+}
