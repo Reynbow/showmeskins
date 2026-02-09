@@ -1,0 +1,385 @@
+.champion-select {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--lol-bg-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background decorations */
+.cs-bg-glow {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(200, 170, 110, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cs-bg-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(rgba(200, 170, 110, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 170, 110, 0.07) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header */
+.champion-select-header {
+  text-align: center;
+  padding: 14px 24px 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.cs-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.cs-logo-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--lol-gold);
+  filter: drop-shadow(0 0 8px rgba(200, 170, 110, 0.3));
+}
+
+.champion-select-title {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  text-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
+}
+
+.champion-select-subtitle {
+  color: var(--lol-text-secondary);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* Controls */
+.champion-select-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--lol-text-dim);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 42px;
+  background: var(--lol-bg-panel);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: var(--lol-text-dim);
+}
+
+.search-input:focus {
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 12px rgba(200, 170, 110, 0.15), inset 0 0 8px rgba(200, 170, 110, 0.05);
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: var(--lol-text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.search-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+.search-clear:hover {
+  color: var(--lol-gold);
+}
+
+/* Role filters */
+.role-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.role-btn {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-btn:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+.role-btn.active {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.1);
+}
+
+.champion-count {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  letter-spacing: 1px;
+}
+
+/* Champion grid */
+.champion-grid-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 24px 8px;
+  position: relative;
+  z-index: 1;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.champion-grid-wrapper.scrolled {
+  mask-image: linear-gradient(to bottom, transparent, black 24px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 24px);
+}
+
+.champion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Letter markers */
+.letter-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  cursor: default;
+}
+
+.letter-marker-box {
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--lol-border-gold);
+  background: linear-gradient(145deg, #080e15 0%, #050a0f 100%);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.letter-marker-box span {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  font-weight: 700;
+  color: #c8aa6e;
+  letter-spacing: 2px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.letter-marker:hover .letter-marker-box {
+  border-color: var(--lol-gold);
+}
+
+.letter-marker:hover .letter-marker-box span {
+  opacity: 0.85;
+}
+
+/* Dim non-matching champions when a letter is hovered */
+.champion-card.dimmed {
+  filter: brightness(0.3);
+}
+
+/* Also dim other letter markers */
+.champion-grid.letter-highlight .letter-marker:not(:hover) .letter-marker-box span {
+  opacity: 0.2;
+}
+
+.champion-grid.letter-highlight .letter-marker:not(:hover) .letter-marker-box {
+  border-color: rgba(100, 85, 55, 0.3);
+}
+
+.champion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: fadeIn 0.3s ease forwards;
+  opacity: 0;
+  position: relative;
+}
+
+.champion-card-border {
+  position: absolute;
+  inset: -4px;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at center, rgba(200, 170, 110, 0.25) 0%, rgba(10, 200, 185, 0.10) 50%, transparent 75%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  filter: blur(6px);
+}
+
+.champion-card:hover .champion-card-border {
+  opacity: 1;
+}
+
+.champion-card:hover {
+  background: transparent;
+}
+
+.champion-card:active {
+  transform: scale(0.96);
+}
+
+.champion-card:hover .champion-card-image {
+  border-color: var(--lol-gold);
+}
+
+.champion-card-image {
+  width: 68px;
+  height: 68px;
+  border: 2px solid var(--lol-border-gold);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.champion-card-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.champion-card:hover .champion-card-image::after {
+  opacity: 1;
+}
+
+.champion-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.champion-card-name {
+  font-size: 13px;
+  color: var(--lol-text-secondary);
+  text-align: center;
+  line-height: 1.3;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 84px;
+}
+
+.champion-card:hover .champion-card-name {
+  color: var(--lol-gold-light);
+}
+
+/* No results */
+.no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 24px;
+  color: var(--lol-text-dim);
+}
+
+.no-results p {
+  font-size: 18px;
+  font-family: var(--font-heading);
+  letter-spacing: 2px;
+}
+
+.no-results span {
+  font-size: 13px;
+}
+
+/* Bottom border */
+.cs-bottom-border {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lol-gold-dark), var(--lol-gold), var(--lol-gold-dark), transparent);
+  z-index: 2;
+}

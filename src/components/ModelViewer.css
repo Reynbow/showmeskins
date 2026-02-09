@@ -1,0 +1,349 @@
+/* Root container */
+.model-viewer-root {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Emote Button Bar ───────────────────────────────────────── */
+.emote-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+  animation: fadeIn 0.4s ease 0.6s both;
+}
+
+/* Push emote bar up when chroma bar is present */
+.model-viewer-root:has(.chroma-bar) .emote-bar {
+  bottom: 52px;
+}
+
+/* ── Emote button wrapper (for tooltip positioning) ── */
+.emote-btn-wrapper {
+  position: relative;
+}
+
+.emote-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  background: rgba(1, 10, 19, 0.92);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold);
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+.emote-btn-wrapper:hover .emote-tooltip {
+  opacity: 1;
+}
+
+.emote-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 54px;
+  box-sizing: border-box;
+  padding: 8px 4px 6px;
+  background: rgba(1, 10, 19, 0.82);
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  color: rgba(200, 170, 110, 0.65);
+  font-family: var(--font-body);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.emote-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.emote-btn:hover {
+  border-color: var(--lol-gold);
+  color: #1a1a1a;
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.emote-btn:hover svg {
+  transform: scale(1.12);
+  filter: none;
+}
+
+.emote-btn.active {
+  border-color: var(--lol-gold);
+  color: #1a1a1a;
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.emote-btn.active svg {
+  filter: none;
+}
+
+
+/* Splash art fallback (when 3D model is unavailable) */
+.viewer-splash-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lol-bg-primary);
+  position: relative;
+}
+
+.viewer-splash-fallback img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border: 2px solid var(--lol-border-gold);
+  box-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
+}
+
+.viewer-splash-fallback-label {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  letter-spacing: 1px;
+  background: rgba(1, 10, 19, 0.85);
+  padding: 6px 16px;
+  border: 1px solid var(--lol-border-gold);
+}
+
+/* ── Ingame Ground Background (flat texture behind canvas) ── */
+.ingame-ground-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ── Map Side Toggle Buttons ───────────────────────────────── */
+.side-btn {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: rgba(200, 170, 110, 0.55);
+  font-family: var(--font-body);
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.2s ease;
+}
+
+.side-icon-box {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 10, 19, 0.82);
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+.side-icon-box .side-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.side-label {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  width: 44px;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 4px 0;
+  background: rgba(1, 10, 19, 0.82);
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: all 0.2s ease;
+}
+
+.side-btn:hover .side-label {
+  border-color: var(--lol-gold);
+  color: #1a1a1a;
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.side-btn.active .side-label {
+  border-color: var(--lol-gold);
+  color: #1a1a1a;
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.side-btn:hover .side-icon-box {
+  border-color: var(--lol-gold);
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.side-btn:hover .side-icon {
+  color: #1a1a1a;
+  filter: none;
+}
+
+.side-btn.active .side-icon-box {
+  border-color: var(--lol-gold);
+  background: var(--lol-gold);
+  box-shadow:
+    0 0 8px rgba(200, 170, 110, 0.3),
+    inset 0 0 6px rgba(255, 255, 255, 0.1);
+}
+
+.side-btn-blue {
+  bottom: 16px;
+  left: 16px;
+}
+
+.side-btn-blue .side-icon {
+  color: #4a9eff;
+}
+
+.side-btn-blue.active .side-icon {
+  color: #1a1a1a;
+  filter: none;
+}
+
+.side-btn-red {
+  top: 16px;
+  right: 16px;
+}
+
+.side-btn-red .side-icon {
+  color: #ff4a4a;
+}
+
+.side-btn-red.active .side-icon {
+  color: #1a1a1a;
+  filter: none;
+}
+
+/* ── Chroma Loading Overlay ─────────────────────────────────── */
+.chroma-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 10, 19, 0.35);
+  z-index: 4;
+  pointer-events: none;
+  animation: fadeIn 0.15s ease;
+}
+
+.chroma-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(200, 170, 110, 0.15);
+  border-top-color: var(--lol-gold);
+  border-radius: 50%;
+  animation: chromaSpin 0.7s linear infinite;
+}
+
+@keyframes chromaSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Chroma Selector Bar ───────────────────────────────────── */
+.chroma-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  z-index: 5;
+  animation: fadeIn 0.4s ease 0.8s both;
+}
+
+.chroma-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid rgba(200, 170, 110, 0.25);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.chroma-swatch:hover {
+  border-color: rgba(200, 170, 110, 0.7);
+  transform: scale(1.15);
+}
+
+.chroma-swatch.active {
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.35);
+  transform: scale(1.15);
+}
+
+/* Reset / default skin icon inside the first swatch */
+.chroma-reset-icon {
+  width: 100%;
+  height: 100%;
+  color: rgba(200, 170, 110, 0.5);
+}
+
+.chroma-swatch:hover .chroma-reset-icon,
+.chroma-swatch.active .chroma-reset-icon {
+  color: var(--lol-gold);
+}

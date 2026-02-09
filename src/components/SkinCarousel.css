@@ -1,0 +1,205 @@
+.skin-carousel {
+  background: linear-gradient(0deg, rgba(10, 20, 40, 0.98) 0%, rgba(1, 10, 19, 0.95) 100%);
+  border-top: 1px solid var(--lol-border-gold);
+  padding: 10px 0 16px;
+  position: relative;
+  z-index: 10;
+}
+
+/* Header with decorative lines */
+.skin-carousel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px 10px;
+}
+
+.skin-carousel-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lol-gold-dark), transparent);
+}
+
+.skin-carousel-title {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  color: var(--lol-gold);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.skin-carousel-count {
+  font-size: 11px;
+  color: var(--lol-text-dim);
+  background: rgba(200, 170, 110, 0.08);
+  padding: 2px 8px;
+  border: 1px solid var(--lol-border-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Carousel container */
+.skin-carousel-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+/* Navigation buttons */
+.skin-nav-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 150px;
+  background: rgba(30, 35, 40, 0.6);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.skin-nav-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.skin-nav-btn:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.08);
+}
+
+/* Scrollable skin cards */
+.skin-cards {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scroll-behavior: smooth;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.skin-cards::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual skin card */
+.skin-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  background: transparent;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  width: 80px;
+  animation: slideUp 0.3s ease forwards;
+  opacity: 0;
+  position: relative;
+}
+
+.skin-card:hover {
+  border-color: var(--lol-gold-dark);
+  background: rgba(200, 170, 110, 0.03);
+}
+
+.skin-card.active {
+  border-color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.06);
+  width: 310px;
+}
+
+/* Image wrapper */
+.skin-card-image-wrapper {
+  position: relative;
+  width: 70px;
+  height: 150px;
+  transition: all 0.25s ease;
+}
+
+.skin-card.active .skin-card-image-wrapper {
+  width: 300px;
+  height: 150px;
+}
+
+.skin-card-image {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--lol-border-gold);
+  transition: all 0.25s ease;
+}
+
+.skin-card.active .skin-card-image {
+  border-color: var(--lol-gold);
+}
+
+.skin-card-glow {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--lol-gold);
+  box-shadow: 0 0 12px rgba(200, 170, 110, 0.3), inset 0 0 8px rgba(200, 170, 110, 0.1);
+  pointer-events: none;
+}
+
+.skin-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  transition: transform 0.3s ease, object-position 0.25s ease;
+}
+
+.skin-card.active .skin-card-image img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.skin-card:hover .skin-card-image img {
+  transform: scale(1.05);
+}
+
+/* Skin name — overlaid on the image, shown only on active card */
+.skin-card-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 18px;
+  color: var(--lol-gold-light);
+  text-align: center;
+  line-height: 1.2;
+  padding: 20px 8px 6px;
+  background: linear-gradient(to top, rgba(1, 10, 19, 0.95) 0%, rgba(1, 10, 19, 0.7) 50%, transparent 100%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.skin-card.active .skin-card-name {
+  opacity: 1;
+}
+
+/* Active indicator dot */
+.skin-card-indicator {
+  width: 4px;
+  height: 4px;
+  background: var(--lol-gold);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--lol-gold);
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+}

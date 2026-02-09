@@ -1,0 +1,98 @@
+:root {
+  --lol-bg-primary: #010a13;
+  --lol-bg-secondary: #0a1428;
+  --lol-bg-panel: #1e2328;
+  --lol-bg-panel-hover: #292e33;
+  --lol-gold: #c8aa6e;
+  --lol-gold-light: #f0e6d2;
+  --lol-gold-bright: #e8d5a3;
+  --lol-gold-dark: #785a28;
+  --lol-gold-darker: #463714;
+  --lol-blue: #0ac8b9;
+  --lol-blue-dark: #005a82;
+  --lol-blue-glow: rgba(10, 200, 185, 0.2);
+  --lol-border: #1e282d;
+  --lol-border-gold: #463714;
+  --lol-text-primary: #f0e6d2;
+  --lol-text-secondary: #a09b8c;
+  --lol-text-dim: #5b5a56;
+
+  --font-heading: 'Cinzel', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--lol-bg-primary);
+  color: var(--lol-text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom Scrollbar - LoL themed */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--lol-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lol-gold-dark);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lol-gold);
+}
+
+/* Utility Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes goldGlow {
+  0%, 100% { box-shadow: 0 0 5px var(--lol-gold-dark); }
+  50% { box-shadow: 0 0 15px var(--lol-gold), 0 0 30px var(--lol-gold-dark); }
+}
+
+@keyframes blueGlow {
+  0%, 100% { box-shadow: 0 0 5px var(--lol-blue-dark); }
+  50% { box-shadow: 0 0 15px var(--lol-blue), 0 0 30px var(--lol-blue-dark); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
