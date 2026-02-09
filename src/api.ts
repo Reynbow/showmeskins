@@ -3,6 +3,7 @@ import type { ChampionBasic, ChampionDetail, ChromaInfo } from './types';
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
 const MODEL_CDN = '/model-cdn'; // proxied through Vite to cdn.modelviewer.lol
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
+const CDRAGON_RAW = 'https://raw.communitydragon.org';
 
 let cachedVersion: string | null = null;
 
@@ -89,7 +90,7 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
  * Key = directory path (e.g. "/cdragon/latest/game/assets/characters/aatrox/skins/skin04/")
  * Value = array of filenames in that directory
  */
-const dirListingCache = new Map<string, string[]>();
+const dirListingCache = new Map<string, { filenames: string[]; baseUrl: string }>();
 
 /** Keywords that identify accessory textures (not the main body texture) */
 const ACCESSORY_KEYWORDS = [
@@ -99,21 +100,9 @@ const ACCESSORY_KEYWORDS = [
 ];
 
 /**
- * Fetch a CommunityDragon directory listing and extract filenames.
- * Results are cached so each directory is only fetched once.
+ * Parse filenames from an HTML directory listing page.
  */
-async function fetchDirListing(dirUrl: string): Promise<string[]> {
-  const cached = dirListingCache.get(dirUrl);
-  if (cached) return cached;
-
-  const res = await fetch(dirUrl);
-  if (!res.ok) {
-    dirListingCache.set(dirUrl, []);
-    return [];
-  }
-  const html = await res.text();
-
-  // Parse <a href="filename"> links from the HTML directory listing
+function parseDirListing(html: string): string[] {
   const filenames: string[] = [];
   const linkRegex = /<a\s+href="([^"]+)"/gi;
   let match;
@@ -123,9 +112,54 @@ async function fetchDirListing(dirUrl: string): Promise<string[]> {
     if (href.startsWith('?') || href.startsWith('/') || href.endsWith('/')) continue;
     filenames.push(decodeURIComponent(href));
   }
-
-  dirListingCache.set(dirUrl, filenames);
   return filenames;
+}
+
+/**
+ * Fetch a CommunityDragon directory listing and extract filenames.
+ * Tries the /cdragon proxy first (works with Vite dev server and Vercel rewrites),
+ * then falls back to a direct fetch from raw.communitydragon.org in case the
+ * proxy returns an unexpected response (e.g. Vercel rewrite issues with HTML).
+ * Results are cached so each directory is only fetched once.
+ */
+async function fetchDirListing(dirUrl: string): Promise<{ filenames: string[]; baseUrl: string }> {
+  const cached = dirListingCache.get(dirUrl);
+  if (cached) return cached;
+
+  // Try fetching through the /cdragon proxy first
+  let filenames: string[] = [];
+  let baseUrl = dirUrl;
+  try {
+    const res = await fetch(dirUrl);
+    if (res.ok) {
+      const html = await res.text();
+      filenames = parseDirListing(html);
+    }
+  } catch {
+    // Proxy fetch failed, will try direct below
+  }
+
+  // If the proxy returned no results and this is a /cdragon path,
+  // fall back to fetching directly from CommunityDragon
+  if (filenames.length === 0 && dirUrl.startsWith('/cdragon/')) {
+    const directUrl = CDRAGON_RAW + dirUrl.replace(/^\/cdragon/, '');
+    try {
+      const res = await fetch(directUrl);
+      if (res.ok) {
+        const html = await res.text();
+        filenames = parseDirListing(html);
+        if (filenames.length > 0) {
+          baseUrl = directUrl;
+        }
+      }
+    } catch {
+      // Direct fetch also failed
+    }
+  }
+
+  const result = { filenames, baseUrl };
+  dirListingCache.set(dirUrl, result);
+  return result;
 }
 
 /**
@@ -147,7 +181,7 @@ export async function resolveChromaTextureUrl(
   const skinNum = String(chromaId % 1000).padStart(2, '0');
   const dirPath = `/cdragon/latest/game/assets/characters/${alias}/skins/skin${skinNum}/`;
 
-  const files = await fetchDirListing(dirPath);
+  const { filenames: files, baseUrl } = await fetchDirListing(dirPath);
   if (files.length === 0) return null;
 
   // Find all PNG files containing "_tx_cm" (color map textures)
@@ -168,7 +202,9 @@ export async function resolveChromaTextureUrl(
       ? bodyFiles.sort((a, b) => a.length - b.length)[0]
       : txCmFiles.sort((a, b) => a.length - b.length)[0];
 
-  return best ? `${dirPath}${best}` : null;
+  // Use whatever base URL the directory listing was fetched from
+  // (proxy path or direct CommunityDragon URL)
+  return best ? `${baseUrl}${best}` : null;
 }
 
 /**
