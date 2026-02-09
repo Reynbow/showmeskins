@@ -11,6 +11,10 @@
     {
       "source": "/cdragon/:path*",
       "destination": "https://raw.communitydragon.org/:path*"
+    },
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
     }
   ]
 }
