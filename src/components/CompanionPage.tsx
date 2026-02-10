@@ -5,7 +5,7 @@ interface Props {
 }
 
 const DOWNLOAD_URL =
-  'https://github.com/aaronlol/show-me-skins-companion/releases/latest/download/Show.Me.Skins.Companion.Setup.0.1.0.exe';
+  'https://github.com/aaronlol/show-me-skins-companion/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
 
 export function CompanionPage({ onBack }: Props) {
   return (
@@ -50,7 +50,7 @@ export function CompanionPage({ onBack }: Props) {
             </svg>
             Download for Windows
           </a>
-          <span className="companion-version">v0.1 Beta &middot; Windows 10/11</span>
+          <span className="companion-version">v0.2 Beta &middot; Windows 10/11</span>
         </div>
 
         {/* What it does */}
