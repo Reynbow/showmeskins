@@ -8,6 +8,7 @@
 
 const { app, Tray, Menu, nativeImage, shell } = require('electron');
 const path = require('path');
+const { execSync } = require('child_process');
 const { LCUConnector } = require('./lcu');
 const { BridgeServer } = require('./bridge');
 
@@ -15,7 +16,8 @@ const { BridgeServer } = require('./bridge');
 
 const WEBSITE_URL = 'https://www.showmeskins.com';
 const BRIDGE_PORT = 8234;
-const LOGIN_ITEM_NAME = 'Show Me Skins Companion';
+const REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+const REG_VALUE_NAME = 'Show Me Skins Companion';
 
 /* ── State ────────────────────────────────────────────────────────────── */
 
@@ -33,16 +35,39 @@ if (!gotLock) {
 }
 
 /* ── Auto-launch helpers ──────────────────────────────────────────────── */
+// Read/write the same registry key the NSIS installer uses so the
+// tray checkbox stays in sync with the installer's "start on login" option.
 
 function isAutoLaunchEnabled() {
-  return app.getLoginItemSettings({ name: LOGIN_ITEM_NAME }).openAtLogin;
+  try {
+    const output = execSync(
+      `reg query "${REG_KEY}" /v "${REG_VALUE_NAME}"`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    return output.includes(REG_VALUE_NAME);
+  } catch {
+    // Key doesn't exist → not enabled
+    return false;
+  }
 }
 
 function setAutoLaunch(enabled) {
-  app.setLoginItemSettings({
-    openAtLogin: enabled,
-    name: LOGIN_ITEM_NAME,
-  });
+  try {
+    if (enabled) {
+      const exePath = process.execPath;
+      execSync(
+        `reg add "${REG_KEY}" /v "${REG_VALUE_NAME}" /t REG_SZ /d "\\"${exePath}\\"" /f`,
+        { stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+    } else {
+      execSync(
+        `reg delete "${REG_KEY}" /v "${REG_VALUE_NAME}" /f`,
+        { stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+    }
+  } catch (err) {
+    console.error('[auto-launch] Failed to update registry:', err.message);
+  }
 }
 
 /* ── Icon ─────────────────────────────────────────────────────────────── */
@@ -75,18 +100,16 @@ function buildMenu() {
   const menuIcon = getMenuIcon();
   const template = [
     {
-      label: 'Show Me Skins Companion',
+      label: 'Show Me Skins Companion (Beta)',
       enabled: false,
       ...(menuIcon && { icon: menuIcon }),
     },
-    { type: 'separator' },
     { label: currentStatus, enabled: false },
     { type: 'separator' },
     {
       label: 'Open Show Me Skins',
       click: () => shell.openExternal(WEBSITE_URL),
     },
-    { type: 'separator' },
     {
       label: 'Start on Login',
       type: 'checkbox',
@@ -95,7 +118,6 @@ function buildMenu() {
         setAutoLaunch(menuItem.checked);
       },
     },
-    { type: 'separator' },
     {
       label: 'Quit',
       click: () => {

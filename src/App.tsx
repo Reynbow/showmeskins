@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
+import { CompanionPage } from './components/CompanionPage';
 import { getChampions, getChampionDetail, getLatestVersion } from './api';
 import type { ChampionBasic, ChampionDetail, Skin } from './types';
 import './App.css';
@@ -38,7 +39,7 @@ function App() {
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion'>('select');
 
   // Track whether initial URL-based load has been attempted
   const initialLoadDone = useRef(false);
@@ -57,9 +58,11 @@ function App() {
         const champList = Object.values(champs).sort((a, b) => a.name.localeCompare(b.name));
         setChampions(champList);
 
-        // Deep-link: if URL has a champion, load it
+        // Deep-link: check URL
         const { championId, skinSlug: urlSkinSlug } = parseUrl();
-        if (championId) {
+        if (championId === 'companion') {
+          setViewMode('companion');
+        } else if (championId) {
           // Find the champion (case-insensitive match against id)
           const match = Object.values(champs).find(
             (c) => c.id.toLowerCase() === championId.toLowerCase(),
@@ -96,6 +99,10 @@ function App() {
         setViewMode('select');
         setSelectedChampion(null);
         setSelectedSkin(null);
+        return;
+      }
+      if (championId === 'companion') {
+        setViewMode('companion');
         return;
       }
       // Load the champion from the URL
@@ -140,6 +147,16 @@ function App() {
     setViewMode('select');
     setSelectedChampion(null);
     setSelectedSkin(null);
+    window.history.pushState(null, '', '/');
+  }, []);
+
+  const handleCompanion = useCallback(() => {
+    setViewMode('companion');
+    window.history.pushState(null, '', '/companion');
+  }, []);
+
+  const handleCompanionBack = useCallback(() => {
+    setViewMode('select');
     window.history.pushState(null, '', '/');
   }, []);
 
@@ -274,7 +291,10 @@ function App() {
           champions={champions}
           version={version}
           onSelect={handleChampionSelect}
+          onCompanion={handleCompanion}
         />
+      ) : viewMode === 'companion' ? (
+        <CompanionPage onBack={handleCompanionBack} />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}

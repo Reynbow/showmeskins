@@ -23,7 +23,7 @@ class BridgeServer {
       this.clients.add(ws);
 
       // Send a welcome message so the website knows the connection is live
-      ws.send(JSON.stringify({ type: 'connected', version: '1.0.0' }));
+      ws.send(JSON.stringify({ type: 'connected', version: '0.1.0-beta' }));
 
       ws.on('close', () => {
         this.clients.delete(ws);

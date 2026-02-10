@@ -7,11 +7,12 @@ interface Props {
   champions: ChampionBasic[];
   version: string;
   onSelect: (champion: ChampionBasic) => void;
+  onCompanion: () => void;
 }
 
 const ROLES = ['All', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'];
 
-export function ChampionSelect({ champions, version, onSelect }: Props) {
+export function ChampionSelect({ champions, version, onSelect, onCompanion }: Props) {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('All');
   const [scrolled, setScrolled] = useState(false);
@@ -59,7 +60,14 @@ export function ChampionSelect({ champions, version, onSelect }: Props) {
           </svg>
         </div>
         <h1 className="champion-select-title">Show me skins!</h1>
-        <p className="champion-select-subtitle">Select a champion to explore their skins in 3D</p>
+        <button className="cs-companion-btn" onClick={onCompanion}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-companion-icon">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Companion App
+        </button>
       </div>
 
       <div className="champion-select-controls">

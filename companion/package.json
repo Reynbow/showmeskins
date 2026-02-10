@@ -1,6 +1,6 @@
 {
   "name": "show-me-skins-companion",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Companion app for Show Me Skins - detects champion select and syncs with the website",
   "main": "src/main.js",
   "scripts": {

@@ -1,0 +1,269 @@
+.companion-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--lol-bg-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.companion-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Back button */
+.companion-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 24px;
+}
+
+.companion-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.companion-back:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+/* Header */
+.companion-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.companion-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.companion-logo-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--lol-gold);
+  filter: drop-shadow(0 0 12px rgba(200, 170, 110, 0.3));
+}
+
+.companion-title {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
+}
+
+.companion-beta-badge {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 2px 8px;
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  color: var(--lol-gold);
+  vertical-align: middle;
+  margin-left: 4px;
+  font-weight: 400;
+  position: relative;
+  top: -2px;
+}
+
+.companion-subtitle {
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  line-height: 1.6;
+}
+
+/* Download section */
+.companion-download-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 40px;
+}
+
+.companion-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.15) 0%, rgba(200, 170, 110, 0.08) 100%);
+  border: 1px solid var(--lol-gold);
+  color: var(--lol-gold-light);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.companion-download-btn:hover {
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.25) 0%, rgba(200, 170, 110, 0.12) 100%);
+  box-shadow: 0 0 20px rgba(200, 170, 110, 0.15), inset 0 0 12px rgba(200, 170, 110, 0.05);
+  transform: translateY(-1px);
+}
+
+.companion-download-btn:active {
+  transform: translateY(0);
+}
+
+.companion-download-btn .download-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.companion-version {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  letter-spacing: 1px;
+}
+
+/* Sections */
+.companion-section {
+  margin-bottom: 32px;
+}
+
+.companion-section-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lol-gold);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--lol-border-gold);
+}
+
+.companion-section-text {
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Steps */
+.companion-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.companion-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.companion-step-number {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.companion-step-content h3 {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.companion-step-content p {
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.companion-step-content strong {
+  color: var(--lol-gold-light);
+}
+
+/* Details grid */
+.companion-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.companion-detail {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.companion-detail svg {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--lol-gold);
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.companion-detail h3 {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.companion-detail p {
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .companion-content {
+    padding: 16px;
+  }
+
+  .companion-title {
+    font-size: 22px;
+    letter-spacing: 4px;
+  }
+
+  .companion-download-btn {
+    padding: 12px 24px;
+    font-size: 13px;
+  }
+}

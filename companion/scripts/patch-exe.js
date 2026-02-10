@@ -23,7 +23,7 @@ exports.default = async function afterPack(context) {
       OriginalFilename: 'Show Me Skins Companion.exe',
       CompanyName: 'Show Me Skins',
     },
-    'product-version': '1.0.0',
+    'product-version': '0.1.0',
   });
 
   console.log('[patch-exe] Done');

@@ -66,10 +66,40 @@
   text-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
 }
 
-.champion-select-subtitle {
-  color: var(--lol-text-secondary);
-  font-size: 12px;
-  letter-spacing: 1px;
+
+
+.cs-companion-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 22px;
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.12) 0%, rgba(200, 170, 110, 0.05) 100%);
+  border: 1px solid var(--lol-gold-dark);
+  color: var(--lol-gold);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.cs-companion-btn:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold-light);
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.2) 0%, rgba(200, 170, 110, 0.08) 100%);
+  box-shadow: 0 0 16px rgba(200, 170, 110, 0.12);
+  transform: translateY(-1px);
+}
+
+.cs-companion-btn:active {
+  transform: translateY(0);
+}
+
+.cs-companion-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Controls */

@@ -8,7 +8,7 @@
   ; ── Custom finish page ──────────────────────────────────────────────────
 
   !macro customFinishPage
-    !define MUI_FINISHPAGE_TEXT "Show Me Skins Companion has been installed!$\r$\n$\r$\nThis application runs in the system tray only - there is no application window.$\r$\n$\r$\nAfter launching, look for the gold hexagon icon in your system tray (bottom-right of your taskbar). Right-click it for options."
+    !define MUI_FINISHPAGE_TEXT "Show Me Skins Companion (Beta) has been installed!$\r$\n$\r$\nThis application runs in the system tray only - there is no application window.$\r$\n$\r$\nAfter launching, look for the gold hexagon icon in your system tray (bottom-right of your taskbar). Right-click it for options."
 
     ; "Launch now" checkbox — uses a function so we can launch async (avoids hang)
     !define MUI_FINISHPAGE_RUN
@@ -25,9 +25,9 @@
     !insertmacro MUI_PAGE_FINISH
   !macroend
 
-  ; Launch the app without blocking the installer
+  ; Launch the app fully detached so the installer closes instantly
   Function LaunchApp
-    Exec '"$INSTDIR\${PRODUCT_FILENAME}.exe"'
+    ExecShell "" '"$INSTDIR\${PRODUCT_FILENAME}.exe"'
   FunctionEnd
 
   Function WriteAutoStartKey
