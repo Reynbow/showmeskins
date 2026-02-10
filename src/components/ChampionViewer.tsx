@@ -32,8 +32,13 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
     setSelectedChromaId(null);
   }, [selectedSkin.id]);
 
+  // True while the chroma texture URL is being resolved (directory listing + pattern match).
+  // Used to show the loading spinner instantly on click, before the texture starts downloading.
+  const [chromaResolving, setChromaResolving] = useState(false);
+
   const handleChromaSelect = useCallback((chromaId: number | null) => {
     setSelectedChromaId(chromaId);
+    setChromaResolving(chromaId !== null);
   }, []);
 
   const skinChromas = chromaMap[selectedSkin.id] ?? [];
@@ -43,11 +48,15 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
   useEffect(() => {
     if (selectedChromaId == null) {
       setChromaTextureUrl(null);
+      setChromaResolving(false);
       return;
     }
     let cancelled = false;
     resolveChromaTextureUrl(champion.id, selectedChromaId).then((url) => {
-      if (!cancelled) setChromaTextureUrl(url);
+      if (!cancelled) {
+        setChromaTextureUrl(url);
+        setChromaResolving(false);
+      }
     });
     return () => { cancelled = true; };
   }, [champion.id, selectedChromaId]);
@@ -256,6 +265,7 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
             chromas={skinChromas}
             selectedChromaId={selectedChromaId}
             chromaTextureUrl={chromaTextureUrl}
+            chromaResolving={chromaResolving}
             onChromaSelect={handleChromaSelect}
           />
         </div>

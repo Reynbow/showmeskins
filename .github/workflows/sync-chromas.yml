@@ -1,0 +1,27 @@
+name: Sync Chromas
+
+on:
+  schedule:
+    # Run at 4:00 AM UTC on the 1st and 15th of each month
+    - cron: '0 4 1,15 * *'
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180 # 3 hours max
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Sync chroma textures to Vercel Blob
+        run: npm run sync-chromas
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}

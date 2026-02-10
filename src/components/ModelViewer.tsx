@@ -65,6 +65,7 @@ interface Props {
   chromas: ChromaInfo[];
   selectedChromaId: number | null;
   chromaTextureUrl: string | null;
+  chromaResolving: boolean;
   onChromaSelect: (chromaId: number | null) => void;
 }
 
@@ -633,18 +634,6 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     const originals = originalTexturesRef.current;
     let cancelled = false;
 
-    /** Restore all previously swapped materials to their original textures */
-    function restoreOriginals() {
-      for (const [mat, origTex] of originals) {
-        mat.map = origTex;
-        mat.needsUpdate = true;
-      }
-      if (loadedChromaTexRef.current) {
-        loadedChromaTexRef.current.dispose();
-        loadedChromaTexRef.current = null;
-      }
-    }
-
     /**
      * Fetch a texture via fetch() + createImageBitmap with retry & timeout.
      * Much more resilient than THREE.TextureLoader (which uses <img> src
@@ -689,24 +678,37 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       throw lastError;
     }
 
-    // Always restore first
-    restoreOriginals();
-
+    /* ── Going back to default: restore originals immediately ────── */
     if (!chromaTextureUrl) {
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
       onChromaLoading(false);
       return;
     }
 
-    // Signal loading started
+    /* ── Loading a new chroma: keep the current texture visible ──── */
     onChromaLoading(true);
 
     loadTextureWithRetry(chromaTextureUrl, 3, 15_000)
       .then((texture) => {
         if (cancelled) { texture.dispose(); return; }
 
+        // Dispose previous chroma texture (but DON'T restore originals —
+        // the model keeps displaying whatever it had until the swap below)
+        if (loadedChromaTexRef.current) {
+          loadedChromaTexRef.current.dispose();
+        }
         loadedChromaTexRef.current = texture;
 
-        // Find the primary body material(s) — largest texture map
+        // Find the primary body material(s) — largest ORIGINAL texture map.
+        // We compare against the stored original (not the current chroma)
+        // so the selection is consistent across chroma-to-chroma switches.
         let maxSize = 0;
         const primaryMats: THREE.MeshStandardMaterial[] = [];
 
@@ -716,8 +718,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           for (const mat of mats) {
             const m = mat as THREE.MeshStandardMaterial;
-            if (m.map?.image) {
-              const img = m.map.image as { width?: number; height?: number };
+            const tex = originals.has(m) ? originals.get(m) : m.map;
+            if (tex?.image) {
+              const img = tex.image as { width?: number; height?: number };
               const size = (img.width ?? 0) * (img.height ?? 0);
               if (size > maxSize) {
                 maxSize = size;
@@ -1628,7 +1631,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrl, onChromaSelect }: Props) {
+export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrl, chromaResolving, onChromaSelect }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -1803,8 +1806,8 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
         </ModelErrorBoundary>
       )}
 
-      {/* Chroma loading spinner */}
-      {chromaLoading && (
+      {/* Chroma loading spinner — shows during URL resolution AND texture download */}
+      {(chromaResolving || chromaLoading) && (
         <div className="chroma-loading-overlay">
           <div className="chroma-loading-spinner" />
         </div>
