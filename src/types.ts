@@ -96,6 +96,7 @@ export interface LiveGameActivePlayer {
 export interface LiveGameData {
   gameTime: number;
   gameMode: string;
+  gameResult?: string; // "Win" or "Lose" (from active player perspective)
   activePlayer: LiveGameActivePlayer;
   players: LiveGamePlayer[];
 }

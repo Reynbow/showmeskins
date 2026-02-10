@@ -20,11 +20,12 @@ const (
 
 // LiveGameUpdate is broadcast to the website with full scoreboard data.
 type LiveGameUpdate struct {
-	Type     string           `json:"type"`
-	GameTime float64          `json:"gameTime"`
-	GameMode string           `json:"gameMode"`
-	Active   ActivePlayerInfo `json:"activePlayer"`
-	Players  []PlayerInfo     `json:"players"`
+	Type       string           `json:"type"`
+	GameTime   float64          `json:"gameTime"`
+	GameMode   string           `json:"gameMode"`
+	GameResult string           `json:"gameResult,omitempty"` // "Win" or "Lose" (from active player perspective)
+	Active     ActivePlayerInfo `json:"activePlayer"`
+	Players    []PlayerInfo     `json:"players"`
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -96,7 +97,7 @@ type LiveGameStats struct {
 // ── Callbacks ───────────────────────────────────────────────────────────
 
 type LiveGameUpdateCallback func(update LiveGameUpdate)
-type LiveGameEndCallback func()
+type LiveGameEndCallback func(result string) // result: "Win", "Lose", or "" (unknown)
 
 // ── LiveGameTracker ─────────────────────────────────────────────────────
 
@@ -113,8 +114,9 @@ type LiveGameTracker struct {
 	stopped   bool
 	stoppedMu sync.Mutex
 
-	wasInGame bool
-	lastHash  string
+	wasInGame  bool
+	lastHash   string
+	gameResult string // captured from GameEnd event
 }
 
 // NewLiveGameTracker creates a tracker with the given callbacks.
@@ -178,17 +180,28 @@ func (t *LiveGameTracker) poll() {
 	data, err := t.fetchAllGameData()
 	if err != nil {
 		if t.wasInGame {
+			result := t.gameResult
 			t.wasInGame = false
 			t.lastHash = ""
-			log.Println("[livegame] Game ended")
+			t.gameResult = ""
+			log.Printf("[livegame] Game ended (result: %q)", result)
 			t.onStatus("Connected – Waiting for Champion Select…")
-			t.onEnd()
+			t.onEnd(result)
 		}
 		return
 	}
 
+	// Check events for GameEnd result (appears in the last moments before the API goes away)
+	for _, ev := range data.Events.Events {
+		if ev.EventName == "GameEnd" && ev.Result != "" {
+			t.gameResult = ev.Result
+			log.Printf("[livegame] GameEnd event detected: %s", ev.Result)
+		}
+	}
+
 	if !t.wasInGame {
 		t.wasInGame = true
+		t.gameResult = ""
 		log.Println("[livegame] Live game detected")
 		t.onStatus("In Game – Tracking scoreboard")
 	}
@@ -197,6 +210,9 @@ func (t *LiveGameTracker) poll() {
 	if update == nil {
 		return
 	}
+
+	// Attach game result if we have it
+	update.GameResult = t.gameResult
 
 	hash := t.computeHash(update)
 	if hash == t.lastHash {
@@ -232,6 +248,16 @@ type allGameData struct {
 	ActivePlayer activePlayerData `json:"activePlayer"`
 	AllPlayers   []playerData     `json:"allPlayers"`
 	GameData     gameDataInfo     `json:"gameData"`
+	Events       gameEvents       `json:"events"`
+}
+
+type gameEvents struct {
+	Events []gameEvent `json:"Events"`
+}
+
+type gameEvent struct {
+	EventName string `json:"EventName"`
+	Result    string `json:"Result,omitempty"` // "Win" or "Lose" on GameEnd events
 }
 
 type activePlayerData struct {

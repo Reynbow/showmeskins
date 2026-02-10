@@ -137,8 +137,12 @@ func onReady() {
 		func(update LiveGameUpdate) {
 			bridgeSrv.Broadcast(update)
 		},
-		func() {
-			bridgeSrv.Broadcast(map[string]string{"type": "liveGameEnd"})
+		func(result string) {
+			msg := map[string]string{"type": "liveGameEnd"}
+			if result != "" {
+				msg["gameResult"] = result
+			}
+			bridgeSrv.Broadcast(msg)
 		},
 	)
 	liveGame.Start()

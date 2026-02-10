@@ -6,15 +6,30 @@
   align-items: center;
   min-height: 100vh;
   background: var(--lol-bg-primary);
-  position: relative;
+  position: fixed;
+  inset: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  z-index: 10;
   opacity: 0;
   transition: opacity 0.6s ease;
 }
 
 .pg-page--enter {
   opacity: 1;
+}
+
+/* Override background decorations to stay fixed behind scrollable content */
+.pg-page .cs-bg-glow,
+.pg-page .cs-bg-lines {
+  position: fixed;
+}
+
+/* Bottom border: flow with content instead of pinning to viewport */
+.pg-page .cs-bottom-border {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────── */
@@ -76,6 +91,20 @@
   letter-spacing: 6px;
   text-transform: uppercase;
   text-shadow: 0 0 40px rgba(200, 170, 110, 0.25);
+}
+
+.pg-title--victory {
+  color: #45b3e7;
+  text-shadow: 0 0 30px rgba(69, 179, 231, 0.4), 0 0 60px rgba(69, 179, 231, 0.15);
+  font-size: 48px;
+  letter-spacing: 10px;
+}
+
+.pg-title--defeat {
+  color: #e74c4c;
+  text-shadow: 0 0 30px rgba(231, 76, 76, 0.4), 0 0 60px rgba(231, 76, 76, 0.15);
+  font-size: 48px;
+  letter-spacing: 10px;
 }
 
 .pg-game-info {
@@ -145,24 +174,37 @@
   color: #c8aa6e;
 }
 
-/* ── 3D model panel ──────────────────────────────────────────────────── */
+/* ── 3D models (flanking the showcase, like the live game page) ──────── */
 
-.pg-card-model {
-  width: 100%;
-  height: 340px;
-  position: relative;
-  margin-bottom: -20px;
+.pg-model-bg {
+  position: fixed;
+  top: 15%;
+  bottom: 15%;
   z-index: 1;
+  pointer-events: none;
+  opacity: 0.6;
 }
 
-.pg-card-model canvas {
+.pg-model-bg canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  pointer-events: auto;
 }
 
-.pg-card-model--mirrored {
+.pg-model-bg--left {
+  right: calc(50% + 460px);
+  left: 0;
+  mask-image: linear-gradient(to right, black 50%, transparent 95%);
+  -webkit-mask-image: linear-gradient(to right, black 50%, transparent 95%);
+}
+
+.pg-model-bg--right {
+  left: calc(50% + 460px);
+  right: 0;
   transform: scaleX(-1);
+  mask-image: linear-gradient(to right, black 50%, transparent 95%);
+  -webkit-mask-image: linear-gradient(to right, black 50%, transparent 95%);
 }
 
 /* ── Divider ─────────────────────────────────────────────────────────── */
@@ -212,7 +254,6 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  overflow: hidden;
   border: 2px solid var(--lol-gold-dark);
   position: relative;
   flex-shrink: 0;
@@ -223,12 +264,14 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 
 .pg-portrait-level {
   position: absolute;
   bottom: -2px;
   right: -2px;
+  z-index: 2;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -496,6 +539,54 @@
   color: var(--lol-text-dim);
 }
 
+/* ── Team gold bar ──────────────────────────────────────────────────── */
+
+.pg-sb-gold-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 8px 20px;
+  font-size: 20px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+}
+
+.pg-sb-gold-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(251, 191, 36, 0.5);
+  min-width: 80px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  transition: color 0.3s, text-shadow 0.3s, background 0.3s;
+}
+
+.pg-sb-gold-team--blue { justify-content: flex-end; }
+.pg-sb-gold-team--red  { justify-content: flex-start; }
+
+.pg-sb-gold-team--leading {
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.pg-sb-gold-label {
+  color: rgba(200, 170, 110, 0.45);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.pg-sb-gold-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 /* ── Match row (one blue + one red side by side) ────────────────────── */
 
 .pg-sb-match-row {
@@ -571,7 +662,6 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  overflow: hidden;
   border: 2px solid rgba(30, 40, 45, 0.8);
   position: relative;
   flex-shrink: 0;
@@ -586,12 +676,14 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 
 .pg-sb-portrait-level {
   position: absolute;
   bottom: -2px;
   right: -2px;
+  z-index: 2;
   width: 17px;
   height: 17px;
   border-radius: 50%;
@@ -701,6 +793,15 @@
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
 
+@media (min-width: 1401px) {
+  .pg-model-bg--left {
+    right: calc(50% + 520px);
+  }
+  .pg-model-bg--right {
+    left: calc(50% + 520px);
+  }
+}
+
 @media (max-width: 1100px) {
   .pg-sb-side--blue {
     grid-template-columns: 160px 1fr 70px 36px 38px;
@@ -756,8 +857,8 @@
     width: 100%;
   }
 
-  .pg-card-model {
-    height: 260px;
+  .pg-model-bg {
+    display: none;
   }
 
   .pg-divider {
@@ -768,13 +869,14 @@
     font-size: 28px;
     letter-spacing: 4px;
   }
+  .pg-title--victory,
+  .pg-title--defeat {
+    font-size: 36px;
+    letter-spacing: 6px;
+  }
 }
 
 @media (max-width: 640px) {
-  .pg-card-model {
-    height: 200px;
-  }
-
   .pg-kda-numbers {
     font-size: 24px;
   }
@@ -799,6 +901,11 @@
   .pg-title {
     font-size: 22px;
     letter-spacing: 3px;
+  }
+  .pg-title--victory,
+  .pg-title--defeat {
+    font-size: 28px;
+    letter-spacing: 4px;
   }
 
   .pg-scoreboard-section {

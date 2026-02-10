@@ -10,12 +10,18 @@
 .companion-content {
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
   padding: 24px;
   position: relative;
   z-index: 1;
   max-width: 680px;
   margin: 0 auto;
   width: 100%;
+}
+
+.companion-content::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
 }
 
 /* Back button */
@@ -251,6 +257,87 @@
   line-height: 1.6;
 }
 
+/* Feature list */
+.companion-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.companion-feature-list li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.companion-feature-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  background: var(--lol-gold);
+  transform: rotate(45deg);
+  opacity: 0.6;
+}
+
+.companion-feature-list li strong {
+  color: var(--lol-gold-light);
+}
+
+/* Preview buttons */
+.companion-preview-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.companion-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: rgba(200, 170, 110, 0.06);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold-light);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.companion-preview-btn svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.companion-preview-btn:hover {
+  background: rgba(200, 170, 110, 0.14);
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 16px rgba(200, 170, 110, 0.12);
+  transform: translateY(-1px);
+}
+
+.companion-preview-btn:hover svg {
+  opacity: 1;
+}
+
+.companion-preview-btn:active {
+  transform: translateY(0);
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .companion-content {
@@ -265,5 +352,13 @@
   .companion-download-btn {
     padding: 12px 24px;
     font-size: 13px;
+  }
+
+  .companion-preview-buttons {
+    flex-direction: column;
+  }
+
+  .companion-preview-btn {
+    justify-content: center;
   }
 }

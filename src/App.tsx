@@ -5,6 +5,7 @@ import { CompanionPage } from './components/CompanionPage';
 import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion } from './api';
+import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
 import type { ChampionBasic, ChampionDetail, Skin, LiveGameData } from './types';
 import './App.css';
 
@@ -181,6 +182,7 @@ function App() {
   }, []);
 
   const handleLiveGameBack = useCallback(() => {
+    setLiveGameData(null);
     setViewMode('select');
     window.history.pushState(null, '', '/');
   }, []);
@@ -189,6 +191,18 @@ function App() {
     setPostGameData(null);
     setViewMode('select');
     window.history.pushState(null, '', '/');
+  }, []);
+
+  const handleSampleLive = useCallback(() => {
+    setLiveGameData(sampleLiveGameData);
+    setViewMode('livegame');
+    window.history.pushState(null, '', '/live');
+  }, []);
+
+  const handleSamplePostGame = useCallback(() => {
+    setPostGameData(samplePostGameData);
+    setViewMode('postgame');
+    window.history.pushState(null, '', '/postgame');
   }, []);
 
   const handleSkinSelect = useCallback((skin: Skin) => {
@@ -281,6 +295,7 @@ function App() {
               setLiveGameData({
                 gameTime: data.gameTime ?? 0,
                 gameMode: data.gameMode ?? 'CLASSIC',
+                gameResult: data.gameResult || undefined,
                 activePlayer: data.activePlayer ?? {},
                 players: data.players ?? [],
               });
@@ -295,10 +310,17 @@ function App() {
 
             // ── Game ended ── transition to post-game summary
             if (data.type === 'liveGameEnd') {
+              const endResult: string | undefined = data.gameResult || undefined;
               // Capture the final snapshot before clearing live data
               setLiveGameData((lastSnapshot) => {
                 if (lastSnapshot) {
-                  setPostGameData(lastSnapshot);
+                  // Merge the game result — prefer the end message's result,
+                  // then fall back to whatever the last update had.
+                  const finalData = {
+                    ...lastSnapshot,
+                    gameResult: endResult || lastSnapshot.gameResult,
+                  };
+                  setPostGameData(finalData);
                   setViewMode('postgame');
                   window.history.pushState(null, '', '/postgame');
                 }
@@ -372,7 +394,11 @@ function App() {
           onCompanion={handleCompanion}
         />
       ) : viewMode === 'companion' ? (
-        <CompanionPage onBack={handleCompanionBack} />
+        <CompanionPage
+          onBack={handleCompanionBack}
+          onSampleLive={handleSampleLive}
+          onSamplePostGame={handleSamplePostGame}
+        />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}

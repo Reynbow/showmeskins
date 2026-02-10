@@ -46,19 +46,24 @@ function getItemIconUrl(version: string, itemId: number): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
 }
 
-/** Readable game mode names */
+/** Readable game mode names (Riot uses fruit codenames for rotating modes) */
 function formatGameMode(mode: string): string {
   const map: Record<string, string> = {
-    CLASSIC: 'Summoner\'s Rift',
+    CLASSIC: "Summoner's Rift",
     ARAM: 'ARAM',
     URF: 'URF',
+    ARURF: 'AR URF',
     ONEFORALL: 'One for All',
     TUTORIAL: 'Tutorial',
     PRACTICETOOL: 'Practice Tool',
     NEXUSBLITZ: 'Nexus Blitz',
     CHERRY: 'Arena',
+    STRAWBERRY: 'Swarm',
+    KIWI: 'ARAM: Mayhem',
   };
-  return map[mode] ?? mode;
+  if (map[mode]) return map[mode];
+  // Fallback: title-case the raw string (e.g. "NEWMODE" → "Newmode")
+  return mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase();
 }
 
 /** Max item slots per player */
@@ -395,6 +400,12 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
   const blueKills = blueTeam.reduce((sum, p) => sum + p.kills, 0);
   const redKills = redTeam.reduce((sum, p) => sum + p.kills, 0);
 
+  // Estimate team gold from item prices (API doesn't expose per-player gold)
+  const teamItemGold = (players: typeof blueTeam) =>
+    players.reduce((total, p) => total + p.items.reduce((s, item) => s + item.price * item.count, 0), 0);
+  const blueGold = teamItemGold(blueTeam);
+  const redGold = teamItemGold(redTeam);
+
   const visibleStats = STAT_CONFIG.filter((s) => {
     const val = data.activePlayer.stats[s.key] as number;
     return s.showIf ? s.showIf(val) : true;
@@ -441,12 +452,17 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
           </div>
         </div>
 
-        {/* Active player gold */}
+        {/* Team gold comparison */}
         <div className="lg-gold-bar">
-          <svg className="lg-gold-icon" viewBox="0 0 16 16" fill="currentColor">
-            <circle cx="8" cy="8" r="6" />
-          </svg>
-          {formatGold(data.activePlayer.currentGold)} Gold
+          <span className={`lg-gold-team lg-gold-team--blue${blueGold > redGold ? ' lg-gold-team--leading' : ''}`}>
+            <svg className="lg-gold-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+            {formatGold(blueGold)}
+          </span>
+          <span className="lg-gold-label">Team Gold</span>
+          <span className={`lg-gold-team lg-gold-team--red${redGold > blueGold ? ' lg-gold-team--leading' : ''}`}>
+            {formatGold(redGold)}
+            <svg className="lg-gold-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+          </span>
         </div>
 
         {/* Scoreboard (mirrored side-by-side) */}

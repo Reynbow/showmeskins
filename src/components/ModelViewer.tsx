@@ -630,6 +630,26 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
   const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
+  /* ── Unmount safety: restore original textures on the useGLTF-cached
+       scene so the cache is never left with stale chroma textures.
+       Without this, switching skins and back would show the old chroma
+       because useGLTF returns the same (mutated) scene object. ────── */
+  useEffect(() => {
+    return () => {
+      const originals = originalTexturesRef.current;
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      originals.clear();
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const originals = originalTexturesRef.current;
     let cancelled = false;
@@ -733,6 +753,14 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           }
         });
 
+        if (primaryMats.length === 0) {
+          console.warn('[chroma] No primary materials found to apply texture to');
+          texture.dispose();
+          loadedChromaTexRef.current = null;
+          onChromaLoading(false);
+          return;
+        }
+
         // Swap the texture on each primary material
         for (const m of primaryMats) {
           if (!originals.has(m)) {
@@ -746,7 +774,12 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       })
       .catch((err) => {
         if ((err as Error).message === 'cancelled') return;
-        console.warn('Failed to load chroma texture:', chromaTextureUrl, err);
+        console.warn('[chroma] Failed to load chroma texture:', chromaTextureUrl, err);
+        // Restore originals on failure so the model isn't stuck in a broken state
+        for (const [mat, origTex] of originals) {
+          mat.map = origTex;
+          mat.needsUpdate = true;
+        }
         onChromaLoading(false);
       });
 

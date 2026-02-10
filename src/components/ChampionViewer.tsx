@@ -52,12 +52,27 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
       return;
     }
     let cancelled = false;
-    resolveChromaTextureUrl(champion.id, selectedChromaId).then((url) => {
-      if (!cancelled) {
-        setChromaTextureUrl(url);
+    resolveChromaTextureUrl(champion.id, selectedChromaId)
+      .then((url) => {
+        if (cancelled) return;
+        if (url) {
+          setChromaTextureUrl(url);
+        } else {
+          // Resolution failed — chroma texture not available on CDN.
+          // Deselect the chroma so the swatch state stays consistent with the model.
+          console.warn(`[chroma] Texture not found for ${champion.id} chroma ${selectedChromaId}`);
+          setSelectedChromaId(null);
+          setChromaTextureUrl(null);
+        }
         setChromaResolving(false);
-      }
-    });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('[chroma] Resolution error:', err);
+        setSelectedChromaId(null);
+        setChromaTextureUrl(null);
+        setChromaResolving(false);
+      });
     return () => { cancelled = true; };
   }, [champion.id, selectedChromaId]);
 

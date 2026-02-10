@@ -21,18 +21,30 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Format gold with K suffix */
+function formatGold(gold: number): string {
+  if (gold >= 1000) return `${(gold / 1000).toFixed(1)}k`;
+  return Math.floor(gold).toString();
+}
+
+/** Readable game mode names (Riot uses fruit codenames for rotating modes) */
 function formatGameMode(mode: string): string {
   const map: Record<string, string> = {
     CLASSIC: "Summoner's Rift",
     ARAM: 'ARAM',
     URF: 'URF',
+    ARURF: 'AR URF',
     ONEFORALL: 'One for All',
     TUTORIAL: 'Tutorial',
     PRACTICETOOL: 'Practice Tool',
     NEXUSBLITZ: 'Nexus Blitz',
     CHERRY: 'Arena',
+    STRAWBERRY: 'Swarm',
+    KIWI: 'ARAM: Mayhem',
   };
-  return map[mode] ?? mode;
+  if (map[mode]) return map[mode];
+  // Fallback: title-case the raw string (e.g. "NEWMODE" → "Newmode")
+  return mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase();
 }
 
 function getChampionIconUrl(version: string, championName: string, champions: ChampionBasic[]): string {
@@ -301,6 +313,12 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
   const blueKills = blueTeam.reduce((s, p) => s + p.kills, 0);
   const redKills = redTeam.reduce((s, p) => s + p.kills, 0);
 
+  // Estimate team gold from item prices
+  const teamItemGold = (players: typeof blueTeam) =>
+    players.reduce((total, p) => total + p.items.reduce((s, item) => s + item.price * item.count, 0), 0);
+  const blueGold = teamItemGold(blueTeam);
+  const redGold = teamItemGold(redTeam);
+
   return (
     <div className={`pg-page ${enterAnim ? 'pg-page--enter' : ''}`}>
       <div className="cs-bg-glow" />
@@ -318,7 +336,9 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
 
       <div className="pg-header">
         <div className="pg-game-mode">{formatGameMode(data.gameMode)}</div>
-        <div className="pg-title">Game Over</div>
+        <div className={`pg-title ${data.gameResult === 'Win' ? 'pg-title--victory' : data.gameResult === 'Lose' ? 'pg-title--defeat' : ''}`}>
+          {data.gameResult === 'Win' ? 'Victory' : data.gameResult === 'Lose' ? 'Defeat' : 'Game Over'}
+        </div>
         <div className="pg-game-info">
           <span className="pg-game-time">{formatTime(data.gameTime)}</span>
           <span className="pg-score-badge">
@@ -329,24 +349,31 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
         </div>
       </div>
 
+      {/* 3D models flanking the showcase — left (your champion) and right (MVP) */}
+      {activeModelUrl && (
+        <div className="pg-model-bg pg-model-bg--left">
+          <ChampionModelCanvas url={activeModelUrl} />
+        </div>
+      )}
+      {mvpModelUrl && (
+        <div className="pg-model-bg pg-model-bg--right">
+          <ChampionModelCanvas url={mvpModelUrl} />
+        </div>
+      )}
+
       {/* Two-panel MVP showcase */}
       <div className="pg-showcase">
         {/* LEFT — Your stats */}
         <div className="pg-card pg-card--you">
           <div className="pg-card-label">Your Performance</div>
           {activePlayer && (
-            <>
-              <div className="pg-card-model">
-                {activeModelUrl && <ChampionModelCanvas url={activeModelUrl} />}
-              </div>
-              <PlayerCard
-                player={activePlayer}
-                champions={champions}
-                version={version}
-                isMvp={!!youAreMvp}
-                stats={data.activePlayer.stats}
-              />
-            </>
+            <PlayerCard
+              player={activePlayer}
+              champions={champions}
+              version={version}
+              isMvp={!!youAreMvp}
+              stats={data.activePlayer.stats}
+            />
           )}
         </div>
 
@@ -361,17 +388,12 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
             {youAreMvp ? 'You Are the MVP!' : 'Game MVP'}
           </div>
           {gameMvp && (
-            <>
-              <div className="pg-card-model pg-card-model--mirrored">
-                {mvpModelUrl && <ChampionModelCanvas url={mvpModelUrl} />}
-              </div>
-              <PlayerCard
-                player={gameMvp}
-                champions={champions}
-                version={version}
-                isMvp={true}
-              />
-            </>
+            <PlayerCard
+              player={gameMvp}
+              champions={champions}
+              version={version}
+              isMvp={true}
+            />
           )}
         </div>
       </div>
@@ -392,6 +414,19 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
               <span className="pg-score-red">{redKills}</span>
             </div>
             <span className="pg-sb-header-red">Red Team</span>
+          </div>
+
+          {/* Team gold */}
+          <div className="pg-sb-gold-bar">
+            <span className={`pg-sb-gold-team pg-sb-gold-team--blue${blueGold > redGold ? ' pg-sb-gold-team--leading' : ''}`}>
+              <svg className="pg-sb-gold-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+              {formatGold(blueGold)}
+            </span>
+            <span className="pg-sb-gold-label">Team Gold</span>
+            <span className={`pg-sb-gold-team pg-sb-gold-team--red${redGold > blueGold ? ' pg-sb-gold-team--leading' : ''}`}>
+              {formatGold(redGold)}
+              <svg className="pg-sb-gold-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+            </span>
           </div>
 
           {/* Rows: blue player (left) | red player (right) */}

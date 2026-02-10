@@ -2,12 +2,14 @@ import './CompanionPage.css';
 
 interface Props {
   onBack: () => void;
+  onSampleLive: () => void;
+  onSamplePostGame: () => void;
 }
 
 const DOWNLOAD_URL =
   'https://github.com/Reynbow/showmeskins/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
 
-export function CompanionPage({ onBack }: Props) {
+export function CompanionPage({ onBack, onSampleLive, onSamplePostGame }: Props) {
   return (
     <div className="companion-page">
       {/* Background decorations (same as champion select) */}
@@ -58,10 +60,48 @@ export function CompanionPage({ onBack }: Props) {
           <h2 className="companion-section-title">What does it do?</h2>
           <p className="companion-section-text">
             The companion app is a small utility that runs in your system tray and connects 
-            to your League of Legends client. When you enter champion select, it detects which 
-            champion and skin you&apos;re selecting and automatically opens the 3D model on this 
-            website in real time.
+            to your League of Legends client. It provides three key features:
           </p>
+          <ul className="companion-feature-list">
+            <li>
+              <strong>Champion Select Sync:</strong> Detects your champion and skin pick in 
+              real time and opens the 3D model on this website automatically.
+            </li>
+            <li>
+              <strong>Live Game Scoreboard:</strong> Tracks all players&apos; KDA, items, 
+              levels, CS, and team gold while you play. Your champion&apos;s 3D model shows 
+              alongside the scoreboard.
+            </li>
+            <li>
+              <strong>Post-Game Summary:</strong> Shows your stats, the match MVP, the full 
+              final scoreboard, and whether you won or lost.
+            </li>
+          </ul>
+        </div>
+
+        {/* Sample pages */}
+        <div className="companion-section">
+          <h2 className="companion-section-title">Preview</h2>
+          <p className="companion-section-text">
+            See what the live game and post-game screens look like with sample data.
+          </p>
+          <div className="companion-preview-buttons">
+            <button className="companion-preview-btn" onClick={onSampleLive}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              Sample Live Game
+            </button>
+            <button className="companion-preview-btn" onClick={onSamplePostGame}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 15l-3-3h6l-3 3z" />
+                <path d="M9 12V4h6v8" />
+                <path d="M4 20h16" />
+              </svg>
+              Sample Game Over
+            </button>
+          </div>
         </div>
 
         {/* How it works */}

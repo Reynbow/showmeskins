@@ -174,7 +174,11 @@ async function fetchDirListing(alias: string, skinNum: string): Promise<{ filena
     } catch { /* direct also failed */ }
   }
 
-  dirListingCache.set(proxyPath, filenames);
+  // Only cache non-empty results — a temporary network failure shouldn't
+  // permanently block the chroma for the entire session.
+  if (filenames.length > 0) {
+    dirListingCache.set(proxyPath, filenames);
+  }
   return { filenames, baseUrl };
 }
 
@@ -190,12 +194,18 @@ async function resolveChromaFromCDragon(
   const skinNum = String(chromaId % 1000).padStart(2, '0');
 
   const { filenames: files, baseUrl } = await fetchDirListing(alias, skinNum);
-  if (files.length === 0) return null;
+  if (files.length === 0) {
+    console.warn(`[chroma] No files found for ${alias}/skin${skinNum} (chromaId ${chromaId})`);
+    return null;
+  }
 
   const txCmFiles = files.filter(
     (f) => f.endsWith('.png') && f.toLowerCase().includes('_tx_cm'),
   );
-  if (txCmFiles.length === 0) return null;
+  if (txCmFiles.length === 0) {
+    console.warn(`[chroma] No _tx_cm textures in ${alias}/skin${skinNum} (chromaId ${chromaId}). Files: ${files.join(', ')}`);
+    return null;
+  }
 
   const bodyFiles = txCmFiles.filter((f) => {
     const lower = f.toLowerCase();
@@ -238,7 +248,11 @@ export async function resolveChromaTextureUrl(
 
   // 3. CommunityDragon fallback (slow but universal)
   const url = await resolveChromaFromCDragon(championId, chromaId);
-  chromaUrlCache.set(chromaId, url);
+  // Only cache successful resolutions — don't let a temporary failure
+  // permanently block the chroma for the rest of the session.
+  if (url) {
+    chromaUrlCache.set(chromaId, url);
+  }
   return url;
 }
 
