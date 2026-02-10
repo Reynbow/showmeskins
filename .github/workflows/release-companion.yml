@@ -1,0 +1,63 @@
+name: Release Companion App
+
+on:
+  push:
+    tags:
+      - 'companion-v*'   # e.g. companion-v0.2.0
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 0.2.0)'
+        required: true
+        default: '0.2.0'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: companion/go.mod
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "tag=companion-v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            TAG="${GITHUB_REF#refs/tags/companion-v}"
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            echo "tag=companion-v$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Go binary
+        working-directory: companion
+        run: go build -ldflags="-s -w -H windowsgui" -o "dist\Show Me Skins Companion.exe" .
+
+      - name: Build NSIS installer
+        working-directory: companion
+        run: |
+          choco install nsis -y --no-progress
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Companion App v${{ steps.version.outputs.version }}"
+          body: |
+            ## Show Me Skins Companion v${{ steps.version.outputs.version }}
+
+            Download the installer below and run it. The app runs in the system tray — look for the hexagon icon after launching.
+          files: |
+            companion/dist/Show Me Skins Companion Setup ${{ steps.version.outputs.version }}.exe
+            companion/dist/Show Me Skins Companion.exe
+          draft: false
+          prerelease: false

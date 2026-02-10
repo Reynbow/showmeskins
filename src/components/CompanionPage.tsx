@@ -5,7 +5,7 @@ interface Props {
 }
 
 const DOWNLOAD_URL =
-  'https://github.com/aaronlol/show-me-skins-companion/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
+  'https://github.com/Reynbow/showmeskins/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
 
 export function CompanionPage({ onBack }: Props) {
   return (
