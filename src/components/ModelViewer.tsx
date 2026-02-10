@@ -1491,45 +1491,55 @@ function LoadingIndicator() {
 /* ================================================================
    Camera Controller — smoothly moves between view modes
    ================================================================ */
-function CameraController({ viewMode, rawHeight }: { viewMode: ViewMode; rawHeight: number }) {
+const DEFAULT_MODEL_CAM = new THREE.Vector3(0, 0.5, 5.5);
+const DEFAULT_MODEL_TARGET = new THREE.Vector3(0, -0.3, 0);
+
+function CameraController({ viewMode, rawHeight, resetId, controlsRef }: { viewMode: ViewMode; rawHeight: number; resetId: number; controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
   const animating = useRef(false);
   const targetPos = useRef(new THREE.Vector3());
   const prevView = useRef(viewMode);
   const prevHeight = useRef(rawHeight);
+  const prevResetId = useRef(resetId);
 
   useEffect(() => {
-    /* In ingame (top-down) mode, scale the camera distance based on the
-       champion's raw model height so that small champions look small and
-       large champions look large.  A reference height of ~4 units maps to
-       the baseline camera position.  We scale the Y and Z components of
-       the camera position proportionally, clamped to keep things sane. */
     const sizeFactor = viewMode === 'ingame'
       ? Math.min(Math.max(rawHeight / 4.0, 0.7), 1.6)
       : 1;
 
     const newTarget = viewMode === 'ingame'
       ? new THREE.Vector3(0, 8.5 * sizeFactor, 4.2 * sizeFactor)
-      : new THREE.Vector3(0, 0.5, 5.5);
+      : DEFAULT_MODEL_CAM.clone();
     targetPos.current.copy(newTarget);
 
     const viewChanged = prevView.current !== viewMode;
     const heightChanged = Math.abs(prevHeight.current - rawHeight) > 0.05;
+    const resetTriggered = prevResetId.current !== resetId;
     prevView.current = viewMode;
     prevHeight.current = rawHeight;
+    prevResetId.current = resetId;
 
-    if (viewChanged || (viewMode === 'ingame' && heightChanged)) {
+    if (viewChanged || (viewMode === 'ingame' && heightChanged) || resetTriggered) {
       animating.current = true;
     }
-  }, [viewMode, rawHeight, camera]);
+  }, [viewMode, rawHeight, camera, resetId, controlsRef]);
+
+  const defaultTarget = useMemo(() => viewMode === 'ingame' ? new THREE.Vector3(0, 0, 0) : DEFAULT_MODEL_TARGET.clone(), [viewMode]);
 
   useFrame(() => {
     if (!animating.current) return;
     camera.position.lerp(targetPos.current, 0.08);
-    camera.lookAt(0, 0, 0);
+    // Smoothly lerp the OrbitControls target back to default (resets panning)
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(defaultTarget, 0.08);
+    }
+    camera.lookAt(controlsRef.current?.target ?? defaultTarget);
     if (camera.position.distanceTo(targetPos.current) < 0.01) {
       camera.position.copy(targetPos.current);
-      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(defaultTarget);
+      }
+      camera.lookAt(defaultTarget);
       animating.current = false;
     }
   });
@@ -1641,6 +1651,8 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
   const [emoteAnimNames, setEmoteAnimNames] = useState<Record<string, string[]>>({});
   const [mapSide, setMapSide] = useState<MapSide>('blue');
   const [rawModelHeight, setRawModelHeight] = useState(4);
+  const [resetCameraId, setResetCameraId] = useState(0);
+  const controlsRef = useRef<any>(null);
 
   /* Facing rotation: SW for blue side, NE for red side (only in ingame mode) */
   const facingRotationY = viewMode === 'ingame'
@@ -1787,12 +1799,14 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
               </>
             )}
 
-            <CameraController viewMode={viewMode} rawHeight={rawModelHeight} />
+            <CameraController viewMode={viewMode} rawHeight={rawModelHeight} resetId={resetCameraId} controlsRef={controlsRef} />
 
             <OrbitControls
+              ref={controlsRef}
               enableRotate={viewMode !== 'ingame'}
-              enablePan={false}
+              enablePan={viewMode !== 'ingame'}
               enableZoom
+              mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
               minDistance={viewMode === 'ingame' ? 4 : 0.5}
               maxDistance={viewMode === 'ingame' ? 20 : 12}
               minPolarAngle={0}
@@ -1800,7 +1814,7 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
               autoRotate={false}
               enableDamping
               dampingFactor={0.05}
-              target={[0, 0, 0]}
+              target={[0, -0.3, 0]}
             />
           </Canvas>
         </ModelErrorBoundary>
@@ -1811,6 +1825,45 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
         <div className="chroma-loading-overlay">
           <div className="chroma-loading-spinner" />
         </div>
+      )}
+
+      {/* Camera info button (model/front view only) */}
+      {viewMode === 'model' && !modelError && (
+        <div className="camera-info-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div className="camera-info-content">
+            <div className="camera-info-row">
+              <kbd>Left Click</kbd>
+              <span>Rotate</span>
+            </div>
+            <div className="camera-info-row">
+              <kbd>Right Click</kbd>
+              <span>Pan</span>
+            </div>
+            <div className="camera-info-row">
+              <kbd>Scroll</kbd>
+              <span>Zoom</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset camera button (model/front view only) */}
+      {viewMode === 'model' && !modelError && (
+        <button
+          className="reset-camera-btn"
+          onClick={() => setResetCameraId((id) => id + 1)}
+        >
+          <span className="reset-camera-label">Reset Camera</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M1 4v6h6" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
+        </button>
       )}
 
       {/* Map side toggle buttons (ingame mode only) */}

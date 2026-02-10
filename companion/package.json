@@ -1,7 +1,7 @@
 {
-  "name": "lol-viewer-companion",
+  "name": "show-me-skins-companion",
   "version": "1.0.0",
-  "description": "Companion app for LoL Model Viewer – detects champion select and syncs with the website",
+  "description": "Companion app for Show Me Skins - detects champion select and syncs with the website",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -16,18 +16,32 @@
   "devDependencies": {
     "electron": "^34.2.0",
     "electron-builder": "^26.0.0",
+    "rcedit": "^5.0.2",
     "sharp": "^0.34.5"
   },
   "build": {
-    "appId": "lol.modelviewer.companion",
-    "productName": "LoL Model Viewer Companion",
+    "appId": "com.showmeskins.companion",
+    "productName": "Show Me Skins Companion",
     "win": {
-      "target": "portable",
-      "icon": "assets/icon.png"
+      "target": "nsis",
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    },
+    "afterPack": "./scripts/patch-exe.js",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "installer.nsh",
+      "runAfterFinish": false,
+      "perMachine": false,
+      "warningsAsErrors": false
     },
     "files": [
       "src/**/*",
       "assets/**/*"
+    ],
+    "extraResources": [
+      "assets/icon.png"
     ]
   }
 }

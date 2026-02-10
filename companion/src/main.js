@@ -1,9 +1,9 @@
 /**
- * LoL Model Viewer Companion — Electron main process.
+ * Show Me Skins Companion — Electron main process.
  *
  * Sits in the system tray, connects to the League client's local API,
- * and bridges champion-select events to the Model Viewer website via
- * a local WebSocket server on port 8234.
+ * and bridges champion-select events to the website via a local
+ * WebSocket server on port 8234.
  */
 
 const { app, Tray, Menu, nativeImage, shell } = require('electron');
@@ -15,6 +15,7 @@ const { BridgeServer } = require('./bridge');
 
 const WEBSITE_URL = 'https://www.showmeskins.com';
 const BRIDGE_PORT = 8234;
+const LOGIN_ITEM_NAME = 'Show Me Skins Companion';
 
 /* ── State ────────────────────────────────────────────────────────────── */
 
@@ -31,33 +32,68 @@ if (!gotLock) {
   app.quit();
 }
 
-/* ── Tray ─────────────────────────────────────────────────────────────── */
+/* ── Auto-launch helpers ──────────────────────────────────────────────── */
 
-function getIcon() {
-  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
-  try {
-    return nativeImage.createFromPath(iconPath);
-  } catch {
-    // Fallback: create a simple 16×16 empty icon (shouldn't happen)
-    return nativeImage.createEmpty();
-  }
+function isAutoLaunchEnabled() {
+  return app.getLoginItemSettings({ name: LOGIN_ITEM_NAME }).openAtLogin;
 }
 
+function setAutoLaunch(enabled) {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    name: LOGIN_ITEM_NAME,
+  });
+}
+
+/* ── Icon ─────────────────────────────────────────────────────────────── */
+
+function getIcon() {
+  // In packaged app, assets are in resources/assets/
+  const locations = [
+    path.join(__dirname, '..', 'assets', 'icon.png'),
+    path.join(process.resourcesPath, 'assets', 'icon.png'),
+  ];
+  for (const loc of locations) {
+    try {
+      const img = nativeImage.createFromPath(loc);
+      if (!img.isEmpty()) return img;
+    } catch {
+      /* try next */
+    }
+  }
+  return nativeImage.createEmpty();
+}
+
+function getMenuIcon() {
+  const icon = getIcon();
+  return icon.isEmpty() ? undefined : icon.resize({ width: 16, height: 16 });
+}
+
+/* ── Tray ─────────────────────────────────────────────────────────────── */
+
 function buildMenu() {
-  return Menu.buildFromTemplate([
+  const menuIcon = getMenuIcon();
+  const template = [
     {
-      label: 'LoL Model Viewer Companion',
+      label: 'Show Me Skins Companion',
       enabled: false,
-      icon: nativeImage
-        .createFromPath(path.join(__dirname, '..', 'assets', 'icon.png'))
-        .resize({ width: 16, height: 16 }),
+      ...(menuIcon && { icon: menuIcon }),
     },
     { type: 'separator' },
     { label: currentStatus, enabled: false },
     { type: 'separator' },
     {
-      label: 'Open Model Viewer',
+      label: 'Open Show Me Skins',
       click: () => shell.openExternal(WEBSITE_URL),
+    },
+    { type: 'separator' },
+    {
+      label: 'Start on Login',
+      type: 'checkbox',
+      checked: isAutoLaunchEnabled(),
+      click: (menuItem) => {
+        setAutoLaunch(menuItem.checked);
+      },
     },
     { type: 'separator' },
     {
@@ -68,14 +104,15 @@ function buildMenu() {
         app.quit();
       },
     },
-  ]);
+  ];
+  return Menu.buildFromTemplate(template);
 }
 
 function updateStatus(status) {
   currentStatus = status;
   if (tray) {
     tray.setContextMenu(buildMenu());
-    tray.setToolTip(`Model Viewer Companion – ${status}`);
+    tray.setToolTip(`Show Me Skins Companion – ${status}`);
   }
 }
 
@@ -84,7 +121,7 @@ function updateStatus(status) {
 app.whenReady().then(async () => {
   // Create tray icon
   tray = new Tray(getIcon());
-  tray.setToolTip('LoL Model Viewer Companion');
+  tray.setToolTip('Show Me Skins Companion');
   tray.setContextMenu(buildMenu());
 
   // Double-click tray → open website

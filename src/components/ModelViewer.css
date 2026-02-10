@@ -174,6 +174,139 @@
   background-repeat: no-repeat;
 }
 
+/* ── Camera Info Button ───────────────────────────────────── */
+.camera-info-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  height: 34px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  background: rgba(1, 10, 19, 0.7);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-text-secondary);
+  cursor: default;
+  padding: 7px;
+  transition: all 0.25s ease, gap 0.25s ease, padding 0.25s ease, height 0.25s ease;
+  z-index: 20;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.camera-info-btn:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  gap: 10px;
+  padding: 7px 12px 7px 8px;
+  height: 90px;
+}
+
+.camera-info-btn > svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.camera-info-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.25s ease, opacity 0.25s ease;
+}
+
+.camera-info-btn:hover .camera-info-content {
+  max-width: 350px;
+  opacity: 1;
+}
+
+.camera-info-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.camera-info-row kbd {
+  display: inline-block;
+  width: 86px;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  padding: 1px 5px;
+  border-radius: 2px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.camera-info-row span {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--lol-text-secondary);
+}
+
+/* ── Reset Camera Button ──────────────────────────────────── */
+.reset-camera-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  background: rgba(1, 10, 19, 0.7);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-text-secondary);
+  cursor: pointer;
+  padding: 0 7px;
+  transition: all 0.25s ease, gap 0.25s ease, padding 0.25s ease;
+  z-index: 20;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.reset-camera-btn:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  gap: 6px;
+  padding: 0 8px 0 12px;
+}
+
+.reset-camera-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.reset-camera-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.25s ease, opacity 0.25s ease;
+}
+
+.reset-camera-btn:hover .reset-camera-label {
+  max-width: 120px;
+  opacity: 1;
+}
+
 /* ── Map Side Toggle Buttons ───────────────────────────────── */
 .side-btn {
   position: absolute;

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ChampionDetail, Skin } from '../types';
 import { getLoadingArt, getSplashArt, getLoadingArtFallback, getSplashArtFallback } from '../api';
 import './SkinCarousel.css';
@@ -11,6 +11,20 @@ interface Props {
 
 export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+
+  const handleImageLoad = useCallback((skinNum: number) => {
+    setLoadedImages(prev => {
+      const next = new Set(prev);
+      next.add(skinNum);
+      return next;
+    });
+  }, []);
+
+  // Reset loaded state when champion changes
+  useEffect(() => {
+    setLoadedImages(new Set());
+  }, [champion.id]);
 
   useEffect(() => {
     const selectedEl = scrollRef.current?.querySelector('.skin-card.active');
@@ -45,7 +59,7 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
         <div className="skin-cards" ref={scrollRef}>
           {champion.skins.map((skin, i) => {
             const isActive = skin.num === selectedSkin.num;
-            const name = skin.num === 0 ? 'Default' : skin.name;
+            const name = skin.num === 0 ? champion.name : skin.name;
             return (
               <button
                 key={skin.num}
@@ -55,10 +69,17 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
               >
                 <div className="skin-card-image-wrapper">
                   <div className="skin-card-image">
+                    {!loadedImages.has(skin.num) && (
+                      <div className="skin-card-loader">
+                        <div className="skin-card-spinner" />
+                      </div>
+                    )}
                     <img
                       src={isActive ? getSplashArt(champion.id, skin.num) : getLoadingArt(champion.id, skin.num)}
-                      alt={name}
+                      alt=""
                       loading="lazy"
+                      className={loadedImages.has(skin.num) ? 'loaded' : ''}
+                      onLoad={() => handleImageLoad(skin.num)}
                       onError={(e) => {
                         const img = e.currentTarget;
                         const fallback = isActive
