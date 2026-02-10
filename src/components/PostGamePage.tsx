@@ -11,6 +11,7 @@ interface Props {
   champions: ChampionBasic[];
   version: string;
   onBack: () => void;
+  backLabel?: string;
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
@@ -274,7 +275,7 @@ function ChampionModelCanvas({ url }: { url: string }) {
    Main PostGamePage component
    ================================================================ */
 
-export function PostGamePage({ data, champions, version, onBack }: Props) {
+export function PostGamePage({ data, champions, version, onBack, backLabel = 'Continue' }: Props) {
   const [enterAnim, setEnterAnim] = useState(false);
   useEffect(() => {
     requestAnimationFrame(() => setEnterAnim(true));
@@ -330,7 +331,7 @@ export function PostGamePage({ data, champions, version, onBack }: Props) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          Continue
+          {backLabel}
         </button>
       </div>
 

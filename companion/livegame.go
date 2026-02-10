@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,6 +27,17 @@ type LiveGameUpdate struct {
 	GameResult string           `json:"gameResult,omitempty"` // "Win" or "Lose" (from active player perspective)
 	Active     ActivePlayerInfo `json:"activePlayer"`
 	Players    []PlayerInfo     `json:"players"`
+	KillFeed   []KillEvent      `json:"killFeed,omitempty"`
+}
+
+// KillEvent represents a champion kill for the kill feed.
+type KillEvent struct {
+	EventTime    float64  `json:"eventTime"`
+	KillerName   string   `json:"killerName"`   // champion display name
+	VictimName   string   `json:"victimName"`   // champion display name
+	Assisters    []string `json:"assisters"`     // champion display names
+	KillerChamp  string   `json:"killerChamp"`  // champion id name (for icon)
+	VictimChamp  string   `json:"victimChamp"`  // champion id name (for icon)
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -227,10 +239,11 @@ func (t *LiveGameTracker) poll() {
 }
 
 func (t *LiveGameTracker) computeHash(u *LiveGameUpdate) string {
-	h := fmt.Sprintf("%.0f:%d:%.0f",
+	h := fmt.Sprintf("%.0f:%d:%.0f:k%d",
 		u.GameTime,
 		u.Active.Level,
 		u.Active.CurrentGold,
+		len(u.KillFeed),
 	)
 	for _, p := range u.Players {
 		h += fmt.Sprintf("|%s:%d:%d:%d:%d:%d",
@@ -256,8 +269,12 @@ type gameEvents struct {
 }
 
 type gameEvent struct {
-	EventName string `json:"EventName"`
-	Result    string `json:"Result,omitempty"` // "Win" or "Lose" on GameEnd events
+	EventName  string   `json:"EventName"`
+	EventTime  float64  `json:"EventTime"`
+	Result     string   `json:"Result,omitempty"`     // "Win" or "Lose" on GameEnd events
+	KillerName string   `json:"KillerName,omitempty"` // ChampionKill
+	VictimName string   `json:"VictimName,omitempty"` // ChampionKill
+	Assisters  []string `json:"Assisters,omitempty"`   // ChampionKill
 }
 
 type activePlayerData struct {
@@ -328,6 +345,43 @@ func (t *LiveGameTracker) fetchAllGameData() (*allGameData, error) {
 	return &data, nil
 }
 
+// resolveNonPlayerKiller maps raw internal entity names to a friendly
+// display name and a "champion" key (used for icon lookup on the frontend).
+// Returns (champKey, displayName).
+func resolveNonPlayerKiller(raw string) (string, string) {
+	lower := strings.ToLower(raw)
+	switch {
+	case strings.Contains(lower, "turret"):
+		if strings.Contains(lower, "order") {
+			return "_turret_blue", "Blue Turret"
+		}
+		if strings.Contains(lower, "chaos") {
+			return "_turret_red", "Red Turret"
+		}
+		return "_turret", "Turret"
+	case strings.Contains(lower, "sru_baron"):
+		return "_baron", "Baron Nashor"
+	case strings.Contains(lower, "sru_dragon"):
+		return "_dragon", "Dragon"
+	case strings.Contains(lower, "sru_riftherald"):
+		return "_herald", "Rift Herald"
+	case strings.Contains(lower, "sru_horde"):
+		return "_voidgrub", "Voidgrub"
+	case strings.Contains(lower, "minion"):
+		if strings.Contains(lower, "order") {
+			return "_minion_blue", "Blue Minion"
+		}
+		if strings.Contains(lower, "chaos") {
+			return "_minion_red", "Red Minion"
+		}
+		return "_minion", "Minion"
+	case strings.Contains(lower, "sru_"):
+		// Other jungle camps (gromp, krugs, raptors, etc.)
+		return "_jungle", "Jungle Camp"
+	}
+	return "_unknown", raw
+}
+
 // ── Build the update message ────────────────────────────────────────────
 
 func (t *LiveGameTracker) isActivePlayer(p *playerData, active *activePlayerData) bool {
@@ -395,6 +449,54 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		})
 	}
 
+	// Build name→champion lookup for the kill feed
+	nameToChamp := make(map[string]string, len(data.AllPlayers))
+	for i := range data.AllPlayers {
+		p := &data.AllPlayers[i]
+		name := p.RiotIdGameName
+		if name == "" {
+			name = p.SummonerName
+		}
+		nameToChamp[name] = p.ChampionName
+	}
+
+	// Extract kill events from game events
+	var killFeed []KillEvent
+	for _, ev := range data.Events.Events {
+		if ev.EventName != "ChampionKill" {
+			continue
+		}
+		assistChamps := make([]string, 0, len(ev.Assisters))
+		for _, a := range ev.Assisters {
+			if champ, ok := nameToChamp[a]; ok {
+				assistChamps = append(assistChamps, champ)
+			} else {
+				assistChamps = append(assistChamps, a)
+			}
+		}
+		killerChamp := nameToChamp[ev.KillerName]
+		victimChamp := nameToChamp[ev.VictimName]
+		killerDisplay := ev.KillerName
+		victimDisplay := ev.VictimName
+
+		// Non-player killers (turrets, minions, monsters) use internal names
+		if killerChamp == "" {
+			killerChamp, killerDisplay = resolveNonPlayerKiller(ev.KillerName)
+		}
+		if victimChamp == "" {
+			victimChamp, victimDisplay = resolveNonPlayerKiller(ev.VictimName)
+		}
+
+		killFeed = append(killFeed, KillEvent{
+			EventTime:   ev.EventTime,
+			KillerName:  killerDisplay,
+			VictimName:  victimDisplay,
+			Assisters:   assistChamps,
+			KillerChamp: killerChamp,
+			VictimChamp: victimChamp,
+		})
+	}
+
 	return &LiveGameUpdate{
 		Type:     "liveGameUpdate",
 		GameTime: data.GameData.GameTime,
@@ -405,6 +507,7 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			CurrentGold:  data.ActivePlayer.CurrentGold,
 			Stats:        stats,
 		},
-		Players: players,
+		Players:  players,
+		KillFeed: killFeed,
 	}
 }

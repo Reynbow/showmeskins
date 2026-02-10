@@ -93,10 +93,20 @@ export interface LiveGameActivePlayer {
   stats: LiveGameStats;
 }
 
+export interface KillEvent {
+  eventTime: number;
+  killerName: string;   // summoner name
+  victimName: string;   // summoner name
+  assisters: string[];  // champion names
+  killerChamp: string;  // champion id name (for icon)
+  victimChamp: string;  // champion id name (for icon)
+}
+
 export interface LiveGameData {
   gameTime: number;
   gameMode: string;
   gameResult?: string; // "Win" or "Lose" (from active player perspective)
   activePlayer: LiveGameActivePlayer;
   players: LiveGamePlayer[];
+  killFeed?: KillEvent[];
 }

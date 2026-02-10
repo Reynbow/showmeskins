@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, ChampionBasic } from '../types';
+import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic } from '../types';
 import { getModelUrl } from '../api';
 import './LiveGamePage.css';
 
@@ -69,29 +69,51 @@ function formatGameMode(mode: string): string {
 /** Max item slots per player */
 const MAX_ITEMS = 7;
 
-/** Stats we display in the panel */
-const STAT_CONFIG: {
+/** Stats we display in the panel, grouped into categories */
+type StatEntry = {
   label: string;
   key: keyof LiveGameData['activePlayer']['stats'];
   color: string;
   format?: (v: number) => string;
   showIf?: (v: number) => boolean;
-}[] = [
-  { label: 'Attack Damage', key: 'attackDamage', color: 'lg-stat-ad' },
-  { label: 'Ability Power', key: 'abilityPower', color: 'lg-stat-ap' },
-  { label: 'Armor', key: 'armor', color: 'lg-stat-armor' },
-  { label: 'Magic Resist', key: 'magicResist', color: 'lg-stat-mr' },
-  { label: 'Attack Speed', key: 'attackSpeed', color: 'lg-stat-as', format: (v) => v.toFixed(2) },
-  { label: 'Ability Haste', key: 'abilityHaste', color: 'lg-stat-ah' },
-  { label: 'Max Health', key: 'maxHealth', color: 'lg-stat-hp' },
-  { label: 'Move Speed', key: 'moveSpeed', color: 'lg-stat-ms' },
-  { label: 'Crit Chance', key: 'critChance', color: 'lg-stat-crit', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
-  { label: 'Life Steal', key: 'lifeSteal', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
-  { label: 'Omnivamp', key: 'omnivamp', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
-  { label: 'Phys. Lethality', key: 'physicalLethality', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
-  { label: 'Magic Pen', key: 'magicPenetrationFlat', color: 'lg-stat-ap', showIf: (v) => v > 0 },
-  { label: 'Tenacity', key: 'tenacity', color: 'lg-stat-ms', format: (v) => `${Math.round(v)}%`, showIf: (v) => v > 0 },
-  { label: 'Heal & Shield', key: 'healShieldPower', color: 'lg-stat-ls', showIf: (v) => v > 0 },
+};
+
+const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
+  {
+    groupLabel: 'Offense',
+    stats: [
+      { label: 'Attack Damage', key: 'attackDamage', color: 'lg-stat-ad' },
+      { label: 'Ability Power', key: 'abilityPower', color: 'lg-stat-ap' },
+      { label: 'Attack Speed', key: 'attackSpeed', color: 'lg-stat-as', format: (v) => v.toFixed(2) },
+      { label: 'Crit Chance', key: 'critChance', color: 'lg-stat-crit', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
+      { label: 'Ability Haste', key: 'abilityHaste', color: 'lg-stat-ah' },
+    ],
+  },
+  {
+    groupLabel: 'Defense',
+    stats: [
+      { label: 'Max Health', key: 'maxHealth', color: 'lg-stat-hp' },
+      { label: 'Armor', key: 'armor', color: 'lg-stat-armor' },
+      { label: 'Magic Resist', key: 'magicResist', color: 'lg-stat-mr' },
+    ],
+  },
+  {
+    groupLabel: 'Utility',
+    stats: [
+      { label: 'Move Speed', key: 'moveSpeed', color: 'lg-stat-ms' },
+      { label: 'Life Steal', key: 'lifeSteal', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
+      { label: 'Omnivamp', key: 'omnivamp', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
+      { label: 'Tenacity', key: 'tenacity', color: 'lg-stat-ms', format: (v) => `${Math.round(v)}%`, showIf: (v) => v > 0 },
+      { label: 'Heal & Shield', key: 'healShieldPower', color: 'lg-stat-ls', showIf: (v) => v > 0 },
+    ],
+  },
+  {
+    groupLabel: 'Penetration',
+    stats: [
+      { label: 'Phys. Lethality', key: 'physicalLethality', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
+      { label: 'Magic Pen', key: 'magicPenetrationFlat', color: 'lg-stat-ap', showIf: (v) => v > 0 },
+    ],
+  },
 ];
 
 /* ================================================================
@@ -406,10 +428,18 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
   const blueGold = teamItemGold(blueTeam);
   const redGold = teamItemGold(redTeam);
 
-  const visibleStats = STAT_CONFIG.filter((s) => {
-    const val = data.activePlayer.stats[s.key] as number;
-    return s.showIf ? s.showIf(val) : true;
-  });
+  // Filter groups to only include stats that pass showIf, and exclude empty groups
+  const visibleGroups = useMemo(() => {
+    return STAT_GROUPS
+      .map((group) => ({
+        ...group,
+        stats: group.stats.filter((s) => {
+          const val = data.activePlayer.stats[s.key] as number;
+          return s.showIf ? s.showIf(val) : true;
+        }),
+      }))
+      .filter((group) => group.stats.length > 0);
+  }, [data.activePlayer.stats]);
 
   return (
     <div className="live-game-page">
@@ -507,29 +537,208 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
             </button>
           </div>
           {showStats && (
-            <div className="lg-stats-grid">
-              <div className="lg-stat-item">
-                <span className="lg-stat-label">Gold</span>
-                <span className="lg-stat-value lg-stat-gold">
-                  {formatGold(data.activePlayer.currentGold)}
-                </span>
-              </div>
-              {visibleStats.map((stat) => {
-                const val = data.activePlayer.stats[stat.key] as number;
-                const formatted = stat.format ? stat.format(val) : Math.round(val).toString();
-                return (
-                  <div key={stat.key} className="lg-stat-item">
-                    <span className="lg-stat-label">{stat.label}</span>
-                    <span className={`lg-stat-value ${stat.color}`}>{formatted}</span>
+            <div className="lg-stats-groups">
+              {/* Gold & CS (always shown) */}
+              <div className="lg-stats-group">
+                <div className="lg-stats-group-label">Gold &amp; CS</div>
+                <div className="lg-stats-group-items">
+                  <div className="lg-stat-item">
+                    <span className="lg-stat-label">Current Gold</span>
+                    <span className="lg-stat-value lg-stat-gold">
+                      {formatGold(data.activePlayer.currentGold)}
+                    </span>
                   </div>
-                );
-              })}
+                  <div className="lg-stat-item">
+                    <span className="lg-stat-label">Total Earned</span>
+                    <span className="lg-stat-value lg-stat-gold">
+                      {Math.floor(
+                        (activePlayer?.items.reduce((s, item) => s + item.price * item.count, 0) ?? 0)
+                        + data.activePlayer.currentGold
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="lg-stat-item">
+                    <span className="lg-stat-label">Creep Score</span>
+                    <span className="lg-stat-value lg-stat-ms">
+                      {activePlayer?.creepScore ?? 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {visibleGroups.map((group) => (
+                <div key={group.groupLabel} className="lg-stats-group">
+                  <div className="lg-stats-group-label">{group.groupLabel}</div>
+                  <div className="lg-stats-group-items">
+                    {group.stats.map((stat) => {
+                      const val = data.activePlayer.stats[stat.key] as number;
+                      const formatted = stat.format ? stat.format(val) : Math.round(val).toString();
+                      return (
+                        <div key={stat.key} className="lg-stat-item">
+                          <span className="lg-stat-label">{stat.label}</span>
+                          <span className={`lg-stat-value ${stat.color}`}>{formatted}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
+
+        {/* Kill Feed */}
+        {data.killFeed && data.killFeed.length > 0 && (
+          <KillFeed
+            kills={data.killFeed}
+            players={data.players}
+            champions={champions}
+            version={version}
+          />
+        )}
       </div>
 
       <div className="cs-bottom-border" />
+    </div>
+  );
+}
+
+/* ── Kill Feed Entity (champion icon or entity placeholder) ──────────── */
+
+const ENTITY_ICONS: Record<string, string> = {
+  _turret: '🏰',
+  _turret_blue: '🏰',
+  _turret_red: '🏰',
+  _baron: '👾',
+  _dragon: '🐉',
+  _herald: '👁',
+  _voidgrub: '🪲',
+  _minion: '⚔',
+  _minion_blue: '⚔',
+  _minion_red: '⚔',
+  _jungle: '🌿',
+  _unknown: '❓',
+};
+
+function KillFeedEntity({
+  isEntity,
+  champ,
+  displayName,
+  side,
+  version,
+  champions,
+}: {
+  isEntity: boolean;
+  champ: string;
+  displayName: string;
+  side: string;
+  version: string;
+  champions: ChampionBasic[];
+}) {
+  if (isEntity) {
+    return (
+      <>
+        <span className={`lg-kill-entity-icon lg-kill-icon--${side}`}>
+          {ENTITY_ICONS[champ] ?? '❓'}
+        </span>
+        <span className={`lg-kill-name lg-kill-name--${side}`}>
+          {displayName}
+        </span>
+      </>
+    );
+  }
+  return (
+    <>
+      <img
+        className={`lg-kill-icon lg-kill-icon--${side}`}
+        src={getChampionIconUrl(version, champ, champions)}
+        alt={champ}
+      />
+      <span className={`lg-kill-name lg-kill-name--${side}`}>
+        {champ}
+      </span>
+    </>
+  );
+}
+
+/* ── Kill Feed ────────────────────────────────────────────────────────── */
+
+function KillFeed({
+  kills,
+  players,
+  champions,
+  version,
+}: {
+  kills: KillEvent[];
+  players: LiveGamePlayer[];
+  champions: ChampionBasic[];
+  version: string;
+}) {
+  // Build a map from summoner name → team
+  const nameToTeam = useMemo(() => {
+    const map: Record<string, 'ORDER' | 'CHAOS'> = {};
+    for (const p of players) {
+      map[p.summonerName] = p.team;
+    }
+    return map;
+  }, [players]);
+
+  // All kills, most recent first
+  const allKills = useMemo(() => [...kills].reverse(), [kills]);
+
+  return (
+    <div className="lg-killfeed">
+      <div className="lg-killfeed-header">
+        <span className="lg-killfeed-title">Kill Feed</span>
+        <span className="lg-killfeed-count">{kills.length} kills</span>
+      </div>
+      <div className="lg-killfeed-list">
+        {allKills.map((kill, i) => {
+          const killerIsEntity = kill.killerChamp.startsWith('_');
+          const victimIsEntity = kill.victimChamp.startsWith('_');
+          const killerTeam = nameToTeam[kill.killerName];
+          const victimTeam = nameToTeam[kill.victimName];
+          const killerSide = killerTeam === 'ORDER' ? 'blue'
+            : killerTeam === 'CHAOS' ? 'red'
+            : kill.killerChamp.includes('blue') ? 'blue'
+            : kill.killerChamp.includes('red') ? 'red'
+            : 'neutral';
+          const victimSide = victimTeam === 'ORDER' ? 'blue'
+            : victimTeam === 'CHAOS' ? 'red'
+            : kill.victimChamp.includes('blue') ? 'blue'
+            : kill.victimChamp.includes('red') ? 'red'
+            : 'neutral';
+
+          return (
+            <div key={`${kill.eventTime}-${i}`} className="lg-kill-entry">
+              <span className="lg-kill-time">{formatTime(kill.eventTime)}</span>
+              <KillFeedEntity
+                isEntity={killerIsEntity}
+                champ={kill.killerChamp}
+                displayName={kill.killerName}
+                side={killerSide}
+                version={version}
+                champions={champions}
+              />
+              <svg className="lg-kill-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14M13 5l6 7-6 7" />
+              </svg>
+              <KillFeedEntity
+                isEntity={victimIsEntity}
+                champ={kill.victimChamp}
+                displayName={kill.victimName}
+                side={victimSide}
+                version={version}
+                champions={champions}
+              />
+              {kill.assisters.length > 0 && (
+                <span className="lg-kill-assists">
+                  + {kill.assisters.join(', ')}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

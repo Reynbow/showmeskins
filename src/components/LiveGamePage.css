@@ -530,18 +530,43 @@
   color: var(--lol-gold-light);
 }
 
-.lg-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 2px 24px;
-  padding: 14px 20px;
+.lg-stats-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.lg-stats-group {
+  flex: 1 1 160px;
+  min-width: 140px;
+  border: 1px solid rgba(200, 170, 110, 0.1);
+  border-radius: 6px;
+  background: rgba(10, 14, 22, 0.5);
+  overflow: hidden;
+}
+
+.lg-stats-group-label {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  opacity: 0.6;
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.06);
+}
+
+.lg-stats-group-items {
+  padding: 4px 12px 8px;
 }
 
 .lg-stat-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 0;
+  padding: 3px 0;
 }
 
 .lg-stat-label {
@@ -580,6 +605,142 @@
   color: #f87171;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Kill Feed ─────────────────────────────────────────────────────── */
+
+.lg-killfeed {
+  width: 100%;
+  max-width: 1200px;
+  margin-top: 20px;
+  border: 1px solid var(--lol-border);
+  background: rgba(10, 12, 20, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.lg-killfeed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--lol-border);
+}
+
+.lg-killfeed-title {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lol-gold);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.lg-killfeed-count {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  letter-spacing: 1px;
+}
+
+.lg-killfeed-list {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 170, 110, 0.2) transparent;
+}
+
+.lg-kill-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.06);
+  transition: background 0.15s;
+}
+
+.lg-kill-entry:last-child {
+  border-bottom: none;
+}
+
+.lg-kill-entry:hover {
+  background: rgba(200, 170, 110, 0.04);
+}
+
+.lg-kill-time {
+  flex-shrink: 0;
+  width: 44px;
+  font-size: 13px;
+  color: var(--lol-text-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lg-kill-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--lol-border);
+}
+
+.lg-kill-icon--blue {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.lg-kill-icon--red {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.lg-kill-icon--neutral {
+  border-color: var(--lol-border);
+}
+
+.lg-kill-entity-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--lol-border);
+  background: rgba(20, 25, 35, 0.8);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lg-kill-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  min-width: 80px;
+}
+
+.lg-kill-name--blue {
+  color: #60a5fa;
+}
+
+.lg-kill-name--red {
+  color: #f87171;
+}
+
+.lg-kill-name--neutral {
+  color: var(--lol-text-dim);
+}
+
+.lg-kill-arrow {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--lol-text-dim);
+  opacity: 0.4;
+}
+
+.lg-kill-assists {
+  font-size: 13px;
+  color: var(--lol-text-dim);
+  margin-left: auto;
+  white-space: nowrap;
+  opacity: 0.7;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────── */
@@ -691,8 +852,12 @@
     font-size: 18px;
   }
 
-  .lg-stats-grid {
-    grid-template-columns: 1fr 1fr;
-    padding: 10px 12px;
+  .lg-stats-groups {
+    padding: 10px 10px;
+    gap: 8px;
+  }
+
+  .lg-stats-group {
+    flex: 1 1 100%;
   }
 }

@@ -251,6 +251,23 @@ const sampleLiveGame: LiveGameData = {
       respawnTimer: 22,
     },
   ],
+  killFeed: [
+    { eventTime: 185, killerName: 'JGKing', victimName: 'ForestGuard', assisters: ['Darius'], killerChamp: 'LeeSin', victimChamp: 'Vi' },
+    { eventTime: 243, killerName: 'xXSlayerXx', victimName: 'MidOrFeed', assisters: [], killerChamp: 'Yone', victimChamp: 'Ahri' },
+    { eventTime: 310, killerName: 'You', victimName: 'ADC Diff', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Caitlyn' },
+    { eventTime: 412, killerName: 'ZedMain420', victimName: 'MidOrFeed', assisters: [], killerChamp: 'Zed', victimChamp: 'Ahri' },
+    { eventTime: 498, killerName: 'You', victimName: 'WardBot', assisters: ['Thresh', 'LeeSin'], killerChamp: 'Jinx', victimChamp: 'Leona' },
+    { eventTime: 560, killerName: 'TopDiff99', victimName: 'xXSlayerXx', assisters: ['LeeSin'], killerChamp: 'Darius', victimChamp: 'Yone' },
+    { eventTime: 623, killerName: 'xXSlayerXx', victimName: 'TopDiff99', assisters: ['Vi'], killerChamp: 'Yone', victimChamp: 'Darius' },
+    { eventTime: 710, killerName: 'You', victimName: 'ZedMain420', assisters: [], killerChamp: 'Jinx', victimChamp: 'Zed' },
+    { eventTime: 784, killerName: 'MidOrFeed', victimName: 'ForestGuard', assisters: ['Jinx'], killerChamp: 'Ahri', victimChamp: 'Vi' },
+    { eventTime: 856, killerName: 'ADC Diff', victimName: 'SuppGap', assisters: ['Leona'], killerChamp: 'Caitlyn', victimChamp: 'Thresh' },
+    { eventTime: 920, killerName: 'You', victimName: 'xXSlayerXx', assisters: ['Darius', 'Thresh'], killerChamp: 'Jinx', victimChamp: 'Yone' },
+    { eventTime: 1005, killerName: 'xXSlayerXx', victimName: 'SuppGap', assisters: [], killerChamp: 'Yone', victimChamp: 'Thresh' },
+    { eventTime: 1087, killerName: 'You', victimName: 'ADC Diff', assisters: ['Ahri'], killerChamp: 'Jinx', victimChamp: 'Caitlyn' },
+    { eventTime: 1150, killerName: 'JGKing', victimName: 'WardBot', assisters: [], killerChamp: 'LeeSin', victimChamp: 'Leona' },
+    { eventTime: 1210, killerName: 'You', victimName: 'ZedMain420', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Zed' },
+  ],
 };
 
 /** Sample data for the live game demo page */

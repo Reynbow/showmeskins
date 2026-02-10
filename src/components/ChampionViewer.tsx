@@ -20,21 +20,25 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
   /* ── Chroma data & selection ─────────────────────────────────── */
   const [chromaMap, setChromaMap] = useState<Record<string, ChromaInfo[]>>({});
   const [selectedChromaId, setSelectedChromaId] = useState<number | null>(null);
+  const [chromaResolving, setChromaResolving] = useState(false);
+  const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
+
+  // Track which skin the current chroma state belongs to.
+  // When the skin changes we clear chroma state synchronously during render
+  // so the ModelViewer never receives a stale chroma URL for a different skin.
+  const chromaSkinRef = useRef(selectedSkin.id);
+  if (chromaSkinRef.current !== selectedSkin.id) {
+    chromaSkinRef.current = selectedSkin.id;
+    if (selectedChromaId !== null) setSelectedChromaId(null);
+    if (chromaTextureUrl !== null) setChromaTextureUrl(null);
+    if (chromaResolving) setChromaResolving(false);
+  }
 
   // Fetch chroma data once per champion
   useEffect(() => {
     setChromaMap({});
     getChampionChromas(champion.key).then(setChromaMap);
   }, [champion.key]);
-
-  // Reset chroma when skin changes
-  useEffect(() => {
-    setSelectedChromaId(null);
-  }, [selectedSkin.id]);
-
-  // True while the chroma texture URL is being resolved (directory listing + pattern match).
-  // Used to show the loading spinner instantly on click, before the texture starts downloading.
-  const [chromaResolving, setChromaResolving] = useState(false);
 
   const handleChromaSelect = useCallback((chromaId: number | null) => {
     setSelectedChromaId(chromaId);
@@ -43,8 +47,9 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
 
   const skinChromas = chromaMap[selectedSkin.id] ?? [];
 
-  // Resolve the actual chroma texture URL asynchronously via directory listing
-  const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
+  // Attempt to resolve the chroma texture URL.
+  // If resolution fails the swatch stays selected but the model just keeps
+  // showing the base skin — no deselection, no error UI.
   useEffect(() => {
     if (selectedChromaId == null) {
       setChromaTextureUrl(null);
@@ -57,20 +62,13 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
         if (cancelled) return;
         if (url) {
           setChromaTextureUrl(url);
-        } else {
-          // Resolution failed — chroma texture not available on CDN.
-          // Deselect the chroma so the swatch state stays consistent with the model.
-          console.warn(`[chroma] Texture not found for ${champion.id} chroma ${selectedChromaId}`);
-          setSelectedChromaId(null);
-          setChromaTextureUrl(null);
         }
+        // If url is null the base skin stays visible — that's fine.
         setChromaResolving(false);
       })
-      .catch((err) => {
+      .catch(() => {
         if (cancelled) return;
-        console.warn('[chroma] Resolution error:', err);
-        setSelectedChromaId(null);
-        setChromaTextureUrl(null);
+        // Silently fall back to the base skin.
         setChromaResolving(false);
       });
     return () => { cancelled = true; };

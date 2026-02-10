@@ -141,7 +141,9 @@ function parseDirListing(html: string): string[] {
   let match;
   while ((match = linkRegex.exec(html)) !== null) {
     const href = match[1];
+    // Skip query strings, absolute paths, directories, and external URLs
     if (href.startsWith('?') || href.startsWith('/') || href.endsWith('/')) continue;
+    if (href.startsWith('http://') || href.startsWith('https://')) continue;
     filenames.push(decodeURIComponent(href));
   }
   return filenames;

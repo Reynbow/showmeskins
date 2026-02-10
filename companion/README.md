@@ -26,7 +26,7 @@ The NSIS installer compresses it further to ~2.5 MB.
 
 ## Usage
 
-1. Run the companion app — a hexagon icon appears in your system tray
+1. Run the companion app. A hexagon icon will appear in your system tray
 2. Open the website (https://www.showmeskins.com)
 3. Start a League of Legends game and enter champion select
 4. The website will automatically update to show the champion and skin you're looking at
@@ -41,5 +41,5 @@ The NSIS installer compresses it further to ~2.5 MB.
 
 - The companion app uses the League Client's local API (LCU API), which runs on `127.0.0.1`
 - It does **not** modify any game files or provide any competitive advantage
-- The website connection is non-intrusive — if the companion isn't running, the website works normally
+- The website connection is non-intrusive. If the companion isn't running, the website works normally
 - Windows only (the LCU API is only accessible on the machine running the League client)

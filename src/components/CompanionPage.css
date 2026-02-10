@@ -4,24 +4,34 @@
   height: 100vh;
   background: var(--lol-bg-primary);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.companion-page::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+}
+
+.companion-page .cs-bg-glow,
+.companion-page .cs-bg-lines {
+  position: fixed;
+}
+
+.companion-page .cs-bottom-border {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 .companion-content {
   flex: 1;
-  overflow-y: auto;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
   padding: 24px;
   position: relative;
   z-index: 1;
   max-width: 680px;
   margin: 0 auto;
   width: 100%;
-}
-
-.companion-content::-webkit-scrollbar {
-  display: none; /* Chrome/Safari/Opera */
 }
 
 /* Back button */
@@ -336,6 +346,38 @@
 
 .companion-preview-btn:active {
   transform: translateY(0);
+}
+
+/* Source code link */
+.companion-source {
+  text-align: center;
+  padding-bottom: 16px;
+}
+
+.companion-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lol-text-dim);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.companion-source-link svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.companion-source-link:hover {
+  color: var(--lol-gold-light);
+}
+
+.companion-source-link:hover svg {
+  opacity: 0.8;
 }
 
 /* Responsive */

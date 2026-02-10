@@ -17,6 +17,7 @@ dist-ssr
 # Companion app generated files
 companion/node_modules/
 companion/dist/
+companion/*.exe
 
 # Editor directories and files
 .vscode/*

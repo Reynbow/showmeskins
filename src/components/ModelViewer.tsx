@@ -754,7 +754,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
         });
 
         if (primaryMats.length === 0) {
-          console.warn('[chroma] No primary materials found to apply texture to');
+          // No body material found — silently keep the base skin visible.
           texture.dispose();
           loadedChromaTexRef.current = null;
           onChromaLoading(false);
@@ -774,8 +774,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       })
       .catch((err) => {
         if ((err as Error).message === 'cancelled') return;
-        console.warn('[chroma] Failed to load chroma texture:', chromaTextureUrl, err);
-        // Restore originals on failure so the model isn't stuck in a broken state
+        // Texture load failed — silently keep the base skin visible.
         for (const [mat, origTex] of originals) {
           mat.map = origTex;
           mat.needsUpdate = true;

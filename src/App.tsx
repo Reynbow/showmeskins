@@ -181,25 +181,41 @@ function App() {
     window.history.pushState(null, '', '/');
   }, []);
 
+  const isSamplePreview = useRef(false);
+
   const handleLiveGameBack = useCallback(() => {
     setLiveGameData(null);
-    setViewMode('select');
-    window.history.pushState(null, '', '/');
+    if (isSamplePreview.current) {
+      isSamplePreview.current = false;
+      setViewMode('companion');
+      window.history.pushState(null, '', '/companion');
+    } else {
+      setViewMode('select');
+      window.history.pushState(null, '', '/');
+    }
   }, []);
 
   const handlePostGameBack = useCallback(() => {
     setPostGameData(null);
-    setViewMode('select');
-    window.history.pushState(null, '', '/');
+    if (isSamplePreview.current) {
+      isSamplePreview.current = false;
+      setViewMode('companion');
+      window.history.pushState(null, '', '/companion');
+    } else {
+      setViewMode('select');
+      window.history.pushState(null, '', '/');
+    }
   }, []);
 
   const handleSampleLive = useCallback(() => {
+    isSamplePreview.current = true;
     setLiveGameData(sampleLiveGameData);
     setViewMode('livegame');
     window.history.pushState(null, '', '/live');
   }, []);
 
   const handleSamplePostGame = useCallback(() => {
+    isSamplePreview.current = true;
     setPostGameData(samplePostGameData);
     setViewMode('postgame');
     window.history.pushState(null, '', '/postgame');
@@ -298,6 +314,7 @@ function App() {
                 gameResult: data.gameResult || undefined,
                 activePlayer: data.activePlayer ?? {},
                 players: data.players ?? [],
+                killFeed: data.killFeed ?? [],
               });
 
               // Auto-navigate to the live game page on first detection
@@ -378,6 +395,7 @@ function App() {
           champions={champions}
           version={version}
           onBack={handlePostGameBack}
+          backLabel={isSamplePreview.current ? 'Back' : 'Continue'}
         />
       ) : viewMode === 'livegame' && liveGameData ? (
         <LiveGamePage
