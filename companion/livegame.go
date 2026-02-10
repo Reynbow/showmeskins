@@ -1,0 +1,384 @@
+package main
+
+import (
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+)
+
+const (
+	liveClientURL = "https://127.0.0.1:2999"
+	pollInterval  = 3 * time.Second
+)
+
+// ── Messages sent to the website via the bridge ─────────────────────────
+
+// LiveGameUpdate is broadcast to the website with full scoreboard data.
+type LiveGameUpdate struct {
+	Type     string           `json:"type"`
+	GameTime float64          `json:"gameTime"`
+	GameMode string           `json:"gameMode"`
+	Active   ActivePlayerInfo `json:"activePlayer"`
+	Players  []PlayerInfo     `json:"players"`
+}
+
+// ActivePlayerInfo holds detailed data for the local player (gold, stats).
+type ActivePlayerInfo struct {
+	SummonerName string        `json:"summonerName"`
+	Level        int           `json:"level"`
+	CurrentGold  float64       `json:"currentGold"`
+	Stats        LiveGameStats `json:"stats"`
+}
+
+// PlayerInfo holds per-player data visible on the scoreboard.
+type PlayerInfo struct {
+	SummonerName   string         `json:"summonerName"`
+	ChampionName   string         `json:"championName"`
+	Team           string         `json:"team"` // "ORDER" (blue) or "CHAOS" (red)
+	Level          int            `json:"level"`
+	Kills          int            `json:"kills"`
+	Deaths         int            `json:"deaths"`
+	Assists        int            `json:"assists"`
+	CreepScore     int            `json:"creepScore"`
+	WardScore      float64        `json:"wardScore"`
+	Items          []LiveGameItem `json:"items"`
+	SkinID         int            `json:"skinID"`
+	IsActivePlayer bool           `json:"isActivePlayer"`
+	IsDead         bool           `json:"isDead"`
+	RespawnTimer   float64        `json:"respawnTimer"`
+}
+
+// LiveGameItem represents a single item slot.
+type LiveGameItem struct {
+	ItemID      int    `json:"itemID"`
+	DisplayName string `json:"displayName"`
+	Count       int    `json:"count"`
+	Slot        int    `json:"slot"`
+	Price       int    `json:"price"`
+}
+
+// LiveGameStats holds the active player's current stats (base + items + runes + levels).
+type LiveGameStats struct {
+	AttackDamage      float64 `json:"attackDamage"`
+	AbilityPower      float64 `json:"abilityPower"`
+	Armor             float64 `json:"armor"`
+	MagicResist       float64 `json:"magicResist"`
+	AttackSpeed       float64 `json:"attackSpeed"`
+	CritChance        float64 `json:"critChance"`
+	CritDamage        float64 `json:"critDamage"`
+	MoveSpeed         float64 `json:"moveSpeed"`
+	MaxHealth         float64 `json:"maxHealth"`
+	CurrentHealth     float64 `json:"currentHealth"`
+	ResourceMax       float64 `json:"resourceMax"`
+	ResourceValue     float64 `json:"resourceValue"`
+	ResourceType      string  `json:"resourceType"`
+	AbilityHaste      float64 `json:"abilityHaste"`
+	LifeSteal         float64 `json:"lifeSteal"`
+	Omnivamp          float64 `json:"omnivamp"`
+	PhysicalLethality float64 `json:"physicalLethality"`
+	MagicLethality    float64 `json:"magicLethality"`
+	ArmorPenFlat      float64 `json:"armorPenetrationFlat"`
+	ArmorPenPercent   float64 `json:"armorPenetrationPercent"`
+	MagicPenFlat      float64 `json:"magicPenetrationFlat"`
+	MagicPenPercent   float64 `json:"magicPenetrationPercent"`
+	Tenacity          float64 `json:"tenacity"`
+	HealShieldPower   float64 `json:"healShieldPower"`
+	AttackRange       float64 `json:"attackRange"`
+	HealthRegenRate   float64 `json:"healthRegenRate"`
+	ResourceRegenRate float64 `json:"resourceRegenRate"`
+}
+
+// ── Callbacks ───────────────────────────────────────────────────────────
+
+type LiveGameUpdateCallback func(update LiveGameUpdate)
+type LiveGameEndCallback func()
+
+// ── LiveGameTracker ─────────────────────────────────────────────────────
+
+// LiveGameTracker polls the Riot Live Client Data API during an active game
+// and emits full scoreboard updates for all players.
+type LiveGameTracker struct {
+	onUpdate LiveGameUpdateCallback
+	onEnd    LiveGameEndCallback
+	onStatus StatusCallback
+
+	client *http.Client
+
+	stopCh    chan struct{}
+	stopped   bool
+	stoppedMu sync.Mutex
+
+	wasInGame bool
+	lastHash  string
+}
+
+// NewLiveGameTracker creates a tracker with the given callbacks.
+func NewLiveGameTracker(onStatus StatusCallback, onUpdate LiveGameUpdateCallback, onEnd LiveGameEndCallback) *LiveGameTracker {
+	return &LiveGameTracker{
+		onUpdate: onUpdate,
+		onEnd:    onEnd,
+		onStatus: onStatus,
+		client: &http.Client{
+			Timeout: 2 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		},
+		stopCh: make(chan struct{}),
+	}
+}
+
+// Start begins polling in a background goroutine.
+func (t *LiveGameTracker) Start() {
+	go t.pollLoop()
+}
+
+// Stop terminates the polling loop.
+func (t *LiveGameTracker) Stop() {
+	t.stoppedMu.Lock()
+	defer t.stoppedMu.Unlock()
+	if !t.stopped {
+		t.stopped = true
+		close(t.stopCh)
+	}
+}
+
+func (t *LiveGameTracker) isStopped() bool {
+	t.stoppedMu.Lock()
+	defer t.stoppedMu.Unlock()
+	return t.stopped
+}
+
+func (t *LiveGameTracker) pollLoop() {
+	t.poll()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-t.stopCh:
+			return
+		case <-ticker.C:
+			t.poll()
+		}
+	}
+}
+
+func (t *LiveGameTracker) poll() {
+	if t.isStopped() {
+		return
+	}
+
+	data, err := t.fetchAllGameData()
+	if err != nil {
+		if t.wasInGame {
+			t.wasInGame = false
+			t.lastHash = ""
+			log.Println("[livegame] Game ended")
+			t.onStatus("Connected – Waiting for Champion Select…")
+			t.onEnd()
+		}
+		return
+	}
+
+	if !t.wasInGame {
+		t.wasInGame = true
+		log.Println("[livegame] Live game detected")
+		t.onStatus("In Game – Tracking scoreboard")
+	}
+
+	update := t.buildUpdate(data)
+	if update == nil {
+		return
+	}
+
+	hash := t.computeHash(update)
+	if hash == t.lastHash {
+		return
+	}
+	t.lastHash = hash
+
+	log.Printf("[livegame] Scoreboard update: %d players, %.0fs",
+		len(update.Players), update.GameTime)
+
+	t.onUpdate(*update)
+}
+
+func (t *LiveGameTracker) computeHash(u *LiveGameUpdate) string {
+	h := fmt.Sprintf("%.0f:%d:%.0f",
+		u.GameTime,
+		u.Active.Level,
+		u.Active.CurrentGold,
+	)
+	for _, p := range u.Players {
+		h += fmt.Sprintf("|%s:%d:%d:%d:%d:%d",
+			p.ChampionName, p.Level, p.Kills, p.Deaths, p.Assists, p.CreepScore)
+		for _, item := range p.Items {
+			h += fmt.Sprintf("-%d", item.ItemID)
+		}
+	}
+	return h
+}
+
+// ── Live Client Data API types ──────────────────────────────────────────
+
+type allGameData struct {
+	ActivePlayer activePlayerData `json:"activePlayer"`
+	AllPlayers   []playerData     `json:"allPlayers"`
+	GameData     gameDataInfo     `json:"gameData"`
+}
+
+type activePlayerData struct {
+	SummonerName   string          `json:"summonerName"`
+	RiotIdGameName string          `json:"riotIdGameName"`
+	Level          int             `json:"level"`
+	CurrentGold    float64         `json:"currentGold"`
+	ChampionStats  json.RawMessage `json:"championStats"`
+}
+
+type playerData struct {
+	SummonerName    string     `json:"summonerName"`
+	RiotIdGameName  string     `json:"riotIdGameName"`
+	ChampionName    string     `json:"championName"`
+	RawChampionName string     `json:"rawChampionName"`
+	Items           []itemData `json:"items"`
+	Level           int        `json:"level"`
+	Scores          scoresData `json:"scores"`
+	SkinID          int        `json:"skinID"`
+	Team            string     `json:"team"`
+	IsDead          bool       `json:"isDead"`
+	RespawnTimer    float64    `json:"respawnTimer"`
+}
+
+type itemData struct {
+	ItemID      int    `json:"itemID"`
+	DisplayName string `json:"displayName"`
+	Count       int    `json:"count"`
+	Slot        int    `json:"slot"`
+	Price       int    `json:"price"`
+}
+
+type scoresData struct {
+	Kills      int     `json:"kills"`
+	Deaths     int     `json:"deaths"`
+	Assists    int     `json:"assists"`
+	CreepScore int     `json:"creepScore"`
+	WardScore  float64 `json:"wardScore"`
+}
+
+type gameDataInfo struct {
+	GameTime float64 `json:"gameTime"`
+	GameMode string  `json:"gameMode"`
+}
+
+// ── API fetch ───────────────────────────────────────────────────────────
+
+func (t *LiveGameTracker) fetchAllGameData() (*allGameData, error) {
+	resp, err := t.client.Get(liveClientURL + "/liveclientdata/allgamedata")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data allGameData
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// ── Build the update message ────────────────────────────────────────────
+
+func (t *LiveGameTracker) isActivePlayer(p *playerData, active *activePlayerData) bool {
+	if active.RiotIdGameName != "" && p.RiotIdGameName == active.RiotIdGameName {
+		return true
+	}
+	if active.SummonerName != "" && p.SummonerName == active.SummonerName {
+		return true
+	}
+	return false
+}
+
+func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
+	// Parse active player stats
+	var stats LiveGameStats
+	if err := json.Unmarshal(data.ActivePlayer.ChampionStats, &stats); err != nil {
+		log.Printf("[livegame] Failed to parse champion stats: %v", err)
+	}
+
+	activeName := data.ActivePlayer.RiotIdGameName
+	if activeName == "" {
+		activeName = data.ActivePlayer.SummonerName
+	}
+
+	// Build player list for both teams
+	players := make([]PlayerInfo, 0, len(data.AllPlayers))
+	for i := range data.AllPlayers {
+		p := &data.AllPlayers[i]
+
+		// Convert items (skip empty slots)
+		items := make([]LiveGameItem, 0, len(p.Items))
+		for _, item := range p.Items {
+			if item.ItemID == 0 {
+				continue
+			}
+			items = append(items, LiveGameItem{
+				ItemID:      item.ItemID,
+				DisplayName: item.DisplayName,
+				Count:       item.Count,
+				Slot:        item.Slot,
+				Price:       item.Price,
+			})
+		}
+
+		displayName := p.RiotIdGameName
+		if displayName == "" {
+			displayName = p.SummonerName
+		}
+
+		players = append(players, PlayerInfo{
+			SummonerName:   displayName,
+			ChampionName:   p.ChampionName,
+			Team:           p.Team,
+			Level:          p.Level,
+			Kills:          p.Scores.Kills,
+			Deaths:         p.Scores.Deaths,
+			Assists:        p.Scores.Assists,
+			CreepScore:     p.Scores.CreepScore,
+			WardScore:      p.Scores.WardScore,
+			Items:          items,
+			SkinID:         p.SkinID,
+			IsActivePlayer: t.isActivePlayer(p, &data.ActivePlayer),
+			IsDead:         p.IsDead,
+			RespawnTimer:   p.RespawnTimer,
+		})
+	}
+
+	return &LiveGameUpdate{
+		Type:     "liveGameUpdate",
+		GameTime: data.GameData.GameTime,
+		GameMode: data.GameData.GameMode,
+		Active: ActivePlayerInfo{
+			SummonerName: activeName,
+			Level:        data.ActivePlayer.Level,
+			CurrentGold:  data.ActivePlayer.CurrentGold,
+			Stats:        stats,
+		},
+		Players: players,
+	}
+}

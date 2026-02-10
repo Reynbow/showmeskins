@@ -1,0 +1,845 @@
+/* ── Post Game Page ─────────────────────────────────────────────────── */
+
+.pg-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--lol-bg-primary);
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.pg-page--enter {
+  opacity: 1;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.pg-top-bar {
+  width: 100%;
+  max-width: 1200px;
+  padding: 20px 24px 0;
+}
+
+.pg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pg-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pg-back:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.pg-header {
+  text-align: center;
+  margin: 16px 0 28px;
+}
+
+.pg-game-mode {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--lol-text-dim);
+  margin-bottom: 4px;
+}
+
+.pg-title {
+  font-family: var(--font-heading);
+  font-size: 38px;
+  font-weight: 700;
+  color: var(--lol-gold-light);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(200, 170, 110, 0.25);
+}
+
+.pg-game-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.pg-game-time {
+  font-size: 14px;
+  color: var(--lol-text-dim);
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.pg-score-blue { color: #4aa8ff; }
+.pg-score-dash { color: var(--lol-text-dim); }
+.pg-score-red  { color: #ff5555; }
+
+/* ── Two-panel showcase ──────────────────────────────────────────────── */
+
+.pg-showcase {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 24px 48px;
+}
+
+.pg-card {
+  flex: 1;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pg-card-label {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--lol-text-dim);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.pg-card--you .pg-card-label {
+  color: var(--lol-gold);
+}
+
+.pg-card--mvp .pg-card-label {
+  color: #c8aa6e;
+}
+
+/* ── 3D model panel ──────────────────────────────────────────────────── */
+
+.pg-card-model {
+  width: 100%;
+  height: 340px;
+  position: relative;
+  margin-bottom: -20px;
+  z-index: 1;
+}
+
+.pg-card-model canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.pg-card-model--mirrored {
+  transform: scaleX(-1);
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────── */
+
+.pg-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  flex-shrink: 0;
+  padding-top: 200px;
+}
+
+.pg-vs {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--lol-text-dim);
+  opacity: 0.5;
+}
+
+/* ── Player card ─────────────────────────────────────────────────────── */
+
+.pg-player-card {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
+  border: 1px solid rgba(30, 40, 45, 0.8);
+  border-radius: 10px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  position: relative;
+  z-index: 2;
+}
+
+/* Player header */
+.pg-player-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+}
+
+.pg-portrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--lol-gold-dark);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pg-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pg-portrait-level {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(10, 14, 22, 0.9);
+  border: 1px solid rgba(60, 70, 80, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--lol-text-primary);
+  line-height: 1;
+}
+
+.pg-player-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pg-player-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lol-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-player-champ {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+}
+
+.pg-mvp-badge {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.2), rgba(200, 170, 110, 0.08));
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  color: var(--lol-gold-light);
+  text-shadow: 0 0 8px rgba(200, 170, 110, 0.4);
+  flex-shrink: 0;
+}
+
+/* KDA display */
+.pg-kda-display {
+  text-align: center;
+  padding: 18px 18px 10px;
+}
+
+.pg-kda-numbers {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+
+.pg-kda-k { color: #4ade80; }
+.pg-kda-d { color: #f87171; }
+.pg-kda-a { color: #60a5fa; }
+.pg-kda-slash { color: var(--lol-text-dim); margin: 0 3px; }
+
+.pg-kda-ratio {
+  font-size: 14px;
+  color: var(--lol-text-secondary);
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* Stats row */
+.pg-stats-row {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 10px 18px 16px;
+  border-bottom: 1px solid rgba(30, 40, 45, 0.4);
+}
+
+.pg-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pg-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lol-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-stat-lbl {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--lol-text-dim);
+}
+
+.pg-stat-gold { color: #fbbf24; }
+
+/* Detail stats (your card only) */
+.pg-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px 20px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(30, 40, 45, 0.4);
+}
+
+.pg-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.pg-detail-label {
+  font-size: 11px;
+  color: var(--lol-text-secondary);
+}
+
+.pg-detail-value {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stat colors */
+.pg-c-ad     { color: #ff8c42; }
+.pg-c-ap     { color: #6e8efb; }
+.pg-c-armor  { color: #f0c040; }
+.pg-c-mr     { color: #c078f0; }
+.pg-c-as     { color: #f0e060; }
+.pg-c-ah     { color: #e8b4f8; }
+.pg-c-ms     { color: #60a5fa; }
+.pg-c-crit   { color: #f87171; }
+.pg-c-ls     { color: #86efac; }
+
+/* Items */
+.pg-items {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 18px;
+}
+
+.pg-item-slot {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  border: 1px solid rgba(30, 40, 45, 0.6);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pg-item-slot.empty {
+  opacity: 0.2;
+}
+
+.pg-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pg-item-count {
+  position: absolute;
+  bottom: 0;
+  right: 1px;
+  font-size: 8px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  font-weight: 700;
+}
+
+/* ── Full Scoreboard (mirrored side-by-side layout) ──────────────────── */
+
+.pg-scoreboard-section {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 24px 60px;
+  margin: 0 auto;
+}
+
+.pg-scoreboard-title {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  text-align: center;
+  margin-bottom: 20px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(200, 170, 110, 0.15);
+}
+
+.pg-scoreboard {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
+  border: 1px solid rgba(30, 40, 45, 0.8);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+/* ── Central score header ────────────────────────────────────────────── */
+
+.pg-sb-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+}
+
+.pg-sb-header-blue {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #4aa8ff;
+  flex: 1;
+  text-align: right;
+}
+
+.pg-sb-header-red {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #ff5555;
+  flex: 1;
+  text-align: left;
+}
+
+.pg-sb-header-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-sb-swords {
+  width: 18px;
+  height: 18px;
+  color: var(--lol-text-dim);
+}
+
+/* ── Match row (one blue + one red side by side) ────────────────────── */
+
+.pg-sb-match-row {
+  display: flex;
+  border-bottom: 1px solid rgba(30, 40, 45, 0.3);
+}
+
+.pg-sb-match-row:last-child {
+  border-bottom: none;
+}
+
+/* Center vertical divider */
+.pg-sb-vs-divider {
+  width: 2px;
+  background: rgba(30, 40, 45, 0.6);
+  flex-shrink: 0;
+}
+
+/* ── Player side (each half of a row) ────────────────────────────────── */
+
+.pg-sb-side {
+  flex: 1;
+  display: grid;
+  align-items: center;
+  padding: 7px 14px;
+  gap: 8px;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.pg-sb-side:hover {
+  background: rgba(200, 170, 110, 0.03);
+}
+
+/* Blue side: items | name | kda | cs | portrait */
+.pg-sb-side--blue {
+  grid-template-columns: 210px 1fr 80px 40px 42px;
+}
+
+/* Red side: portrait | cs | kda | name | items */
+.pg-sb-side--red {
+  grid-template-columns: 42px 40px 80px 1fr 210px;
+}
+
+/* Active player highlight */
+.pg-sb-side--active {
+  background: rgba(200, 170, 110, 0.06);
+}
+
+.pg-sb-side--active:hover {
+  background: rgba(200, 170, 110, 0.09);
+}
+
+.pg-sb-side--blue.pg-sb-side--active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--lol-gold);
+}
+
+.pg-sb-side--red.pg-sb-side--active::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--lol-gold);
+}
+
+/* ── Portrait ────────────────────────────────────────────────────────── */
+
+.pg-sb-portrait {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(30, 40, 45, 0.8);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pg-sb-portrait--blue { border-color: rgba(0, 130, 220, 0.4); }
+.pg-sb-portrait--red  { border-color: rgba(220, 50, 50, 0.4); }
+.pg-sb-side--active .pg-sb-portrait { border-color: var(--lol-gold-dark); }
+
+.pg-sb-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pg-sb-portrait-level {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(10, 14, 22, 0.92);
+  border: 1px solid rgba(60, 70, 80, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--lol-text-primary);
+  line-height: 1;
+}
+
+/* ── Player info ─────────────────────────────────────────────────────── */
+
+.pg-sb-player-info {
+  min-width: 0;
+}
+
+.pg-sb-side--blue .pg-sb-player-info {
+  text-align: left;
+}
+
+.pg-sb-side--red .pg-sb-player-info {
+  text-align: right;
+}
+
+.pg-sb-player-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lol-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.pg-sb-player-name--active {
+  color: var(--lol-gold-light);
+}
+
+/* ── KDA ─────────────────────────────────────────────────────────────── */
+
+.pg-sb-kda {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+/* ── CS ──────────────────────────────────────────────────────────────── */
+
+.pg-sb-cs {
+  text-align: center;
+  font-size: 13px;
+  color: var(--lol-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Items ────────────────────────────────────────────────────────────── */
+
+.pg-sb-items {
+  display: flex;
+  gap: 3px;
+}
+
+.pg-sb-side--blue .pg-sb-items {
+  justify-content: flex-start;
+}
+
+.pg-sb-side--red .pg-sb-items {
+  justify-content: flex-end;
+}
+
+.pg-sb-item-slot {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  border: 1px solid rgba(30, 40, 45, 0.6);
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pg-sb-item-slot.empty { opacity: 0.2; }
+
+.pg-sb-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pg-sb-item-count {
+  position: absolute;
+  bottom: 0;
+  right: 1px;
+  font-size: 8px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  font-weight: 700;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .pg-sb-side--blue {
+    grid-template-columns: 160px 1fr 70px 36px 38px;
+  }
+  .pg-sb-side--red {
+    grid-template-columns: 38px 36px 70px 1fr 160px;
+  }
+  .pg-sb-item-slot {
+    width: 22px;
+    height: 22px;
+  }
+  .pg-sb-items { gap: 2px; }
+}
+
+@media (max-width: 900px) {
+  .pg-scoreboard-section {
+    padding: 0 12px 48px;
+  }
+
+  /* Hide items on narrower screens */
+  .pg-sb-items { display: none; }
+
+  .pg-sb-side--blue {
+    grid-template-columns: 1fr 70px 36px 38px;
+  }
+  .pg-sb-side--red {
+    grid-template-columns: 38px 36px 70px 1fr;
+  }
+
+  .pg-sb-side {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .pg-sb-portrait {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pg-sb-player-name { font-size: 12px; }
+  .pg-sb-kda { font-size: 12px; }
+  .pg-sb-cs { font-size: 12px; }
+
+  .pg-showcase {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 0 16px 48px;
+  }
+
+  .pg-card {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .pg-card-model {
+    height: 260px;
+  }
+
+  .pg-divider {
+    padding-top: 0;
+  }
+
+  .pg-title {
+    font-size: 28px;
+    letter-spacing: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pg-card-model {
+    height: 200px;
+  }
+
+  .pg-kda-numbers {
+    font-size: 24px;
+  }
+
+  .pg-stats-row {
+    gap: 16px;
+  }
+
+  .pg-stat-val {
+    font-size: 15px;
+  }
+
+  .pg-detail-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .pg-item-slot {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pg-title {
+    font-size: 22px;
+    letter-spacing: 3px;
+  }
+
+  .pg-scoreboard-section {
+    padding: 0 8px 32px;
+  }
+
+  /* Hide CS on mobile, just portrait + KDA + name */
+  .pg-sb-cs { display: none; }
+
+  .pg-sb-side--blue {
+    grid-template-columns: 1fr 60px 32px;
+  }
+  .pg-sb-side--red {
+    grid-template-columns: 32px 60px 1fr;
+  }
+
+  .pg-sb-side {
+    padding: 5px 8px;
+    gap: 5px;
+  }
+
+  .pg-sb-portrait {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pg-sb-player-name { font-size: 11px; }
+  .pg-sb-kda { font-size: 11px; }
+
+  .pg-sb-header {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .pg-sb-header-blue,
+  .pg-sb-header-red {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .pg-sb-header-score {
+    font-size: 18px;
+  }
+}

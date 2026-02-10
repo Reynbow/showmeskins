@@ -20,6 +20,7 @@ const (
 
 var (
 	lcu         *LCUConnector
+	liveGame    *LiveGameTracker
 	bridgeSrv   *BridgeServer
 	statusItem  *systray.MenuItem
 )
@@ -115,17 +116,32 @@ func onReady() {
 	bridgeSrv = NewBridgeServer(bridgePort)
 	bridgeSrv.Start()
 
-	// Start the LCU connector
+	// Status callback shared by LCU and live game tracker
+	setStatus := func(status string) {
+		statusItem.SetTitle(status)
+		systray.SetTooltip("Show Me Skins Companion – " + status)
+	}
+
+	// Start the LCU connector (champion select detection)
 	lcu = NewLCUConnector(
-		func(status string) {
-			statusItem.SetTitle(status)
-			systray.SetTooltip("Show Me Skins Companion – " + status)
-		},
+		setStatus,
 		func(update ChampSelectUpdate) {
 			bridgeSrv.Broadcast(update)
 		},
 	)
 	go lcu.Start()
+
+	// Start the live game tracker (in-game items & stats)
+	liveGame = NewLiveGameTracker(
+		setStatus,
+		func(update LiveGameUpdate) {
+			bridgeSrv.Broadcast(update)
+		},
+		func() {
+			bridgeSrv.Broadcast(map[string]string{"type": "liveGameEnd"})
+		},
+	)
+	liveGame.Start()
 
 	// Handle menu clicks
 	go func() {
@@ -149,6 +165,9 @@ func onReady() {
 }
 
 func onExit() {
+	if liveGame != nil {
+		liveGame.Stop()
+	}
 	if lcu != nil {
 		lcu.Stop()
 	}

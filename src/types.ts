@@ -28,3 +28,74 @@ export interface ChampionDetail extends ChampionBasic {
 }
 
 export type ViewMode = 'select' | 'viewer';
+
+// ── Live game data (from companion app → Live Client Data API) ──────────
+
+export interface LiveGameItem {
+  itemID: number;
+  displayName: string;
+  count: number;
+  slot: number;
+  price: number;
+}
+
+export interface LiveGameStats {
+  attackDamage: number;
+  abilityPower: number;
+  armor: number;
+  magicResist: number;
+  attackSpeed: number;
+  critChance: number;
+  critDamage: number;
+  moveSpeed: number;
+  maxHealth: number;
+  currentHealth: number;
+  resourceMax: number;
+  resourceValue: number;
+  resourceType: string;
+  abilityHaste: number;
+  lifeSteal: number;
+  omnivamp: number;
+  physicalLethality: number;
+  magicLethality: number;
+  armorPenetrationFlat: number;
+  armorPenetrationPercent: number;
+  magicPenetrationFlat: number;
+  magicPenetrationPercent: number;
+  tenacity: number;
+  healShieldPower: number;
+  attackRange: number;
+  healthRegenRate: number;
+  resourceRegenRate: number;
+}
+
+export interface LiveGamePlayer {
+  summonerName: string;
+  championName: string;
+  team: 'ORDER' | 'CHAOS';
+  level: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  creepScore: number;
+  wardScore: number;
+  items: LiveGameItem[];
+  skinID: number;
+  isActivePlayer: boolean;
+  isDead: boolean;
+  respawnTimer: number;
+}
+
+export interface LiveGameActivePlayer {
+  summonerName: string;
+  level: number;
+  currentGold: number;
+  stats: LiveGameStats;
+}
+
+export interface LiveGameData {
+  gameTime: number;
+  gameMode: string;
+  activePlayer: LiveGameActivePlayer;
+  players: LiveGamePlayer[];
+}

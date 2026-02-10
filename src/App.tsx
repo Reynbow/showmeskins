@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
+import { LiveGamePage } from './components/LiveGamePage';
+import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion } from './api';
-import type { ChampionBasic, ChampionDetail, Skin } from './types';
+import type { ChampionBasic, ChampionDetail, Skin, LiveGameData } from './types';
 import './App.css';
 
 /** Turn a skin name into a URL-friendly slug: "Dark Star Thresh" → "dark-star-thresh" */
@@ -39,7 +41,13 @@ function App() {
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame'>('select');
+  const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
+  const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
+
+  // Track whether we've already auto-navigated for this game session
+  // (so we don't force the user back if they navigate away)
+  const liveGameAutoNavDone = useRef(false);
 
   // Track whether initial URL-based load has been attempted
   const initialLoadDone = useRef(false);
@@ -62,6 +70,10 @@ function App() {
         const { championId, skinSlug: urlSkinSlug } = parseUrl();
         if (championId === 'companion') {
           setViewMode('companion');
+        } else if (championId === 'live') {
+          setViewMode('livegame');
+        } else if (championId === 'postgame') {
+          setViewMode('postgame');
         } else if (championId) {
           // Find the champion (case-insensitive match against id)
           const match = Object.values(champs).find(
@@ -103,6 +115,14 @@ function App() {
       }
       if (championId === 'companion') {
         setViewMode('companion');
+        return;
+      }
+      if (championId === 'live') {
+        setViewMode('livegame');
+        return;
+      }
+      if (championId === 'postgame') {
+        setViewMode('postgame');
         return;
       }
       // Load the champion from the URL
@@ -160,6 +180,17 @@ function App() {
     window.history.pushState(null, '', '/');
   }, []);
 
+  const handleLiveGameBack = useCallback(() => {
+    setViewMode('select');
+    window.history.pushState(null, '', '/');
+  }, []);
+
+  const handlePostGameBack = useCallback(() => {
+    setPostGameData(null);
+    setViewMode('select');
+    window.history.pushState(null, '', '/');
+  }, []);
+
   const handleSkinSelect = useCallback((skin: Skin) => {
     setSelectedSkin(skin);
     if (selectedChampion) {
@@ -211,6 +242,8 @@ function App() {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data as string);
+
+            // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
               // De-duplicate on the website side too
               const key = `${data.championId}:${data.skinNum}`;
@@ -241,6 +274,37 @@ function App() {
                   console.error('[companion] Failed to load champion:', err);
                 }
               }, 300);
+            }
+
+            // ── Live game updates (full scoreboard) ──
+            if (data.type === 'liveGameUpdate') {
+              setLiveGameData({
+                gameTime: data.gameTime ?? 0,
+                gameMode: data.gameMode ?? 'CLASSIC',
+                activePlayer: data.activePlayer ?? {},
+                players: data.players ?? [],
+              });
+
+              // Auto-navigate to the live game page on first detection
+              if (!liveGameAutoNavDone.current) {
+                liveGameAutoNavDone.current = true;
+                setViewMode('livegame');
+                window.history.pushState(null, '', '/live');
+              }
+            }
+
+            // ── Game ended ── transition to post-game summary
+            if (data.type === 'liveGameEnd') {
+              // Capture the final snapshot before clearing live data
+              setLiveGameData((lastSnapshot) => {
+                if (lastSnapshot) {
+                  setPostGameData(lastSnapshot);
+                  setViewMode('postgame');
+                  window.history.pushState(null, '', '/postgame');
+                }
+                return null;
+              });
+              liveGameAutoNavDone.current = false;
             }
           } catch {
             /* ignore malformed messages */
@@ -286,7 +350,21 @@ function App() {
         </div>
       )}
 
-      {viewMode === 'select' ? (
+      {viewMode === 'postgame' && postGameData ? (
+        <PostGamePage
+          data={postGameData}
+          champions={champions}
+          version={version}
+          onBack={handlePostGameBack}
+        />
+      ) : viewMode === 'livegame' && liveGameData ? (
+        <LiveGamePage
+          data={liveGameData}
+          champions={champions}
+          version={version}
+          onBack={handleLiveGameBack}
+        />
+      ) : viewMode === 'select' ? (
         <ChampionSelect
           champions={champions}
           version={version}
