@@ -15,7 +15,6 @@ dist-ssr
 .env.local
 
 # Companion app generated files
-companion/assets/
 companion/node_modules/
 companion/dist/
 

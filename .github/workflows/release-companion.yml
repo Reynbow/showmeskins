@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: companion/go.mod
+          cache-dependency-path: companion/go.sum
 
       - name: Determine version
         id: version
