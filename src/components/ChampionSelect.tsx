@@ -104,17 +104,19 @@ export function ChampionSelect({ champions, version, onSelect }: Props) {
       <div className={`champion-grid-wrapper${scrolled ? ' scrolled' : ''}`} onScroll={handleGridScroll}>
         <div className={`champion-grid${hoveredLetter ? ' letter-highlight' : ''}`}>
           {grouped.map((group, gi) => [
-            <div
-              key={`letter-${group.letter}`}
-              className="letter-marker"
-              onMouseEnter={() => setHoveredLetter(group.letter)}
-              onMouseLeave={() => setHoveredLetter(null)}
-            >
-              <div className="letter-marker-box">
-                <span>{group.letter}</span>
+            ...(selectedRole === 'All' ? [
+              <div
+                key={`letter-${group.letter}`}
+                className="letter-marker"
+                onMouseEnter={() => setHoveredLetter(group.letter)}
+                onMouseLeave={() => setHoveredLetter(null)}
+              >
+                <div className="letter-marker-box">
+                  <span>{group.letter}</span>
+                </div>
+                <span className="champion-card-name">&nbsp;</span>
               </div>
-              <span className="champion-card-name">&nbsp;</span>
-            </div>,
+            ] : []),
             ...group.champions.map((champion, ci) => {
               const i = grouped.slice(0, gi).reduce((sum, g) => sum + g.champions.length, 0) + ci;
               const dimmed = hoveredLetter !== null && champion.name[0].toUpperCase() !== hoveredLetter;

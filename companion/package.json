@@ -1,0 +1,33 @@
+{
+  "name": "lol-viewer-companion",
+  "version": "1.0.0",
+  "description": "Companion app for LoL Model Viewer – detects champion select and syncs with the website",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-icon": "node scripts/create-icon.mjs",
+    "postinstall": "node scripts/create-icon.mjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^34.2.0",
+    "electron-builder": "^26.0.0",
+    "sharp": "^0.34.5"
+  },
+  "build": {
+    "appId": "lol.modelviewer.companion",
+    "productName": "LoL Model Viewer Companion",
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.png"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ]
+  }
+}

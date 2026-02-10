@@ -43,6 +43,11 @@ function App() {
   // Track whether initial URL-based load has been attempted
   const initialLoadDone = useRef(false);
 
+  // Refs for the companion-app WebSocket hook (avoids stale closures)
+  const championsRef = useRef<ChampionBasic[]>([]);
+  championsRef.current = champions;
+  const lastCompanionKey = useRef('');
+
   // On first load: fetch champions, then check URL for deep-link
   useEffect(() => {
     async function load() {
@@ -167,6 +172,91 @@ function App() {
 
   const handlePrevChampion = useCallback(() => navigateChampion(-1), [navigateChampion]);
   const handleNextChampion = useCallback(() => navigateChampion(1), [navigateChampion]);
+
+  // ── Companion app WebSocket integration ────────────────────────────
+  // Connects to the local companion app (ws://localhost:8234) which
+  // detects champion-select state from the League client and forwards
+  // the selected champion + skin here in real time.
+  useEffect(() => {
+    const COMPANION_URL = 'ws://localhost:8234';
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let disposed = false;
+
+    function connect() {
+      if (disposed) return;
+      try {
+        ws = new WebSocket(COMPANION_URL);
+
+        ws.onopen = () => console.log('[companion] Connected to companion app');
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data as string);
+            if (data.type === 'champSelectUpdate') {
+              // De-duplicate on the website side too
+              const key = `${data.championId}:${data.skinNum}`;
+              if (key === lastCompanionKey.current) return;
+              lastCompanionKey.current = key;
+
+              // Debounce: wait 300ms of no change before navigating
+              clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(async () => {
+                const champs = championsRef.current;
+                if (champs.length === 0) return;
+
+                const match = champs.find(
+                  (c) => c.id.toLowerCase() === data.championId.toLowerCase(),
+                );
+                if (!match) return;
+
+                try {
+                  const detail = await getChampionDetail(match.id);
+                  const skin =
+                    detail.skins.find((s) => s.num === data.skinNum) ?? detail.skins[0];
+                  setSelectedChampion(detail);
+                  setSelectedSkin(skin);
+                  setViewMode('viewer');
+                  const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
+                  window.history.replaceState(null, '', `/${match.id}${skinPath}`);
+                } catch (err) {
+                  console.error('[companion] Failed to load champion:', err);
+                }
+              }, 300);
+            }
+          } catch {
+            /* ignore malformed messages */
+          }
+        };
+
+        ws.onclose = () => {
+          ws = null;
+          if (!disposed) {
+            reconnectTimer = setTimeout(connect, 5000);
+          }
+        };
+
+        ws.onerror = () => {
+          // Will trigger onclose → reconnect
+          ws?.close();
+        };
+      } catch {
+        if (!disposed) {
+          reconnectTimer = setTimeout(connect, 5000);
+        }
+      }
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      clearTimeout(reconnectTimer);
+      clearTimeout(debounceTimer);
+      ws?.close();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="app">
