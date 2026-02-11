@@ -379,6 +379,27 @@
   transition: opacity 0.2s;
 }
 
+.companion-dev-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.companion-dev-btn:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
 .companion-source-link:hover {
   color: var(--lol-gold-light);
 }

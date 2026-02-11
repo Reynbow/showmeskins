@@ -128,6 +128,16 @@ func onReady() {
 		func(update ChampSelectUpdate) {
 			bridgeSrv.Broadcast(update)
 		},
+		func(info AccountInfo) {
+			bridgeSrv.Broadcast(map[string]interface{}{
+				"type":         "accountInfo",
+				"puuid":        info.PUUID,
+				"displayName":  info.DisplayName,
+				"summonerId":   info.SummonerID,
+				"accountId":    info.AccountID,
+				"platformId":   info.PlatformID,
+			})
+		},
 	)
 	go lcu.Start()
 

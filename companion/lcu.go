@@ -42,6 +42,18 @@ type StatusCallback func(status string)
 // ChampSelectCallback is called with champion-select updates.
 type ChampSelectCallback func(update ChampSelectUpdate)
 
+// AccountInfoCallback is called with the current summoner's account info (from LCU).
+type AccountInfoCallback func(info AccountInfo)
+
+// AccountInfo holds PUUID and display info for Riot API / match history.
+type AccountInfo struct {
+	PUUID       string `json:"puuid"`
+	DisplayName string `json:"displayName"`
+	SummonerID  string `json:"summonerId,omitempty"`
+	AccountID   int64  `json:"accountId,omitempty"`
+	PlatformID  string `json:"platformId,omitempty"` // e.g. NA1, EUW1 (maps to regional routing)
+}
+
 // LCUConnector detects the running League client, authenticates via the local
 // API, subscribes to champion-select WebSocket events, and emits updates.
 type LCUConnector struct {
@@ -51,8 +63,9 @@ type LCUConnector struct {
 	championMap map[string]ChampInfo // numeric key → ChampInfo
 	lastUpdate  string               // dedup key
 
-	onStatus      StatusCallback
-	onChampSelect ChampSelectCallback
+	onStatus       StatusCallback
+	onChampSelect  ChampSelectCallback
+	onAccountInfo  AccountInfoCallback
 
 	ws        *websocket.Conn
 	stopCh    chan struct{}
@@ -61,12 +74,14 @@ type LCUConnector struct {
 }
 
 // NewLCUConnector creates a new connector with the given callbacks.
-func NewLCUConnector(onStatus StatusCallback, onChampSelect ChampSelectCallback) *LCUConnector {
+// onAccountInfo may be nil (account fetch skipped).
+func NewLCUConnector(onStatus StatusCallback, onChampSelect ChampSelectCallback, onAccountInfo AccountInfoCallback) *LCUConnector {
 	return &LCUConnector{
-		championMap:   make(map[string]ChampInfo),
-		onStatus:      onStatus,
-		onChampSelect: onChampSelect,
-		stopCh:        make(chan struct{}),
+		championMap:    make(map[string]ChampInfo),
+		onStatus:       onStatus,
+		onChampSelect:  onChampSelect,
+		onAccountInfo:  onAccountInfo,
+		stopCh:         make(chan struct{}),
 	}
 }
 
@@ -230,6 +245,11 @@ func (l *LCUConnector) connectToLCU() {
 	l.ws = conn
 	log.Println("[lcu] Connected to League Client WebSocket")
 	l.onStatus("Connected – Waiting for Champion Select…")
+
+	// Fetch account info (PUUID, etc.) for match history / dev tools
+	if l.onAccountInfo != nil {
+		go l.fetchAndEmitAccountInfo(auth)
+	}
 
 	// Subscribe to champion-select session events (WAMP opcode 5 = subscribe)
 	subscribe := `[5, "OnJsonApiEvent_lol-champ-select_v1_session"]`
@@ -402,6 +422,87 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 		SkinNum:      skinNum,
 		SkinID:       skinID,
 	})
+}
+
+// ── Account info (LCU HTTP API) ────────────────────────────────────────
+
+func (l *LCUConnector) fetchAndEmitAccountInfo(auth string) {
+	if l.onAccountInfo == nil || l.isStopped() {
+		return
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Timeout: 10 * time.Second,
+	}
+
+	base := fmt.Sprintf("https://127.0.0.1:%s", l.port)
+	req, err := http.NewRequest("GET", base+"/lol-summoner/v1/current-summoner", nil)
+	if err != nil {
+		log.Printf("[lcu] Account request error: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", "Basic "+auth)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[lcu] Account fetch error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[lcu] Account fetch HTTP %d", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[lcu] Account read error: %v", err)
+		return
+	}
+
+	var summoner struct {
+		PUUID       string `json:"puuid"`
+		DisplayName string `json:"displayName"`
+		SummonerID  int64  `json:"summonerId"`
+		AccountID   int64  `json:"accountId"`
+	}
+	if err := json.Unmarshal(body, &summoner); err != nil {
+		log.Printf("[lcu] Account parse error: %v", err)
+		return
+	}
+
+	if summoner.PUUID == "" {
+		log.Println("[lcu] No PUUID in current-summoner response")
+		return
+	}
+
+	// Fetch platformId from LoginSession (for regional routing)
+	platformID := ""
+	req2, _ := http.NewRequest("GET", base+"/lol-platform-config/v1/namespaces/LoginSession", nil)
+	req2.Header.Set("Authorization", "Basic "+auth)
+	if resp2, err := client.Do(req2); err == nil && resp2.StatusCode == http.StatusOK {
+		var login struct {
+			PlatformID string `json:"platformId"`
+		}
+		if b, _ := io.ReadAll(resp2.Body); json.Unmarshal(b, &login) == nil && login.PlatformID != "" {
+			platformID = login.PlatformID
+		}
+		resp2.Body.Close()
+	}
+
+	info := AccountInfo{
+		PUUID:       summoner.PUUID,
+		DisplayName: summoner.DisplayName,
+		SummonerID:  strconv.FormatInt(summoner.SummonerID, 10),
+		AccountID:   summoner.AccountID,
+		PlatformID:  platformID,
+	}
+	log.Printf("[lcu] Account: %s (platform: %s)", info.DisplayName, info.PlatformID)
+	l.onAccountInfo(info)
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────

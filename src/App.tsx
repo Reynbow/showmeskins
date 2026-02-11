@@ -3,6 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
+import { DevPage, type AccountInfo } from './components/DevPage';
 import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems } from './api';
@@ -43,10 +44,11 @@ function App() {
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev'>('select');
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
   // Track whether we've already auto-navigated for this game session
   // (so we don't force the user back if they navigate away)
@@ -74,6 +76,8 @@ function App() {
         const { championId, skinSlug: urlSkinSlug } = parseUrl();
         if (championId === 'companion') {
           setViewMode('companion');
+        } else if (championId === 'dev') {
+          setViewMode('dev');
         } else if (championId === 'live') {
           setViewMode('livegame');
         } else if (championId === 'postgame') {
@@ -119,6 +123,10 @@ function App() {
       }
       if (championId === 'companion') {
         setViewMode('companion');
+        return;
+      }
+      if (championId === 'dev') {
+        setViewMode('dev');
         return;
       }
       if (championId === 'live') {
@@ -182,6 +190,16 @@ function App() {
   const handleCompanionBack = useCallback(() => {
     setViewMode('select');
     window.history.pushState(null, '', '/');
+  }, []);
+
+  const handleDev = useCallback(() => {
+    setViewMode('dev');
+    window.history.pushState(null, '', '/dev');
+  }, []);
+
+  const handleDevBack = useCallback(() => {
+    setViewMode('companion');
+    window.history.pushState(null, '', '/companion');
   }, []);
 
   const isSamplePreview = useRef(false);
@@ -309,6 +327,17 @@ function App() {
               }, 300);
             }
 
+            // ── Account info (PUUID, etc. for match history) ──
+            if (data.type === 'accountInfo' && data.puuid) {
+              setAccountInfo({
+                puuid: data.puuid,
+                displayName: data.displayName ?? '',
+                summonerId: data.summonerId,
+                accountId: data.accountId,
+                platformId: data.platformId,
+              });
+            }
+
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
               setLiveGameData({
@@ -421,7 +450,10 @@ function App() {
           onBack={handleCompanionBack}
           onSampleLive={handleSampleLive}
           onSamplePostGame={handleSamplePostGame}
+          onDev={handleDev}
         />
+      ) : viewMode === 'dev' ? (
+        <DevPage accountInfo={accountInfo} onBack={handleDevBack} />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}

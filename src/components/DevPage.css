@@ -1,0 +1,193 @@
+.dev-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--lol-bg-primary);
+  position: relative;
+}
+
+.dev-bg-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 300px;
+  background: radial-gradient(ellipse 80% 80% at 50% 0%, rgba(200, 170, 110, 0.08), transparent);
+  pointer-events: none;
+}
+
+.dev-content {
+  flex: 1;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.dev-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 24px;
+}
+
+.dev-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dev-back:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+.dev-title {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  color: var(--lol-text-primary);
+  margin: 0 0 8px;
+}
+
+.dev-subtitle {
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  margin: 0 0 32px;
+}
+
+.dev-section {
+  margin-bottom: 28px;
+}
+
+.dev-section h2 {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--lol-gold-light);
+  margin: 0 0 12px;
+}
+
+.dev-card {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--lol-border);
+  padding: 16px 20px;
+  border-radius: 4px;
+}
+
+.dev-card.dev-account {
+  border-color: rgba(200, 170, 110, 0.3);
+}
+
+.dev-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.dev-row:last-child {
+  margin-bottom: 0;
+}
+
+.dev-label {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--lol-text-muted);
+}
+
+.dev-value {
+  font-size: 14px;
+  color: var(--lol-text-primary);
+}
+
+.dev-code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--lol-gold-light);
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+.dev-empty,
+.dev-empty-inline {
+  color: var(--lol-text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.dev-empty-inline {
+  margin-top: 8px;
+}
+
+.dev-loading {
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.dev-error {
+  color: #c95c5c;
+  font-size: 14px;
+  margin: 0;
+}
+
+.dev-match-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.dev-match-id {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--lol-border);
+  font-size: 12px;
+}
+
+.dev-match-id:last-child {
+  border-bottom: none;
+}
+
+.dev-match-id code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lol-text-secondary);
+  word-break: break-all;
+}
+
+.dev-api-note {
+  border-top: 1px solid var(--lol-border);
+  padding-top: 20px;
+}
+
+.dev-api-note p {
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dev-api-note code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--lol-gold-light);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 2px;
+}

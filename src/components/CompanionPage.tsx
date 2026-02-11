@@ -4,12 +4,13 @@ interface Props {
   onBack: () => void;
   onSampleLive: () => void;
   onSamplePostGame: () => void;
+  onDev?: () => void;
 }
 
 const DOWNLOAD_URL =
   'https://github.com/Reynbow/showmeskins/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
 
-export function CompanionPage({ onBack, onSampleLive, onSamplePostGame }: Props) {
+export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev }: Props) {
   return (
     <div className="companion-page">
       {/* Background decorations (same as champion select) */}
@@ -167,6 +168,19 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame }: Props)
             </div>
           </div>
         </div>
+
+        {/* Dev tools link */}
+        {onDev && (
+          <div className="companion-section">
+            <button
+              type="button"
+              className="companion-dev-btn"
+              onClick={onDev}
+            >
+              Dev: Account &amp; Match History
+            </button>
+          </div>
+        )}
 
         {/* Source code link */}
         <div className="companion-section companion-source">
