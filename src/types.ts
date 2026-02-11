@@ -22,9 +22,41 @@ export interface ChromaInfo {
   colors: string[];   // hex color(s) from CommunityDragon, e.g. ["#9C68D7","#9C68D7"]
 }
 
+/** Champion info bars (attack, defense, magic, difficulty 1–10) from Data Dragon */
+export interface ChampionInfo {
+  attack: number;
+  defense: number;
+  magic: number;
+  difficulty: number;
+}
+
+/** Champion base stats from Data Dragon */
+export interface ChampionStats {
+  hp: number;
+  hpperlevel?: number;
+  mp: number;
+  mpperlevel?: number;
+  movespeed: number;
+  armor: number;
+  armorperlevel?: number;
+  spellblock: number;
+  spellblockperlevel?: number;
+  attackrange: number;
+  hpregen?: number;
+  mpregen?: number;
+  crit?: number;
+  critperlevel?: number;
+  attackdamage: number;
+  attackdamageperlevel?: number;
+  attackspeed: number;
+  attackspeedperlevel?: number;
+}
+
 export interface ChampionDetail extends ChampionBasic {
   skins: Skin[];
   lore: string;
+  info?: ChampionInfo;
+  stats?: ChampionStats;
 }
 
 export interface ItemInfo {

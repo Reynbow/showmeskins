@@ -123,6 +123,13 @@
   margin-bottom: 40px;
 }
 
+.companion-download-tagline {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: var(--lol-text-secondary);
+  letter-spacing: 1px;
+}
+
 .companion-download-btn {
   display: inline-flex;
   align-items: center;

@@ -53,6 +53,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame }: Props)
             Download for Windows
           </a>
           <span className="companion-version">v0.2 Beta &middot; Windows 10/11</span>
+          <p className="companion-download-tagline">Live and post-game information tracker</p>
         </div>
 
         {/* What it does */}
