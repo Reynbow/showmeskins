@@ -27,6 +27,13 @@ export interface ChampionDetail extends ChampionBasic {
   lore: string;
 }
 
+export interface ItemInfo {
+  name: string;
+  descriptionHtml: string;  // HTML with styled spans for rich rendering
+  plaintext: string;        // one-line summary
+  goldTotal: number;
+}
+
 export type ViewMode = 'select' | 'viewer';
 
 // ── Live game data (from companion app → Live Client Data API) ──────────
@@ -69,10 +76,13 @@ export interface LiveGameStats {
   resourceRegenRate: number;
 }
 
+export type PlayerPosition = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | '';
+
 export interface LiveGamePlayer {
   summonerName: string;
   championName: string;
   team: 'ORDER' | 'CHAOS';
+  position: PlayerPosition;
   level: number;
   kills: number;
   deaths: number;

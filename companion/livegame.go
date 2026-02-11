@@ -53,6 +53,7 @@ type PlayerInfo struct {
 	SummonerName   string         `json:"summonerName"`
 	ChampionName   string         `json:"championName"`
 	Team           string         `json:"team"` // "ORDER" (blue) or "CHAOS" (red)
+	Position       string         `json:"position"` // "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", or ""
 	Level          int            `json:"level"`
 	Kills          int            `json:"kills"`
 	Deaths         int            `json:"deaths"`
@@ -290,6 +291,7 @@ type playerData struct {
 	RiotIdGameName  string     `json:"riotIdGameName"`
 	ChampionName    string     `json:"championName"`
 	RawChampionName string     `json:"rawChampionName"`
+	Position        string     `json:"position"` // "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"
 	Items           []itemData `json:"items"`
 	Level           int        `json:"level"`
 	Scores          scoresData `json:"scores"`
@@ -435,6 +437,7 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			SummonerName:   displayName,
 			ChampionName:   p.ChampionName,
 			Team:           p.Team,
+			Position:       p.Position,
 			Level:          p.Level,
 			Kills:          p.Scores.Kills,
 			Deaths:         p.Scores.Deaths,

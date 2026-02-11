@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic } from '../types';
+import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { getModelUrl } from '../api';
 import './LiveGamePage.css';
 
@@ -10,7 +10,37 @@ interface Props {
   data: LiveGameData;
   champions: ChampionBasic[];
   version: string;
+  itemData: Record<number, ItemInfo>;
   onBack: () => void;
+}
+
+/* ── Role ordering & icons ───────────────────────────────────────────── */
+
+const ROLE_ORDER: Record<string, number> = {
+  TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4,
+};
+
+function sortByRole<T extends { position: PlayerPosition }>(players: T[]): T[] {
+  return [...players].sort((a, b) => (ROLE_ORDER[a.position] ?? 99) - (ROLE_ORDER[b.position] ?? 99));
+}
+
+const ROLE_ICON_URL: Record<string, string> = {
+  TOP: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top-hover.png',
+  JUNGLE: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle-hover.png',
+  MIDDLE: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle-hover.png',
+  BOTTOM: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom-hover.png',
+  UTILITY: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility-hover.png',
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support',
+};
+
+function RoleIcon({ position }: { position: PlayerPosition }) {
+  const src = ROLE_ICON_URL[position];
+  const label = ROLE_LABELS[position] ?? '';
+  if (!src) return <span className="lg-role-icon" />;
+  return <img className="lg-role-icon" src={src} alt={label} />;
 }
 
 /** Format seconds → MM:SS */
@@ -86,7 +116,6 @@ const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
       { label: 'Ability Power', key: 'abilityPower', color: 'lg-stat-ap' },
       { label: 'Attack Speed', key: 'attackSpeed', color: 'lg-stat-as', format: (v) => v.toFixed(2) },
       { label: 'Crit Chance', key: 'critChance', color: 'lg-stat-crit', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
-      { label: 'Ability Haste', key: 'abilityHaste', color: 'lg-stat-ah' },
     ],
   },
   {
@@ -100,6 +129,8 @@ const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
   {
     groupLabel: 'Utility',
     stats: [
+      { label: 'Ability Haste', key: 'abilityHaste', color: 'lg-stat-ah' },
+      { label: 'Attack Range', key: 'attackRange', color: 'lg-stat-as' },
       { label: 'Move Speed', key: 'moveSpeed', color: 'lg-stat-ms' },
       { label: 'Life Steal', key: 'lifeSteal', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
       { label: 'Omnivamp', key: 'omnivamp', color: 'lg-stat-ls', format: (v) => `${Math.round(v * 100)}%`, showIf: (v) => v > 0 },
@@ -117,8 +148,24 @@ const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
 ];
 
 /* ================================================================
-   Simplified 3D Model — Idle animation, auto-sizing, auto-rotate
+   Simplified 3D Model — Taunt animation (fallback to idle), auto-sizing
    ================================================================ */
+
+/** Check if an animation name is an attack animation */
+function isAttackAnim(name: string): boolean {
+  const n = name.replace(/\.anm$/i, '');
+  if (/_to_/i.test(n) || /to_attack/i.test(n)) return false;
+  return /attack/i.test(n);
+}
+
+const ATTACK_PATTERNS: RegExp[] = [
+  /^attack1(\.anm)?$/i,
+  /^attack_?1(\.anm)?$/i,
+  /^attack(\.anm)?$/i,
+  /^attack\d?(\.anm)?$/i,
+  /(?:^|_)attack(?:\d{0,2})?(\.anm)?$/i,
+  /attack/i,
+];
 
 /** Check if an animation name is a valid idle animation */
 function isIdleAnim(name: string): boolean {
@@ -140,7 +187,18 @@ const IDLE_PATTERNS: RegExp[] = [
   /idle/i,
 ];
 
-function findBestIdleName(names: string[]): string | undefined {
+/** Find the best attack animation, falling back to idle */
+function findBestAnimName(names: string[]): string | undefined {
+  // Try attack first
+  const attacks = names.filter(isAttackAnim);
+  if (attacks.length > 0) {
+    for (const pattern of ATTACK_PATTERNS) {
+      const match = attacks.find((n) => pattern.test(n));
+      if (match) return match;
+    }
+    return attacks[0];
+  }
+  // Fallback to idle
   const idles = names.filter(isIdleAnim);
   if (idles.length > 0) {
     for (const pattern of IDLE_PATTERNS) {
@@ -163,7 +221,7 @@ function LiveChampionModel({ url }: { url: string }) {
   const { actions, names } = useAnimations(animations, groupRef);
   const [ready, setReady] = useState(false);
 
-  const idleName = useMemo(() => findBestIdleName(names), [names]);
+  const animName = useMemo(() => findBestAnimName(names), [names]);
 
   useEffect(() => {
     setReady(false);
@@ -200,12 +258,12 @@ function LiveChampionModel({ url }: { url: string }) {
       if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
     });
 
-    // Play idle animation, tick one frame to pose the skeleton, then pause
-    if (idleName && actions[idleName]) {
-      const idle = actions[idleName]!;
-      idle.reset().play();
-      idle.getMixer().update(0);
-      idle.paused = true;
+    // Play taunt (or idle fallback), tick one frame to pose the skeleton, then pause
+    if (animName && actions[animName]) {
+      const anim = actions[animName]!;
+      anim.reset().play();
+      anim.getMixer().update(0);
+      anim.paused = true;
     }
     scene.updateMatrixWorld(true);
 
@@ -272,7 +330,8 @@ function LiveChampionModel({ url }: { url: string }) {
     // Reveal
     scene.visible = true;
     setReady(true);
-  }, [scene, actions, names, idleName, url]);
+  }, [scene, actions, names, animName, url]);
+
 
   return (
     <group ref={groupRef}>
@@ -299,9 +358,10 @@ function ModelLoadingIndicator() {
 }
 
 /** Error boundary for 3D model loading failures */
-class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode; resetKey?: string }, { hasError: boolean }> {
+class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode; resetKey?: string; onError?: () => void }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch() { this.props.onError?.(); }
   componentDidUpdate(prev: { resetKey?: string }) {
     if (prev.resetKey !== this.props.resetKey) this.setState({ hasError: false });
   }
@@ -309,9 +369,19 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 }
 
 /** Reusable 3D canvas that renders a champion model with lighting + shadows */
-function ChampionModelCanvas({ url }: { url: string }) {
+function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: string }) {
+  const [useFallback, setUseFallback] = useState(false);
+  const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
+
+  // Reset fallback state when the primary URL changes
+  useEffect(() => { setUseFallback(false); }, [url]);
+
   return (
-    <ModelErrorBoundary resetKey={url} fallback={null}>
+    <ModelErrorBoundary
+      resetKey={activeUrl}
+      fallback={null}
+      onError={() => { if (fallbackUrl && !useFallback) setUseFallback(true); }}
+    >
       <Canvas
         shadows
         camera={{ position: [0, 0.5, 5.5], fov: 45 }}
@@ -349,7 +419,7 @@ function ChampionModelCanvas({ url }: { url: string }) {
           <shadowMaterial opacity={0.3} />
         </mesh>
         <Suspense fallback={<ModelLoadingIndicator />}>
-          <LiveChampionModel key={url} url={url} />
+          <LiveChampionModel key={activeUrl} url={activeUrl} />
         </Suspense>
         <OrbitControls
           enableRotate
@@ -368,9 +438,12 @@ function ChampionModelCanvas({ url }: { url: string }) {
    Main LiveGamePage component
    ================================================================ */
 
-export function LiveGamePage({ data, champions, version, onBack }: Props) {
+export function LiveGamePage({ data, champions, version, itemData, onBack }: Props) {
   const [showStats, setShowStats] = useState(true);
   const toggleStats = useCallback(() => setShowStats((s) => !s), []);
+
+  // Track the highest observed gold total (items + current) so it never dips on purchase
+  const peakGoldRef = useRef(0);
 
   // Find the active player
   const activePlayer = useMemo(
@@ -379,14 +452,20 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
   );
 
   // Resolve model URL for a player by champion name + skin
+  // Returns { url, fallbackUrl } — fallback is the base skin in case a chroma ID has no model
   const resolveModelUrl = useCallback((player: LiveGamePlayer | undefined) => {
     if (!player) return null;
     const match = champions.find(
       (c) => c.name.toLowerCase() === player.championName.toLowerCase(),
     );
     if (!match) return null;
-    const skinId = `${parseInt(match.key) * 1000 + player.skinID}`;
-    return getModelUrl(match.id, skinId);
+    const championKey = parseInt(match.key);
+    const skinId = `${championKey * 1000 + player.skinID}`;
+    const baseSkinId = `${championKey * 1000}`;
+    return {
+      url: getModelUrl(match.id, skinId),
+      fallbackUrl: skinId !== baseSkinId ? getModelUrl(match.id, baseSkinId) : undefined,
+    };
   }, [champions]);
 
   // Active player's model
@@ -409,13 +488,13 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
     [topEnemy, resolveModelUrl],
   );
 
-  // Split players into teams
+  // Split players into teams, sorted by role
   const blueTeam = useMemo(
-    () => data.players.filter((p) => p.team === 'ORDER'),
+    () => sortByRole(data.players.filter((p) => p.team === 'ORDER')),
     [data.players],
   );
   const redTeam = useMemo(
-    () => data.players.filter((p) => p.team === 'CHAOS'),
+    () => sortByRole(data.players.filter((p) => p.team === 'CHAOS')),
     [data.players],
   );
 
@@ -449,14 +528,14 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
       {/* Your champion model — left of scoreboard */}
       {modelUrl && (
         <div className="lg-model-bg lg-model-bg--left">
-          <ChampionModelCanvas url={modelUrl} />
+          <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
         </div>
       )}
 
       {/* Enemy top-killer model — right of scoreboard, mirrored */}
       {enemyModelUrl && (
         <div className="lg-model-bg lg-model-bg--right">
-          <ChampionModelCanvas url={enemyModelUrl} />
+          <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
         </div>
       )}
 
@@ -510,22 +589,27 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
             <span className="lg-sb-header-red">Red Team</span>
           </div>
 
-          {/* Rows: blue player (left) | red player (right) */}
-          {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => (
+          {/* Rows: blue player (left) | role icon | red player (right) */}
+          {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
+            const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
+            return (
             <div key={i} className="lg-sb-match-row">
               {blueTeam[i] ? (
-                <LgPlayerSide player={blueTeam[i]} side="blue" champions={champions} version={version} />
+                <LgPlayerSide player={blueTeam[i]} side="blue" champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--blue" />
               )}
-              <div className="lg-sb-vs-divider" />
+              <div className="lg-sb-vs-divider">
+                {rolePos && <RoleIcon position={rolePos as PlayerPosition} />}
+              </div>
               {redTeam[i] ? (
-                <LgPlayerSide player={redTeam[i]} side="red" champions={champions} version={version} />
+                <LgPlayerSide player={redTeam[i]} side="red" champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--red" />
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Active player stats panel */}
@@ -545,16 +629,19 @@ export function LiveGamePage({ data, champions, version, onBack }: Props) {
                   <div className="lg-stat-item">
                     <span className="lg-stat-label">Current Gold</span>
                     <span className="lg-stat-value lg-stat-gold">
-                      {formatGold(data.activePlayer.currentGold)}
+                      {Math.floor(data.activePlayer.currentGold).toLocaleString()}
                     </span>
                   </div>
                   <div className="lg-stat-item">
                     <span className="lg-stat-label">Total Earned</span>
                     <span className="lg-stat-value lg-stat-gold">
-                      {Math.floor(
-                        (activePlayer?.items.reduce((s, item) => s + item.price * item.count, 0) ?? 0)
-                        + data.activePlayer.currentGold
-                      ).toLocaleString()}
+                      {(() => {
+                        const current =
+                          (activePlayer?.items.reduce((s, item) => s + item.price * item.count, 0) ?? 0)
+                          + data.activePlayer.currentGold;
+                        if (current > peakGoldRef.current) peakGoldRef.current = current;
+                        return Math.floor(peakGoldRef.current).toLocaleString();
+                      })()}
                     </span>
                   </div>
                   <div className="lg-stat-item">
@@ -750,11 +837,13 @@ function LgPlayerSide({
   side,
   champions,
   version,
+  itemData,
 }: {
   player: LiveGamePlayer;
   side: 'blue' | 'red';
   champions: ChampionBasic[];
   version: string;
+  itemData: Record<number, ItemInfo>;
 }) {
   const isActive = player.isActivePlayer;
 
@@ -772,21 +861,39 @@ function LgPlayerSide({
 
   const items = (
     <div className="lg-sb-items">
-      {itemSlots.map((item, i) => (
-        <div key={i} className={`lg-sb-item-slot ${!item ? 'empty' : ''}`}>
-          {item && (
-            <>
-              <img
-                className="lg-sb-item-img"
-                src={getItemIconUrl(version, item.itemID)}
-                alt={item.displayName}
-                loading="lazy"
-              />
-              {item.count > 1 && <span className="lg-sb-item-count">{item.count}</span>}
-            </>
-          )}
-        </div>
-      ))}
+      {itemSlots.map((item, i) => {
+        const info = item ? itemData[item.itemID] : undefined;
+        return (
+          <div key={i} className={`lg-sb-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
+            {item && (
+              <>
+                <img
+                  className="lg-sb-item-img"
+                  src={getItemIconUrl(version, item.itemID)}
+                  alt={item.displayName}
+                  loading="lazy"
+                />
+                {item.count > 1 && <span className="lg-sb-item-count">{item.count}</span>}
+                {info && (
+                  <div className="item-tooltip">
+                    <div className="item-tooltip-header">
+                      <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
+                      <div className="item-tooltip-title">
+                        <span className="item-tooltip-name">{info.name}</span>
+                      </div>
+                      <span className="item-tooltip-gold">
+                        <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+                        {info.goldTotal.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: info.descriptionHtml }} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 

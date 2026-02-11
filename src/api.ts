@@ -1,4 +1,4 @@
-import type { ChampionBasic, ChampionDetail, ChromaInfo } from './types';
+import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo } from './types';
 
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
 const MODEL_CDN = '/model-cdn'; // proxied through Vite to cdn.modelviewer.lol
@@ -20,6 +20,114 @@ export async function getChampions(): Promise<Record<string, ChampionBasic>> {
   const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/champion.json`);
   const data = await res.json();
   return data.data;
+}
+
+/**
+ * Convert Data Dragon's custom HTML tags into standard HTML with CSS classes.
+ * Preserves <br> for line breaks and wraps custom tags in styled <span>s.
+ */
+/** Map stat keywords to color classes (matching the "Your Stats" panel) */
+const STAT_COLORS: [RegExp, string][] = [
+  [/\bAttack Damage\b/g, 'itt-c-ad'],
+  [/\bAbility Power\b/g, 'itt-c-ap'],
+  [/\bArmor\b/g, 'itt-c-armor'],
+  [/\bMagic Resist\b/g, 'itt-c-mr'],
+  [/\bAttack Speed\b/g, 'itt-c-as'],
+  [/\bAbility Haste\b/g, 'itt-c-ah'],
+  [/\bHealth(?:\s+Regen)?\b/g, 'itt-c-hp'],
+  [/\bMove(?:ment)?\s*Speed\b/g, 'itt-c-ms'],
+  [/\bCritical Strike(?:\s+(?:Chance|Damage))?\b/g, 'itt-c-crit'],
+  [/\bLife Steal\b/g, 'itt-c-ls'],
+  [/\bOmnivamp\b/g, 'itt-c-ls'],
+  [/\bLethality\b/g, 'itt-c-lethality'],
+  [/\bMana(?:\s+Regen)?\b/g, 'itt-c-mana'],
+  [/\bBase Mana Regen\b/g, 'itt-c-mana'],
+  [/\bBase Health Regen\b/g, 'itt-c-hp'],
+];
+
+function colorizeStats(html: string): string {
+  for (const [pattern, cls] of STAT_COLORS) {
+    html = html.replace(pattern, (m) => `<span class="${cls}">${m}</span>`);
+  }
+  return html;
+}
+
+function convertItemHtml(raw: string): string {
+  return raw
+    // Strip the outer wrapper
+    .replace(/<\/?mainText>/gi, '')
+    // Stats block → div (colorize stat keywords inside)
+    .replace(/<stats>([\s\S]*?)<\/stats>/gi, (_match, inner: string) =>
+      '<div class="itt-stats">' + colorizeStats(inner) + '</div>'
+    )
+    // Attention (highlighted numbers)
+    .replace(/<attention>/gi, '<span class="itt-attention">')
+    .replace(/<\/attention>/gi, '</span>')
+    // Passive / Active names
+    .replace(/<passive>/gi, '<span class="itt-passive">')
+    .replace(/<\/passive>/gi, '</span>')
+    .replace(/<active>/gi, '<span class="itt-active">')
+    .replace(/<\/active>/gi, '</span>')
+    // Damage types
+    .replace(/<physicalDamage>/gi, '<span class="itt-phys">')
+    .replace(/<\/physicalDamage>/gi, '</span>')
+    .replace(/<magicDamage>/gi, '<span class="itt-magic">')
+    .replace(/<\/magicDamage>/gi, '</span>')
+    .replace(/<trueDamage>/gi, '<span class="itt-true">')
+    .replace(/<\/trueDamage>/gi, '</span>')
+    // Utility keywords
+    .replace(/<healing>/gi, '<span class="itt-healing">')
+    .replace(/<\/healing>/gi, '</span>')
+    .replace(/<shield>/gi, '<span class="itt-shield">')
+    .replace(/<\/shield>/gi, '</span>')
+    .replace(/<speed>/gi, '<span class="itt-speed">')
+    .replace(/<\/speed>/gi, '</span>')
+    .replace(/<status>/gi, '<span class="itt-status">')
+    .replace(/<\/status>/gi, '</span>')
+    .replace(/<OnHit>/gi, '<span class="itt-onhit">')
+    .replace(/<\/OnHit>/gi, '</span>')
+    // Rarity tags
+    .replace(/<rarityMythic>/gi, '<span class="itt-mythic">')
+    .replace(/<\/rarityMythic>/gi, '</span>')
+    .replace(/<rarityLegendary>/gi, '<span class="itt-legendary">')
+    .replace(/<\/rarityLegendary>/gi, '</span>')
+    // Scale tags
+    .replace(/<scale\w+>/gi, '<span class="itt-scale">')
+    .replace(/<\/scale\w+>/gi, '</span>')
+    // List items
+    .replace(/<li>/gi, '<div class="itt-li">')
+    .replace(/<\/li>/gi, '</div>')
+    // Rules (horizontal separator)
+    .replace(/<rules>/gi, '<hr class="itt-rule">')
+    .replace(/<\/rules>/gi, '')
+    // Collapse 3+ consecutive <br> into a separator
+    .replace(/(<br\s*\/?>){3,}/gi, '<div class="itt-sep"></div>')
+    // Collapse 2 consecutive <br> into a spacer
+    .replace(/(<br\s*\/?>){2}/gi, '<div class="itt-spacer"></div>')
+    // Strip any remaining unknown tags (but keep <br>, <span>, <div>, <hr>)
+    .replace(/<(?!\/?(?:br|span|div|hr)\b)[^>]+>/gi, '')
+    .trim();
+}
+
+let cachedItems: Record<number, ItemInfo> | null = null;
+
+export async function getItems(): Promise<Record<number, ItemInfo>> {
+  if (cachedItems) return cachedItems;
+  const version = await getLatestVersion();
+  const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/item.json`);
+  const data = await res.json();
+  const items: Record<number, ItemInfo> = {};
+  for (const [id, raw] of Object.entries(data.data)) {
+    const item = raw as { name: string; description: string; plaintext: string; gold: { total: number } };
+    items[Number(id)] = {
+      name: item.name,
+      descriptionHtml: convertItemHtml(item.description),
+      plaintext: item.plaintext || '',
+      goldTotal: item.gold?.total ?? 0,
+    };
+  }
+  cachedItems = items;
+  return items;
 }
 
 export async function getChampionDetail(id: string): Promise<ChampionDetail> {

@@ -48,6 +48,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'TopDiff99',
       championName: 'Darius',
       team: 'ORDER',
+      position: 'TOP',
       level: 12,
       kills: 4,
       deaths: 3,
@@ -69,6 +70,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'JGKing',
       championName: 'LeeSin',
       team: 'ORDER',
+      position: 'JUNGLE',
       level: 11,
       kills: 5,
       deaths: 2,
@@ -89,6 +91,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'You',
       championName: 'Jinx',
       team: 'ORDER',
+      position: 'BOTTOM',
       level: 13,
       kills: 8,
       deaths: 1,
@@ -111,6 +114,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'SuppGap',
       championName: 'Thresh',
       team: 'ORDER',
+      position: 'UTILITY',
       level: 10,
       kills: 1,
       deaths: 4,
@@ -131,6 +135,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'MidOrFeed',
       championName: 'Ahri',
       team: 'ORDER',
+      position: 'MIDDLE',
       level: 12,
       kills: 6,
       deaths: 2,
@@ -153,6 +158,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'xXSlayerXx',
       championName: 'Yone',
       team: 'CHAOS',
+      position: 'TOP',
       level: 13,
       kills: 7,
       deaths: 3,
@@ -174,6 +180,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'ForestGuard',
       championName: 'Vi',
       team: 'CHAOS',
+      position: 'JUNGLE',
       level: 11,
       kills: 3,
       deaths: 5,
@@ -194,6 +201,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'ZedMain420',
       championName: 'Zed',
       team: 'CHAOS',
+      position: 'MIDDLE',
       level: 12,
       kills: 5,
       deaths: 4,
@@ -214,6 +222,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'ADC Diff',
       championName: 'Caitlyn',
       team: 'CHAOS',
+      position: 'BOTTOM',
       level: 12,
       kills: 3,
       deaths: 5,
@@ -234,6 +243,7 @@ const sampleLiveGame: LiveGameData = {
       summonerName: 'WardBot',
       championName: 'Leona',
       team: 'CHAOS',
+      position: 'UTILITY',
       level: 9,
       kills: 0,
       deaths: 7,
@@ -282,6 +292,10 @@ export const samplePostGameData: LiveGameData = {
     // Bump kills / CS a bit for the final snapshot
     if (p.team === 'ORDER') {
       return { ...p, kills: p.kills + 2, creepScore: p.creepScore + 30 };
+    }
+    // Give Yone a big late-game pop-off so he's the game MVP (enemy carry scenario)
+    if (p.championName === 'Yone') {
+      return { ...p, kills: 14, deaths: 4, assists: 6, creepScore: p.creepScore + 40 };
     }
     return { ...p, deaths: p.deaths + 1, creepScore: p.creepScore + 20 };
   }),

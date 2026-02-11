@@ -204,7 +204,7 @@
   background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
   border: 1px solid rgba(30, 40, 45, 0.8);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   backdrop-filter: blur(8px);
 }
 
@@ -217,6 +217,7 @@
   padding: 12px 20px;
   background: rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+  border-radius: 8px 8px 0 0;
 }
 
 .lg-sb-header-blue {
@@ -271,10 +272,20 @@
   border-bottom: none;
 }
 
-/* Center vertical divider */
+/* Center vertical divider with role icon */
 .lg-sb-vs-divider {
-  width: 2px;
-  background: rgba(30, 40, 45, 0.6);
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(30, 40, 45, 0.3);
+}
+
+.lg-role-icon {
+  width: 16px;
+  height: 16px;
+  color: rgba(200, 170, 110, 0.5);
   flex-shrink: 0;
 }
 
@@ -305,11 +316,11 @@
 
 /* Active player highlight */
 .lg-sb-side--active {
-  background: rgba(200, 170, 110, 0.06);
+  background: rgba(200, 170, 110, 0.14);
 }
 
 .lg-sb-side--active:hover {
-  background: rgba(200, 170, 110, 0.09);
+  background: rgba(200, 170, 110, 0.18);
 }
 
 .lg-sb-side--blue.lg-sb-side--active::before {
@@ -328,9 +339,33 @@
   background: var(--lol-gold);
 }
 
-/* Dead player */
+/* Dead player — dim each child individually so item tooltips stay opaque */
 .lg-sb-side--dead {
-  opacity: 0.45;
+  background: rgba(80, 20, 20, 0.15);
+}
+
+.lg-sb-side--dead .lg-sb-portrait,
+.lg-sb-side--dead .lg-sb-player-info,
+.lg-sb-side--dead .lg-sb-kda,
+.lg-sb-side--dead .lg-sb-cs,
+.lg-sb-side--dead .lg-sb-respawn {
+  opacity: 0.35;
+}
+
+.lg-sb-side--dead .lg-sb-item-slot {
+  opacity: 0.35;
+}
+
+.lg-sb-side--dead .lg-sb-item-slot.item-tooltip-wrap:hover {
+  opacity: 1;
+}
+
+.lg-sb-side--dead .lg-sb-portrait {
+  border-color: rgba(120, 40, 40, 0.6);
+}
+
+.lg-sb-side--dead .lg-sb-portrait-img {
+  filter: grayscale(0.7);
 }
 
 /* Portrait */

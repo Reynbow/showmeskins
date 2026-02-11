@@ -55,3 +55,213 @@
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+
+/* ── Shared item tooltip (in-game style) ─────────────────────────────── */
+
+.item-tooltip-wrap {
+  position: relative;
+}
+
+.item-tooltip-wrap:hover {
+  overflow: visible !important;
+  z-index: 50;
+}
+
+.item-tooltip-wrap .item-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: 280px;
+  background: linear-gradient(180deg, #0a0e14 0%, #070b11 100%);
+  border: 1px solid #5b4c33;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), 0 6px 20px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a09b8c;
+}
+
+.item-tooltip-wrap:hover .item-tooltip {
+  display: block;
+}
+
+/* ── Tooltip header (icon + name + gold) ─────────────────────────────── */
+
+.item-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #5b4c33;
+  background: rgba(30, 25, 15, 0.4);
+}
+
+.item-tooltip-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px solid #5b4c33;
+  flex-shrink: 0;
+}
+
+.item-tooltip-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.item-tooltip-name {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: #f0e6d2;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.item-tooltip-subtitle {
+  font-size: 11px;
+  color: #5b5a56;
+  line-height: 1.3;
+}
+
+.item-tooltip-gold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.item-tooltip-coin {
+  width: 14px;
+  height: 14px;
+  color: #fbbf24;
+}
+
+/* ── Tooltip body (description) ──────────────────────────────────────── */
+
+.item-tooltip-body {
+  padding: 10px 12px;
+}
+
+/* Stats block */
+.item-tooltip-body .itt-stats {
+  margin-bottom: 4px;
+  line-height: 1.7;
+  color: #a09b8c;
+}
+
+/* Spacer between stats and passives */
+.item-tooltip-body .itt-spacer {
+  height: 6px;
+}
+
+/* Separator line (for triple+ <br>) */
+.item-tooltip-body .itt-sep {
+  height: 1px;
+  background: rgba(91, 76, 51, 0.5);
+  margin: 8px 0;
+}
+
+/* Horizontal rule */
+.item-tooltip-body .itt-rule {
+  border: none;
+  height: 1px;
+  background: rgba(91, 76, 51, 0.5);
+  margin: 8px 0;
+}
+
+/* Highlighted numbers */
+.item-tooltip-body .itt-attention {
+  color: #f0e6d2;
+  font-weight: 600;
+}
+
+/* Stat keyword colors (matching "Your Stats" panel) */
+.item-tooltip-body .itt-c-ad       { color: #ff8c42; }
+.item-tooltip-body .itt-c-ap       { color: #6e8efb; }
+.item-tooltip-body .itt-c-armor    { color: #f0c040; }
+.item-tooltip-body .itt-c-mr       { color: #c078f0; }
+.item-tooltip-body .itt-c-as       { color: #f0e060; }
+.item-tooltip-body .itt-c-ah       { color: #e8b4f8; }
+.item-tooltip-body .itt-c-hp       { color: #4ade80; }
+.item-tooltip-body .itt-c-ms       { color: #60a5fa; }
+.item-tooltip-body .itt-c-crit     { color: #f87171; }
+.item-tooltip-body .itt-c-ls       { color: #86efac; }
+.item-tooltip-body .itt-c-lethality { color: #ff6b6b; }
+.item-tooltip-body .itt-c-mana     { color: #60a5fa; }
+
+/* Passive name */
+.item-tooltip-body .itt-passive {
+  color: #f0e6d2;
+  font-weight: 700;
+}
+
+/* Active name */
+.item-tooltip-body .itt-active {
+  color: #f0e6d2;
+  font-weight: 700;
+}
+
+/* Damage type colors */
+.item-tooltip-body .itt-phys {
+  color: #ff8c42;
+}
+
+.item-tooltip-body .itt-magic {
+  color: #7bb5f0;
+}
+
+.item-tooltip-body .itt-true {
+  color: #f0f0f0;
+}
+
+/* Utility keyword colors */
+.item-tooltip-body .itt-healing {
+  color: #58c564;
+}
+
+.item-tooltip-body .itt-shield {
+  color: #e0e0e0;
+}
+
+.item-tooltip-body .itt-speed {
+  color: #f5f593;
+}
+
+.item-tooltip-body .itt-status {
+  color: #c8c8c8;
+}
+
+.item-tooltip-body .itt-onhit {
+  color: #a09b8c;
+  font-style: italic;
+}
+
+/* Rarity */
+.item-tooltip-body .itt-mythic {
+  color: #c89b3c;
+  font-weight: 700;
+}
+
+.item-tooltip-body .itt-legendary {
+  color: #e34343;
+}
+
+.item-tooltip-body .itt-scale {
+  color: #a09b8c;
+}
+
+/* List items */
+.item-tooltip-body .itt-li {
+  margin-top: 4px;
+}

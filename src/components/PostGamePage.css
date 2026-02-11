@@ -140,12 +140,13 @@
 
 .pg-showcase {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   gap: 0;
   width: 100%;
   max-width: 1200px;
   padding: 0 24px 48px;
+  position: relative;
 }
 
 .pg-card {
@@ -172,6 +173,185 @@
 
 .pg-card--mvp .pg-card-label {
   color: #c8aa6e;
+}
+
+/* ── Reset view button ──────────────────────────────────────────────── */
+
+.pg-reset-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto 12px;
+  padding: 6px 14px;
+  border: 1px solid rgba(200, 170, 110, 0.3);
+  border-radius: 4px;
+  background: rgba(10, 14, 22, 0.8);
+  color: var(--lol-gold);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pg-reset-view:hover {
+  background: rgba(200, 170, 110, 0.12);
+  border-color: rgba(200, 170, 110, 0.5);
+}
+.pg-reset-view svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ── MVP Congratulatory panel ────────────────────────────────────────── */
+
+.pg-mvp-congrats {
+  width: 100%;
+  flex: 1;
+  background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
+  border: 2px solid var(--lol-gold);
+  border-radius: 10px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 0 24px rgba(200, 170, 110, 0.15), inset 0 0 30px rgba(200, 170, 110, 0.03);
+}
+
+.pg-mvp-congrats-badge {
+  font-family: var(--font-heading);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: var(--lol-gold);
+  text-shadow: 0 0 20px rgba(200, 170, 110, 0.5), 0 0 40px rgba(200, 170, 110, 0.2);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.pg-mvp-congrats-name {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: #f0e6d2;
+  letter-spacing: 1px;
+}
+
+.pg-mvp-congrats-champ {
+  font-size: 13px;
+  color: var(--lol-text-dim);
+}
+
+.pg-mvp-congrats-msg {
+  font-size: 14px;
+  color: #c8c0b0;
+  line-height: 1.6;
+  max-width: 320px;
+  margin: 8px 0 4px;
+}
+
+.pg-mvp-congrats-divider {
+  width: 60%;
+  height: 1px;
+  background: rgba(200, 170, 110, 0.2);
+  margin: 10px 0;
+}
+
+.pg-mvp-congrats-standings-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-text-dim);
+  margin-bottom: 6px;
+}
+
+.pg-mvp-congrats-standings {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pg-mvp-standing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(30, 40, 45, 0.4);
+}
+
+.pg-mvp-standing--you {
+  background: rgba(200, 170, 110, 0.08);
+  border-color: rgba(200, 170, 110, 0.25);
+}
+
+.pg-mvp-standing-rank {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lol-gold);
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.pg-mvp-standing:nth-child(2) .pg-mvp-standing-rank { color: #a0a0a0; }
+.pg-mvp-standing:nth-child(3) .pg-mvp-standing-rank { color: #a07040; }
+
+.pg-mvp-standing-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(30, 40, 45, 0.6);
+  flex-shrink: 0;
+}
+
+.pg-mvp-standing-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pg-mvp-standing-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0e6d2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-mvp-standing--you .pg-mvp-standing-name {
+  color: var(--lol-gold-light);
+}
+
+.pg-mvp-standing-kda {
+  font-size: 11px;
+  color: var(--lol-text-dim);
+}
+
+.pg-mvp-standing-score {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lol-gold-dark);
+  flex-shrink: 0;
+}
+
+/* Ensure both showcase cards stretch to equal height */
+.pg-card .pg-player-card,
+.pg-card .pg-mvp-congrats {
+  flex: 1;
 }
 
 /* ── 3D models (flanking the showcase, like the live game page) ──────── */
@@ -232,12 +412,23 @@
 .pg-player-card {
   width: 100%;
   background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
-  border: 1px solid rgba(30, 40, 45, 0.8);
+  border: 2px solid rgba(30, 40, 45, 0.8);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
   backdrop-filter: blur(8px);
   position: relative;
   z-index: 2;
+}
+
+/* Team-colored card borders */
+.pg-card--blue .pg-player-card {
+  border-color: rgba(74, 168, 255, 0.5);
+  box-shadow: 0 0 12px rgba(74, 168, 255, 0.1);
+}
+
+.pg-card--red .pg-player-card {
+  border-color: rgba(255, 85, 85, 0.5);
+  box-shadow: 0 0 12px rgba(255, 85, 85, 0.1);
 }
 
 /* Player header */
@@ -248,6 +439,7 @@
   padding: 14px 18px;
   background: rgba(0, 0, 0, 0.25);
   border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+  border-radius: 10px 10px 0 0;
 }
 
 .pg-portrait {
@@ -416,6 +608,7 @@
 .pg-c-ms     { color: #60a5fa; }
 .pg-c-crit   { color: #f87171; }
 .pg-c-ls     { color: #86efac; }
+.pg-c-gold   { color: #fbbf24; }
 
 /* Items */
 .pg-items {
@@ -474,8 +667,6 @@
   color: var(--lol-gold);
   text-align: center;
   margin-bottom: 20px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(200, 170, 110, 0.15);
 }
 
 .pg-scoreboard {
@@ -484,7 +675,7 @@
   background: linear-gradient(180deg, rgba(14, 20, 30, 0.92), rgba(10, 14, 22, 0.96));
   border: 1px solid rgba(30, 40, 45, 0.8);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   backdrop-filter: blur(8px);
 }
 
@@ -498,6 +689,7 @@
   padding: 12px 20px;
   background: rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid rgba(30, 40, 45, 0.5);
+  border-radius: 8px 8px 0 0;
 }
 
 .pg-sb-header-blue {
@@ -598,10 +790,20 @@
   border-bottom: none;
 }
 
-/* Center vertical divider */
+/* Center vertical divider with role icon */
 .pg-sb-vs-divider {
-  width: 2px;
-  background: rgba(30, 40, 45, 0.6);
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(30, 40, 45, 0.3);
+}
+
+.pg-role-icon {
+  width: 16px;
+  height: 16px;
+  color: rgba(200, 170, 110, 0.5);
   flex-shrink: 0;
 }
 
@@ -633,11 +835,11 @@
 
 /* Active player highlight */
 .pg-sb-side--active {
-  background: rgba(200, 170, 110, 0.06);
+  background: rgba(200, 170, 110, 0.14);
 }
 
 .pg-sb-side--active:hover {
-  background: rgba(200, 170, 110, 0.09);
+  background: rgba(200, 170, 110, 0.18);
 }
 
 .pg-sb-side--blue.pg-sb-side--active::before {
@@ -654,6 +856,35 @@
   right: 0; top: 0; bottom: 0;
   width: 3px;
   background: var(--lol-gold);
+}
+
+/* Clickable scoreboard rows */
+.pg-sb-side--clickable {
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.pg-sb-side--clickable:hover {
+  background: rgba(200, 170, 110, 0.08);
+}
+
+/* Selected player highlight */
+.pg-sb-side--selected {
+  background: rgba(200, 170, 110, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(200, 170, 110, 0.35);
+}
+.pg-sb-side--blue.pg-sb-side--selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: #4aa8ff;
+}
+.pg-sb-side--red.pg-sb-side--selected::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: #ff5555;
 }
 
 /* ── Portrait ────────────────────────────────────────────────────────── */

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect, useCallback, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, LiveGameStats, ChampionBasic } from '../types';
+import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { getModelUrl } from '../api';
 import './PostGamePage.css';
 
@@ -10,8 +10,38 @@ interface Props {
   data: LiveGameData;
   champions: ChampionBasic[];
   version: string;
+  itemData: Record<number, ItemInfo>;
   onBack: () => void;
   backLabel?: string;
+}
+
+/* ── Role ordering & icons ───────────────────────────────────────────── */
+
+const ROLE_ORDER: Record<string, number> = {
+  TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4,
+};
+
+function sortByRole<T extends { position: PlayerPosition }>(players: T[]): T[] {
+  return [...players].sort((a, b) => (ROLE_ORDER[a.position] ?? 99) - (ROLE_ORDER[b.position] ?? 99));
+}
+
+const ROLE_ICON_URL: Record<string, string> = {
+  TOP: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top-hover.png',
+  JUNGLE: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle-hover.png',
+  MIDDLE: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle-hover.png',
+  BOTTOM: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom-hover.png',
+  UTILITY: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility-hover.png',
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support',
+};
+
+function RoleIcon({ position }: { position: PlayerPosition }) {
+  const src = ROLE_ICON_URL[position];
+  const label = ROLE_LABELS[position] ?? '';
+  if (!src) return <span className="pg-role-icon" />;
+  return <img className="pg-role-icon" src={src} alt={label} />;
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
@@ -71,7 +101,23 @@ function kdaRatio(p: LiveGamePlayer): string {
 
 const MAX_ITEMS = 7;
 
-/* ── 3D Model (same as LiveGamePage — static idle pose) ──────────── */
+/* ── 3D Model — Taunt animation (fallback to idle), auto-sizing ───── */
+
+/** Check if an animation name is an attack animation */
+function isAttackAnim(name: string): boolean {
+  const n = name.replace(/\.anm$/i, '');
+  if (/_to_/i.test(n) || /to_attack/i.test(n)) return false;
+  return /attack/i.test(n);
+}
+
+const ATTACK_PATTERNS: RegExp[] = [
+  /^attack1(\.anm)?$/i,
+  /^attack_?1(\.anm)?$/i,
+  /^attack(\.anm)?$/i,
+  /^attack\d?(\.anm)?$/i,
+  /(?:^|_)attack(?:\d{0,2})?(\.anm)?$/i,
+  /attack/i,
+];
 
 function isIdleAnim(name: string): boolean {
   const n = name.replace(/\.anm$/i, '');
@@ -92,7 +138,18 @@ const IDLE_PATTERNS: RegExp[] = [
   /idle/i,
 ];
 
-function findBestIdleName(names: string[]): string | undefined {
+/** Find the best attack animation, falling back to idle */
+function findBestAnimName(names: string[]): string | undefined {
+  // Try attack first
+  const attacks = names.filter(isAttackAnim);
+  if (attacks.length > 0) {
+    for (const pattern of ATTACK_PATTERNS) {
+      const match = attacks.find((n) => pattern.test(n));
+      if (match) return match;
+    }
+    return attacks[0];
+  }
+  // Fallback to idle
   const idles = names.filter(isIdleAnim);
   if (idles.length > 0) {
     for (const pattern of IDLE_PATTERNS) {
@@ -113,7 +170,7 @@ function PostGameChampionModel({ url }: { url: string }) {
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
 
-  const idleName = useMemo(() => findBestIdleName(names), [names]);
+  const animName = useMemo(() => findBestAnimName(names), [names]);
 
   useEffect(() => {
     scene.visible = false;
@@ -140,11 +197,11 @@ function PostGameChampionModel({ url }: { url: string }) {
       if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
     });
 
-    if (idleName && actions[idleName]) {
-      const idle = actions[idleName]!;
-      idle.reset().play();
-      idle.getMixer().update(0);
-      idle.paused = true;
+    if (animName && actions[animName]) {
+      const anim = actions[animName]!;
+      anim.reset().play();
+      anim.getMixer().update(0);
+      anim.paused = true;
     }
     scene.updateMatrixWorld(true);
 
@@ -193,7 +250,8 @@ function PostGameChampionModel({ url }: { url: string }) {
 
     scene.position.set(-centerX, -footY - 1.7, -centerZ);
     scene.visible = true;
-  }, [scene, actions, names, idleName, url]);
+  }, [scene, actions, names, animName, url]);
+
 
   return (
     <group ref={groupRef}>
@@ -219,18 +277,28 @@ function ModelLoadingIndicator() {
   );
 }
 
-class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode; resetKey?: string }, { hasError: boolean }> {
+class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode; resetKey?: string; onError?: () => void }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch() { this.props.onError?.(); }
   componentDidUpdate(prev: { resetKey?: string }) {
     if (prev.resetKey !== this.props.resetKey) this.setState({ hasError: false });
   }
   render() { return this.state.hasError ? this.props.fallback : this.props.children; }
 }
 
-function ChampionModelCanvas({ url }: { url: string }) {
+function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: string }) {
+  const [useFallback, setUseFallback] = useState(false);
+  const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
+
+  useEffect(() => { setUseFallback(false); }, [url]);
+
   return (
-    <ModelErrorBoundary resetKey={url} fallback={null}>
+    <ModelErrorBoundary
+      resetKey={activeUrl}
+      fallback={null}
+      onError={() => { if (fallbackUrl && !useFallback) setUseFallback(true); }}
+    >
       <Canvas
         shadows
         camera={{ position: [0, 0.5, 5.5], fov: 45 }}
@@ -263,7 +331,7 @@ function ChampionModelCanvas({ url }: { url: string }) {
           <shadowMaterial opacity={0.3} />
         </mesh>
         <Suspense fallback={<ModelLoadingIndicator />}>
-          <PostGameChampionModel key={url} url={url} />
+          <PostGameChampionModel key={activeUrl} url={activeUrl} />
         </Suspense>
         <OrbitControls enableRotate enablePan={false} enableZoom={false} enableDamping dampingFactor={0.05} target={[0, -0.3, 0]} />
       </Canvas>
@@ -275,11 +343,25 @@ function ChampionModelCanvas({ url }: { url: string }) {
    Main PostGamePage component
    ================================================================ */
 
-export function PostGamePage({ data, champions, version, onBack, backLabel = 'Continue' }: Props) {
+export function PostGamePage({ data, champions, version, itemData, onBack, backLabel = 'Continue' }: Props) {
   const [enterAnim, setEnterAnim] = useState(false);
   useEffect(() => {
     requestAnimationFrame(() => setEnterAnim(true));
   }, []);
+
+  // Selected players for the showcase panels (null = default view)
+  const [selectedBlue, setSelectedBlue] = useState<LiveGamePlayer | null>(null);
+  const [selectedRed, setSelectedRed] = useState<LiveGamePlayer | null>(null);
+  const isCustomView = selectedBlue !== null || selectedRed !== null;
+  const resetView = () => { setSelectedBlue(null); setSelectedRed(null); };
+
+  const handlePlayerClick = (player: LiveGamePlayer) => {
+    if (player.team === 'ORDER') {
+      setSelectedBlue((prev) => prev?.summonerName === player.summonerName ? null : player);
+    } else {
+      setSelectedRed((prev) => prev?.summonerName === player.summonerName ? null : player);
+    }
+  };
 
   // Find the active (local) player
   const activePlayer = useMemo(
@@ -296,21 +378,37 @@ export function PostGamePage({ data, champions, version, onBack, backLabel = 'Co
   // Are you the MVP?
   const youAreMvp = activePlayer && gameMvp && activePlayer.summonerName === gameMvp.summonerName;
 
-  // Resolve model URLs
+  // Top 3 players by MVP score (for the congrats panel)
+  const topPlayers = useMemo(() => {
+    return [...data.players].sort((a, b) => mvpScore(b) - mvpScore(a)).slice(0, 3);
+  }, [data.players]);
+
+  // Resolve model URLs (with base-skin fallback for chromas)
   const resolveModelUrl = useCallback((player: LiveGamePlayer | undefined) => {
     if (!player) return null;
     const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
     if (!match) return null;
-    const skinId = `${parseInt(match.key) * 1000 + player.skinID}`;
-    return getModelUrl(match.id, skinId);
+    const championKey = parseInt(match.key);
+    const skinId = `${championKey * 1000 + player.skinID}`;
+    const baseSkinId = `${championKey * 1000}`;
+    return {
+      url: getModelUrl(match.id, skinId),
+      fallbackUrl: skinId !== baseSkinId ? getModelUrl(match.id, baseSkinId) : undefined,
+    };
   }, [champions]);
 
-  const activeModelUrl = useMemo(() => resolveModelUrl(activePlayer), [activePlayer, resolveModelUrl]);
-  const mvpModelUrl = useMemo(() => resolveModelUrl(gameMvp), [gameMvp, resolveModelUrl]);
+  // Determine which players to show in the panels
+  const defaultLeftPlayer = youAreMvp ? activePlayer : activePlayer;
+  const defaultRightPlayer = youAreMvp ? activePlayer : gameMvp;
+  const leftPlayer = selectedBlue ?? defaultLeftPlayer;
+  const rightPlayer = selectedRed ?? defaultRightPlayer;
+
+  const leftModelUrl = useMemo(() => resolveModelUrl(leftPlayer), [leftPlayer, resolveModelUrl]);
+  const rightModelUrl = useMemo(() => resolveModelUrl(rightPlayer), [rightPlayer, resolveModelUrl]);
 
   // Team results
-  const blueTeam = useMemo(() => data.players.filter((p) => p.team === 'ORDER'), [data.players]);
-  const redTeam = useMemo(() => data.players.filter((p) => p.team === 'CHAOS'), [data.players]);
+  const blueTeam = useMemo(() => sortByRole(data.players.filter((p) => p.team === 'ORDER')), [data.players]);
+  const redTeam = useMemo(() => sortByRole(data.players.filter((p) => p.team === 'CHAOS')), [data.players]);
   const blueKills = blueTeam.reduce((s, p) => s + p.kills, 0);
   const redKills = redTeam.reduce((s, p) => s + p.kills, 0);
 
@@ -350,31 +448,77 @@ export function PostGamePage({ data, champions, version, onBack, backLabel = 'Co
         </div>
       </div>
 
-      {/* 3D models flanking the showcase — left (your champion) and right (MVP) */}
-      {activeModelUrl && (
+      {/* 3D models flanking the showcase — left and right */}
+      {leftModelUrl && (
         <div className="pg-model-bg pg-model-bg--left">
-          <ChampionModelCanvas url={activeModelUrl} />
+          <ChampionModelCanvas url={leftModelUrl.url} fallbackUrl={leftModelUrl.fallbackUrl} />
         </div>
       )}
-      {mvpModelUrl && (
+      {rightModelUrl && (
         <div className="pg-model-bg pg-model-bg--right">
-          <ChampionModelCanvas url={mvpModelUrl} />
+          <ChampionModelCanvas url={rightModelUrl.url} fallbackUrl={rightModelUrl.fallbackUrl} />
         </div>
       )}
 
-      {/* Two-panel MVP showcase */}
+      {/* Two-panel showcase */}
       <div className="pg-showcase">
-        {/* LEFT — Your stats */}
-        <div className="pg-card pg-card--you">
-          <div className="pg-card-label">Your Performance</div>
-          {activePlayer && (
-            <PlayerCard
-              player={activePlayer}
-              champions={champions}
-              version={version}
-              isMvp={!!youAreMvp}
-              stats={data.activePlayer.stats}
-            />
+
+        {/* LEFT — Blue team panel */}
+        <div className="pg-card pg-card--blue">
+          <div className="pg-card-label">
+            {!isCustomView && youAreMvp
+              ? 'Most Valuable Player'
+              : selectedBlue
+                ? selectedBlue.summonerName
+                : 'Your Performance'}
+          </div>
+          {!isCustomView && youAreMvp && activePlayer ? (
+            <div className="pg-mvp-congrats">
+              <div className="pg-mvp-congrats-badge">MVP</div>
+              <div className="pg-mvp-congrats-name">{activePlayer.summonerName}</div>
+              <div className="pg-mvp-congrats-champ">{activePlayer.championName}</div>
+
+              <div className="pg-mvp-congrats-msg">
+                {data.gameResult === 'Win'
+                  ? 'You carried your team to victory — outstanding performance!'
+                  : 'The best player in the game. Incredible effort despite the loss.'}
+              </div>
+
+              <div className="pg-mvp-congrats-divider" />
+
+              <div className="pg-mvp-congrats-standings-label">Top Players</div>
+              <div className="pg-mvp-congrats-standings">
+                {topPlayers.map((p, i) => (
+                  <div key={p.summonerName} className={`pg-mvp-standing ${p.isActivePlayer ? 'pg-mvp-standing--you' : ''}`}>
+                    <span className="pg-mvp-standing-rank">#{i + 1}</span>
+                    <img
+                      className="pg-mvp-standing-icon"
+                      src={getChampionIconUrl(version, p.championName, champions)}
+                      alt={p.championName}
+                    />
+                    <div className="pg-mvp-standing-info">
+                      <span className="pg-mvp-standing-name">{p.summonerName}</span>
+                      <span className="pg-mvp-standing-kda">
+                        {p.kills}/{p.deaths}/{p.assists}
+                      </span>
+                    </div>
+                    <span className="pg-mvp-standing-score">{mvpScore(p).toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            leftPlayer && (
+              <PlayerCard
+                player={leftPlayer}
+                champions={champions}
+                version={version}
+                isMvp={gameMvp?.summonerName === leftPlayer.summonerName}
+                teamPlayers={leftPlayer.team === 'ORDER' ? blueTeam : redTeam}
+                gameTime={data.gameTime}
+                itemData={itemData}
+              />
+            )
           )}
         </div>
 
@@ -383,17 +527,24 @@ export function PostGamePage({ data, champions, version, onBack, backLabel = 'Co
           <span className="pg-vs">VS</span>
         </div>
 
-        {/* RIGHT — Game MVP */}
-        <div className="pg-card pg-card--mvp">
+        {/* RIGHT — Red team panel */}
+        <div className={`pg-card pg-card--red`}>
           <div className="pg-card-label">
-            {youAreMvp ? 'You Are the MVP!' : 'Game MVP'}
+            {!isCustomView && youAreMvp
+              ? 'Your Stats'
+              : selectedRed
+                ? selectedRed.summonerName
+                : 'Game MVP'}
           </div>
-          {gameMvp && (
+          {rightPlayer && (
             <PlayerCard
-              player={gameMvp}
+              player={rightPlayer}
               champions={champions}
               version={version}
-              isMvp={true}
+              isMvp={gameMvp?.summonerName === rightPlayer.summonerName}
+              teamPlayers={rightPlayer.team === 'ORDER' ? blueTeam : redTeam}
+              gameTime={data.gameTime}
+              itemData={itemData}
             />
           )}
         </div>
@@ -401,6 +552,14 @@ export function PostGamePage({ data, champions, version, onBack, backLabel = 'Co
 
       {/* ── Full Scoreboard (side-by-side mirrored layout) ────────── */}
       <div className="pg-scoreboard-section">
+        {isCustomView && (
+          <button className="pg-reset-view" onClick={resetView}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+            </svg>
+            Reset View
+          </button>
+        )}
         <div className="pg-scoreboard-title">Final Scoreboard</div>
 
         <div className="pg-scoreboard">
@@ -430,22 +589,43 @@ export function PostGamePage({ data, champions, version, onBack, backLabel = 'Co
             </span>
           </div>
 
-          {/* Rows: blue player (left) | red player (right) */}
-          {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => (
+          {/* Rows: blue player (left) | role icon | red player (right) */}
+          {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
+            const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
+            return (
             <div key={i} className="pg-sb-match-row">
               {blueTeam[i] ? (
-                <PgPlayerSide player={blueTeam[i]} side="blue" champions={champions} version={version} />
+                <PgPlayerSide
+                  player={blueTeam[i]}
+                  side="blue"
+                  champions={champions}
+                  version={version}
+                  itemData={itemData}
+                  onClick={() => handlePlayerClick(blueTeam[i])}
+                  selected={selectedBlue?.summonerName === blueTeam[i].summonerName}
+                />
               ) : (
                 <div className="pg-sb-side pg-sb-side--blue" />
               )}
-              <div className="pg-sb-vs-divider" />
+              <div className="pg-sb-vs-divider">
+                {rolePos && <RoleIcon position={rolePos as PlayerPosition} />}
+              </div>
               {redTeam[i] ? (
-                <PgPlayerSide player={redTeam[i]} side="red" champions={champions} version={version} />
+                <PgPlayerSide
+                  player={redTeam[i]}
+                  side="red"
+                  champions={champions}
+                  version={version}
+                  itemData={itemData}
+                  onClick={() => handlePlayerClick(redTeam[i])}
+                  selected={selectedRed?.summonerName === redTeam[i].summonerName}
+                />
               ) : (
                 <div className="pg-sb-side pg-sb-side--red" />
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -461,11 +641,17 @@ function PgPlayerSide({
   side,
   champions,
   version,
+  itemData,
+  onClick,
+  selected,
 }: {
   player: LiveGamePlayer;
   side: 'blue' | 'red';
   champions: ChampionBasic[];
   version: string;
+  itemData: Record<number, ItemInfo>;
+  onClick?: () => void;
+  selected?: boolean;
 }) {
   const isActive = player.isActivePlayer;
 
@@ -476,21 +662,39 @@ function PgPlayerSide({
 
   const items = (
     <div className="pg-sb-items">
-      {itemSlots.map((item, i) => (
-        <div key={i} className={`pg-sb-item-slot ${!item ? 'empty' : ''}`}>
-          {item && (
-            <>
-              <img
-                className="pg-sb-item-img"
-                src={getItemIconUrl(version, item.itemID)}
-                alt={item.displayName}
-                loading="lazy"
-              />
-              {item.count > 1 && <span className="pg-sb-item-count">{item.count}</span>}
-            </>
-          )}
-        </div>
-      ))}
+      {itemSlots.map((item, i) => {
+        const info = item ? itemData[item.itemID] : undefined;
+        return (
+          <div key={i} className={`pg-sb-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
+            {item && (
+              <>
+                <img
+                  className="pg-sb-item-img"
+                  src={getItemIconUrl(version, item.itemID)}
+                  alt={item.displayName}
+                  loading="lazy"
+                />
+                {item.count > 1 && <span className="pg-sb-item-count">{item.count}</span>}
+                {info && (
+                  <div className="item-tooltip">
+                    <div className="item-tooltip-header">
+                      <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
+                      <div className="item-tooltip-title">
+                        <span className="item-tooltip-name">{info.name}</span>
+                      </div>
+                      <span className="item-tooltip-gold">
+                        <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+                        {info.goldTotal.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: info.descriptionHtml }} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -526,11 +730,13 @@ function PgPlayerSide({
     </div>
   );
 
+  const sideClass = `pg-sb-side pg-sb-side--${side} ${isActive ? 'pg-sb-side--active' : ''} ${selected ? 'pg-sb-side--selected' : ''} pg-sb-side--clickable`;
+
   // Blue reads: items → name → KDA → CS → portrait (left to right)
   // Red reads:  portrait → CS → KDA → name → items (left to right, mirrored)
   if (side === 'blue') {
     return (
-      <div className={`pg-sb-side pg-sb-side--blue ${isActive ? 'pg-sb-side--active' : ''}`}>
+      <div className={sideClass} onClick={onClick}>
         {items}
         {info}
         {kda}
@@ -541,7 +747,7 @@ function PgPlayerSide({
   }
 
   return (
-    <div className={`pg-sb-side pg-sb-side--red ${isActive ? 'pg-sb-side--active' : ''}`}>
+    <div className={sideClass} onClick={onClick}>
       {portrait}
       {cs}
       {kda}
@@ -558,18 +764,31 @@ function PlayerCard({
   champions,
   version,
   isMvp,
-  stats,
+  teamPlayers,
+  gameTime,
+  itemData,
 }: {
   player: LiveGamePlayer;
   champions: ChampionBasic[];
   version: string;
   isMvp: boolean;
-  stats?: LiveGameStats;
+  teamPlayers: LiveGamePlayer[];
+  gameTime: number;
+  itemData: Record<number, ItemInfo>;
 }) {
   const itemSlots: (LiveGamePlayer['items'][number] | null)[] = [];
   for (let i = 0; i < MAX_ITEMS; i++) {
     itemSlots.push(player.items.find((item) => item.slot === i) ?? null);
   }
+
+  // Derived comparative stats
+  const teamKills = teamPlayers.reduce((s, p) => s + p.kills, 0);
+  const teamDeaths = teamPlayers.reduce((s, p) => s + p.deaths, 0);
+  const killParticipation = teamKills > 0 ? ((player.kills + player.assists) / teamKills) * 100 : 0;
+  const deathShare = teamDeaths > 0 ? (player.deaths / teamDeaths) * 100 : 0;
+  const estimatedGold = player.items.reduce((s, item) => s + item.price * item.count, 0);
+  const minutes = Math.max(gameTime / 60, 1);
+  const csPerMin = player.creepScore / minutes;
 
   return (
     <div className="pg-player-card">
@@ -622,33 +841,44 @@ function PlayerCard({
         </div>
       </div>
 
-      {/* Detailed stats (only for your own card, since we have the stats object) */}
-      {stats && (
-        <div className="pg-detail-stats">
-          <StatRow label="Attack Damage" value={Math.round(stats.attackDamage)} className="pg-c-ad" />
-          <StatRow label="Ability Power" value={Math.round(stats.abilityPower)} className="pg-c-ap" />
-          <StatRow label="Armor" value={Math.round(stats.armor)} className="pg-c-armor" />
-          <StatRow label="Magic Resist" value={Math.round(stats.magicResist)} className="pg-c-mr" />
-          <StatRow label="Attack Speed" value={stats.attackSpeed.toFixed(2)} className="pg-c-as" />
-          <StatRow label="Ability Haste" value={Math.round(stats.abilityHaste)} className="pg-c-ah" />
-          <StatRow label="Move Speed" value={Math.round(stats.moveSpeed)} className="pg-c-ms" />
-          {stats.critChance > 0 && <StatRow label="Crit Chance" value={`${Math.round(stats.critChance * 100)}%`} className="pg-c-crit" />}
-          {stats.lifeSteal > 0 && <StatRow label="Life Steal" value={`${Math.round(stats.lifeSteal * 100)}%`} className="pg-c-ls" />}
-        </div>
-      )}
+      {/* Comparative stats (available for all players) */}
+      <div className="pg-detail-stats">
+        <StatRow label="Kill Participation" value={`${Math.round(killParticipation)}%`} className="pg-c-ad" />
+        <StatRow label="CS / min" value={csPerMin.toFixed(1)} className="pg-c-as" />
+        <StatRow label="Gold (est.)" value={formatGold(estimatedGold)} className="pg-c-gold" />
+        <StatRow label="Death Share" value={`${Math.round(deathShare)}%`} className="pg-c-mr" />
+      </div>
 
       {/* Items */}
       <div className="pg-items">
-        {itemSlots.map((item, i) => (
-          <div key={i} className={`pg-item-slot ${!item ? 'empty' : ''}`}>
-            {item && (
-              <>
-                <img className="pg-item-img" src={getItemIconUrl(version, item.itemID)} alt={item.displayName} />
-                {item.count > 1 && <span className="pg-item-count">{item.count}</span>}
-              </>
-            )}
-          </div>
-        ))}
+        {itemSlots.map((item, i) => {
+          const tip = item ? itemData[item.itemID] : undefined;
+          return (
+            <div key={i} className={`pg-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
+              {item && (
+                <>
+                  <img className="pg-item-img" src={getItemIconUrl(version, item.itemID)} alt={item.displayName} />
+                  {item.count > 1 && <span className="pg-item-count">{item.count}</span>}
+                  {tip && (
+                    <div className="item-tooltip">
+                      <div className="item-tooltip-header">
+                        <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
+                        <div className="item-tooltip-title">
+                          <span className="item-tooltip-name">{tip.name}</span>
+                        </div>
+                        <span className="item-tooltip-gold">
+                          <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
+                          {tip.goldTotal.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: tip.descriptionHtml }} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

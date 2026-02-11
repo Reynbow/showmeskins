@@ -4,9 +4,9 @@ import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
 import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
-import { getChampions, getChampionDetail, getLatestVersion } from './api';
+import { getChampions, getChampionDetail, getLatestVersion, getItems } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
-import type { ChampionBasic, ChampionDetail, Skin, LiveGameData } from './types';
+import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, ItemInfo } from './types';
 import './App.css';
 
 /** Turn a skin name into a URL-friendly slug: "Dark Star Thresh" → "dark-star-thresh" */
@@ -45,6 +45,7 @@ function App() {
   const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame'>('select');
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
+  const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
 
   // Track whether we've already auto-navigated for this game session
   // (so we don't force the user back if they navigate away)
@@ -62,8 +63,9 @@ function App() {
   useEffect(() => {
     async function load() {
       try {
-        const [v, champs] = await Promise.all([getLatestVersion(), getChampions()]);
+        const [v, champs, items] = await Promise.all([getLatestVersion(), getChampions(), getItems()]);
         setVersion(v);
+        setItemData(items);
         const champList = Object.values(champs).sort((a, b) => a.name.localeCompare(b.name));
         setChampions(champList);
 
@@ -394,6 +396,7 @@ function App() {
           data={postGameData}
           champions={champions}
           version={version}
+          itemData={itemData}
           onBack={handlePostGameBack}
           backLabel={isSamplePreview.current ? 'Back' : 'Continue'}
         />
@@ -402,6 +405,7 @@ function App() {
           data={liveGameData}
           champions={champions}
           version={version}
+          itemData={itemData}
           onBack={handleLiveGameBack}
         />
       ) : viewMode === 'select' ? (

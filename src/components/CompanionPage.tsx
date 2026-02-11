@@ -99,7 +99,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame }: Props)
                 <path d="M9 12V4h6v8" />
                 <path d="M4 20h16" />
               </svg>
-              Sample Game Over
+              Sample Post-Game
             </button>
           </div>
         </div>
