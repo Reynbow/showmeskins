@@ -544,11 +544,6 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         </div>
         <div className="pg-game-info">
           <span className="pg-game-time">{formatTime(data.gameTime)}</span>
-          <span className="pg-score-badge">
-            <span className="pg-score-blue">{blueKills}</span>
-            <span className="pg-score-dash">&ndash;</span>
-            <span className="pg-score-red">{redKills}</span>
-          </span>
         </div>
       </div>
 
