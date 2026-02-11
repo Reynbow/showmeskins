@@ -934,14 +934,18 @@
 
 .pg-sb-player-info {
   min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .pg-sb-side--blue .pg-sb-player-info {
-  text-align: left;
+  text-align: right;
+  justify-content: flex-end;
 }
 
 .pg-sb-side--red .pg-sb-player-info {
-  text-align: right;
+  text-align: left;
+  justify-content: flex-start;
 }
 
 .pg-sb-player-name {

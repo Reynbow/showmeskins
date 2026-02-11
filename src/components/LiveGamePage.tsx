@@ -1152,6 +1152,11 @@ function LgPlayerSide({
       <span className={`lg-sb-player-name ${isActive ? 'lg-sb-player-name--active' : ''}`}>
         {player.summonerName}
       </span>
+    </div>
+  );
+
+  const mvpSlot = (
+    <div className="lg-sb-mvp-slot">
       {isMvp && <span className="lg-mvp-badge">MVP</span>}
     </div>
   );
@@ -1184,12 +1189,13 @@ function LgPlayerSide({
     <span className="lg-sb-respawn">{Math.ceil(player.respawnTimer)}s</span>
   ) : null;
 
-  // Blue: items → name → KDA → CS → portrait
-  // Red:  portrait → CS → KDA → name → items
+  // Blue: items → MVP → name → KDA → CS → portrait
+  // Red:  portrait → CS → KDA → name → MVP → items
   if (side === 'blue') {
     return (
       <div className={sideClass}>
         {items}
+        {mvpSlot}
         {info}
         {kda}
         {cs}
@@ -1205,6 +1211,7 @@ function LgPlayerSide({
       {cs}
       {kda}
       {info}
+      {mvpSlot}
       {items}
       {respawn}
     </div>
