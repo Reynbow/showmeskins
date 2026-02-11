@@ -412,6 +412,23 @@
 /* Player info */
 .lg-sb-player-info {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lg-mvp-badge {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.2), rgba(200, 170, 110, 0.08));
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  color: var(--lol-gold-light);
+  text-shadow: 0 0 8px rgba(200, 170, 110, 0.4);
+  flex-shrink: 0;
 }
 
 .lg-sb-side--blue .lg-sb-player-info {

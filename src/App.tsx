@@ -6,7 +6,7 @@ import { CompanionPage } from './components/CompanionPage';
 import { DevPage, type AccountInfo } from './components/DevPage';
 import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
-import { getChampions, getChampionDetail, getLatestVersion, getItems } from './api';
+import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
 import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, ItemInfo } from './types';
 import './App.css';
@@ -42,6 +42,7 @@ function App() {
   const [champions, setChampions] = useState<ChampionBasic[]>([]);
   const [selectedChampion, setSelectedChampion] = useState<ChampionDetail | null>(null);
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
+  const [companionChromaId, setCompanionChromaId] = useState<number | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev'>('select');
@@ -179,6 +180,7 @@ function App() {
     setViewMode('select');
     setSelectedChampion(null);
     setSelectedSkin(null);
+    setCompanionChromaId(null);
     window.history.pushState(null, '', '/');
   }, []);
 
@@ -244,6 +246,7 @@ function App() {
 
   const handleSkinSelect = useCallback((skin: Skin) => {
     setSelectedSkin(skin);
+    setCompanionChromaId(null);
     if (selectedChampion) {
       const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
       window.history.replaceState(null, '', `/${selectedChampion.id}${skinPath}`);
@@ -261,6 +264,7 @@ function App() {
       const detail = await getChampionDetail(next.id);
       setSelectedChampion(detail);
       setSelectedSkin(detail.skins[0]);
+      setCompanionChromaId(null);
       window.history.pushState(null, '', `/${next.id}`);
     } catch (err) {
       console.error('Failed to load champion:', err);
@@ -314,10 +318,22 @@ function App() {
 
                 try {
                   const detail = await getChampionDetail(match.id);
-                  const skin =
-                    detail.skins.find((s) => s.num === data.skinNum) ?? detail.skins[0];
+                  const resolution = await resolveLcuSkinNum(match.key, data.skinNum);
+                  let skin: Skin;
+                  let chromaId: number | null = null;
+                  if (resolution) {
+                    skin =
+                      detail.skins.find((s) => s.id === resolution.baseSkinId) ??
+                      detail.skins.find((s) => s.num === (parseInt(resolution.baseSkinId, 10) % 1000)) ??
+                      detail.skins[0];
+                    chromaId = resolution.chromaId;
+                  } else {
+                    skin =
+                      detail.skins.find((s) => s.num === data.skinNum) ?? detail.skins[0];
+                  }
                   setSelectedChampion(detail);
                   setSelectedSkin(skin);
+                  setCompanionChromaId(chromaId);
                   setViewMode('viewer');
                   const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
                   window.history.replaceState(null, '', `/${match.id}${skinPath}`);
@@ -458,6 +474,7 @@ function App() {
         <ChampionViewer
           champion={selectedChampion}
           selectedSkin={selectedSkin}
+          initialChromaId={companionChromaId}
           onBack={handleBack}
           onSkinSelect={handleSkinSelect}
           onPrevChampion={handlePrevChampion}

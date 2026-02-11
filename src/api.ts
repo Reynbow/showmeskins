@@ -193,6 +193,14 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
   return `${MODEL_CDN}/lol/models/${form.alias}/${skinId}/model.glb`;
 }
 
+/**
+ * Per-champion scale overrides for 3D models (by Data Dragon alias, lowercase).
+ * Scale is a multiplier of the auto-computed size.
+ */
+export const CHAMPION_SCALE_OVERRIDES: Record<string, number> = {
+  ziggs: 0.3,
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Chroma Texture Resolution
    Uses Vercel Blob Storage as primary source (deterministic URLs, no manifest
@@ -364,6 +372,55 @@ export async function resolveChromaTextureUrl(
     chromaUrlCache.set(chromaId, url);
   }
   return url;
+}
+
+/**
+ * Result of resolving an LCU skin number to base skin + optional chroma.
+ * LCU reports skin numbers that include both base skins and chromas (e.g. Pool Party = 15,
+ * Pool Party Rainbow chroma = 23). Chromas use the base skin's model with a texture overlay.
+ */
+export interface LcuSkinResolution {
+  baseSkinId: string;   // Riot skin ID for the base skin (model), e.g. "74015"
+  chromaId: number | null;  // Chroma ID if a chroma was selected, e.g. 74023
+}
+
+/**
+ * Resolve an LCU-reported skin number to the base skin and optional chroma.
+ * Uses CommunityDragon data where skins and chromas are both listed with full IDs.
+ * Chromas are grouped after their base skin in Riot's numbering.
+ *
+ * @param championKey - Numeric champion key (e.g. "74" for Heimerdinger)
+ * @param skinNum - The skin number from LCU (selectedSkinId % 1000)
+ * @returns Base skin ID for the model and chroma ID if a chroma was selected
+ */
+export async function resolveLcuSkinNum(
+  championKey: string,
+  skinNum: number,
+): Promise<LcuSkinResolution | null> {
+  try {
+    const res = await fetch(`${CDRAGON}/champions/${championKey}.json`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const skins: Array<{ id: number; chromas?: Array<{ id: number }> }> = data.skins ?? [];
+
+    for (const skin of skins) {
+      const baseSkinNum = skin.id % 1000;
+      if (baseSkinNum === skinNum) {
+        return { baseSkinId: String(skin.id), chromaId: null };
+      }
+      if (skin.chromas) {
+        for (const chroma of skin.chromas) {
+          const chromaSkinNum = chroma.id % 1000;
+          if (chromaSkinNum === skinNum) {
+            return { baseSkinId: String(skin.id), chromaId: chroma.id };
+          }
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**

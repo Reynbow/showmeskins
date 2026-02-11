@@ -4,7 +4,8 @@ import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { ItemTooltip } from './ItemTooltip';
-import { getModelUrl } from '../api';
+import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
+import { CHAMPION_SCALE_OVERRIDES } from '../api';
 import './PostGamePage.css';
 
 interface Props {
@@ -166,12 +167,124 @@ function findBestAnimName(names: string[]): string | undefined {
   return names[0];
 }
 
-function PostGameChampionModel({ url }: { url: string }) {
+function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextureUrl?: string | null }) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
+  const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
+  const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
   const animName = useMemo(() => findBestAnimName(names), [names]);
+
+  /* ── Chroma texture overlay (same logic as LiveGamePage's LiveChampionModel) ── */
+  useEffect(() => {
+    const originals = originalTexturesRef.current;
+    let cancelled = false;
+
+    async function loadTextureWithRetry(url: string, retries = 3, timeoutMs = 15_000): Promise<THREE.Texture> {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        if (cancelled) throw new Error('cancelled');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          if (cancelled) throw new Error('cancelled');
+          const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' });
+          if (cancelled) { bitmap.close(); throw new Error('cancelled'); }
+          const texture = new THREE.CanvasTexture(bitmap as unknown as HTMLCanvasElement);
+          texture.flipY = false;
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.needsUpdate = true;
+          return texture;
+        } catch (err) {
+          clearTimeout(timer);
+          if ((err as Error).message === 'cancelled') throw err;
+          if (attempt < retries - 1) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+          throw err;
+        }
+      }
+      throw new Error('failed');
+    }
+
+    if (!chromaTextureUrl) {
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+      return;
+    }
+
+    loadTextureWithRetry(chromaTextureUrl, 3, 15_000)
+      .then((texture) => {
+        if (cancelled) { texture.dispose(); return; }
+        if (loadedChromaTexRef.current) loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = texture;
+        let maxSize = 0;
+        const primaryMats: THREE.MeshStandardMaterial[] = [];
+        scene.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh || !mesh.visible) return;
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const mat of mats) {
+            const m = mat as THREE.MeshStandardMaterial;
+            const tex = originals.has(m) ? originals.get(m) : m.map;
+            if (tex?.image) {
+              const img = tex.image as { width?: number; height?: number };
+              const size = (img.width ?? 0) * (img.height ?? 0);
+              if (size > maxSize) { maxSize = size; primaryMats.length = 0; primaryMats.push(m); }
+              else if (size === maxSize && size > 0) primaryMats.push(m);
+            }
+          }
+        });
+        if (primaryMats.length > 0) {
+          for (const m of primaryMats) {
+            if (!originals.has(m)) originals.set(m, m.map);
+            m.map = texture;
+            m.needsUpdate = true;
+          }
+        } else {
+          texture.dispose();
+          loadedChromaTexRef.current = null;
+        }
+      })
+      .catch(() => {
+        for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
+      });
+
+    return () => {
+      cancelled = true;
+      for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
+      originals.clear();
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+    };
+  }, [scene, chromaTextureUrl]);
+
+  useEffect(() => {
+    return () => {
+      const originals = originalTexturesRef.current;
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      originals.clear();
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     scene.visible = false;
@@ -228,7 +341,10 @@ function PostGameChampionModel({ url }: { url: string }) {
     }
 
     const targetHeight = 3.4;
-    const scale = targetHeight / Math.max(modelHeight, 0.01);
+    const urlMatch = url.match(/\/models\/([^/]+)\//);
+    const alias = urlMatch?.[1] ?? '';
+    const scaleMult = CHAMPION_SCALE_OVERRIDES[alias] ?? 1;
+    const scale = (targetHeight / Math.max(modelHeight, 0.01)) * scaleMult;
     scene.scale.setScalar(scale);
     scene.updateMatrixWorld(true);
 
@@ -288,7 +404,7 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
   render() { return this.state.hasError ? this.props.fallback : this.props.children; }
 }
 
-function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: string }) {
+function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string | null }) {
   const [useFallback, setUseFallback] = useState(false);
   const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
 
@@ -296,7 +412,7 @@ function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: 
 
   return (
     <ModelErrorBoundary
-      resetKey={activeUrl}
+      resetKey={`${activeUrl}:${chromaTextureUrl ?? ''}`}
       fallback={null}
       onError={() => { if (fallbackUrl && !useFallback) setUseFallback(true); }}
     >
@@ -332,7 +448,7 @@ function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: 
           <shadowMaterial opacity={0.3} />
         </mesh>
         <Suspense fallback={<ModelLoadingIndicator />}>
-          <PostGameChampionModel key={activeUrl} url={activeUrl} />
+          <PostGameChampionModel key={activeUrl} url={activeUrl} chromaTextureUrl={chromaTextureUrl} />
         </Suspense>
         <OrbitControls enableRotate enablePan={false} enableZoom={false} enableDamping dampingFactor={0.05} target={[0, -0.3, 0]} />
       </Canvas>
@@ -384,28 +500,15 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     return [...data.players].sort((a, b) => mvpScore(b) - mvpScore(a)).slice(0, 3);
   }, [data.players]);
 
-  // Resolve model URLs (with base-skin fallback for chromas)
-  const resolveModelUrl = useCallback((player: LiveGamePlayer | undefined) => {
-    if (!player) return null;
-    const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
-    if (!match) return null;
-    const championKey = parseInt(match.key);
-    const skinId = `${championKey * 1000 + player.skinID}`;
-    const baseSkinId = `${championKey * 1000}`;
-    return {
-      url: getModelUrl(match.id, skinId),
-      fallbackUrl: skinId !== baseSkinId ? getModelUrl(match.id, baseSkinId) : undefined,
-    };
-  }, [champions]);
-
   // Determine which players to show in the panels
   const defaultLeftPlayer = youAreMvp ? activePlayer : activePlayer;
   const defaultRightPlayer = youAreMvp ? activePlayer : gameMvp;
   const leftPlayer = selectedBlue ?? defaultLeftPlayer;
   const rightPlayer = selectedRed ?? defaultRightPlayer;
 
-  const leftModelUrl = useMemo(() => resolveModelUrl(leftPlayer), [leftPlayer, resolveModelUrl]);
-  const rightModelUrl = useMemo(() => resolveModelUrl(rightPlayer), [rightPlayer, resolveModelUrl]);
+  // Resolve model URLs + chroma textures (uses resolveLcuSkinNum for chroma detection)
+  const leftModelInfo = usePlayerModelInfo(leftPlayer, champions);
+  const rightModelInfo = usePlayerModelInfo(rightPlayer, champions);
 
   // Team results
   const blueTeam = useMemo(() => sortByRole(data.players.filter((p) => p.team === 'ORDER')), [data.players]);
@@ -450,14 +553,22 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
       </div>
 
       {/* 3D models flanking the showcase — left and right */}
-      {leftModelUrl && (
+      {leftModelInfo?.modelUrl && (
         <div className="pg-model-bg pg-model-bg--left">
-          <ChampionModelCanvas url={leftModelUrl.url} fallbackUrl={leftModelUrl.fallbackUrl} />
+          <ChampionModelCanvas
+            url={leftModelInfo.modelUrl}
+            fallbackUrl={leftModelInfo.fallbackUrl}
+            chromaTextureUrl={leftModelInfo.chromaTextureUrl}
+          />
         </div>
       )}
-      {rightModelUrl && (
+      {rightModelInfo?.modelUrl && (
         <div className="pg-model-bg pg-model-bg--right">
-          <ChampionModelCanvas url={rightModelUrl.url} fallbackUrl={rightModelUrl.fallbackUrl} />
+          <ChampionModelCanvas
+            url={rightModelInfo.modelUrl}
+            fallbackUrl={rightModelInfo.fallbackUrl}
+            chromaTextureUrl={rightModelInfo.chromaTextureUrl}
+          />
         </div>
       )}
 

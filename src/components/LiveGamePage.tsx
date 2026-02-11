@@ -3,7 +3,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
-import { getModelUrl, getChampionDetail } from '../api';
+import { getChampionDetail, CHAMPION_SCALE_OVERRIDES } from '../api';
+import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
 import './LiveGamePage.css';
 
@@ -75,6 +76,11 @@ function getChampionIconUrl(
 /** Get Data Dragon item icon URL */
 function getItemIconUrl(version: string, itemId: number): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
+}
+
+/** MVP score: weighted formula favouring kills, assists, low deaths, and CS */
+function mvpScore(p: LiveGamePlayer): number {
+  return p.kills * 3 + p.assists * 1.5 - p.deaths * 1.2 + p.creepScore * 0.012;
 }
 
 /** Readable game mode names (Riot uses fruit codenames for rotating modes) */
@@ -248,14 +254,127 @@ function findBestAnimName(names: string[]): string | undefined {
   return names[0];
 }
 
-/** The 3D champion model with auto-sizing, idle animation, and slow auto-rotation */
-function LiveChampionModel({ url }: { url: string }) {
+/** The 3D champion model with auto-sizing, idle animation, and optional chroma texture */
+function LiveChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextureUrl?: string | null }) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
   const [ready, setReady] = useState(false);
+  const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
+  const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
   const animName = useMemo(() => findBestAnimName(names), [names]);
+
+  /* ── Chroma texture overlay (same logic as ModelViewer's ChampionModel) ── */
+  useEffect(() => {
+    const originals = originalTexturesRef.current;
+    let cancelled = false;
+
+    async function loadTextureWithRetry(url: string, retries = 3, timeoutMs = 15_000): Promise<THREE.Texture> {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        if (cancelled) throw new Error('cancelled');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          if (cancelled) throw new Error('cancelled');
+          const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' });
+          if (cancelled) { bitmap.close(); throw new Error('cancelled'); }
+          const texture = new THREE.CanvasTexture(bitmap as unknown as HTMLCanvasElement);
+          texture.flipY = false;
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.needsUpdate = true;
+          return texture;
+        } catch (err) {
+          clearTimeout(timer);
+          if ((err as Error).message === 'cancelled') throw err;
+          if (attempt < retries - 1) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+          throw err;
+        }
+      }
+      throw new Error('failed');
+    }
+
+    if (!chromaTextureUrl) {
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+      return;
+    }
+
+    loadTextureWithRetry(chromaTextureUrl, 3, 15_000)
+      .then((texture) => {
+        if (cancelled) { texture.dispose(); return; }
+        if (loadedChromaTexRef.current) loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = texture;
+        let maxSize = 0;
+        const primaryMats: THREE.MeshStandardMaterial[] = [];
+        scene.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh || !mesh.visible) return;
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const mat of mats) {
+            const m = mat as THREE.MeshStandardMaterial;
+            const tex = originals.has(m) ? originals.get(m) : m.map;
+            if (tex?.image) {
+              const img = tex.image as { width?: number; height?: number };
+              const size = (img.width ?? 0) * (img.height ?? 0);
+              if (size > maxSize) { maxSize = size; primaryMats.length = 0; primaryMats.push(m); }
+              else if (size === maxSize && size > 0) primaryMats.push(m);
+            }
+          }
+        });
+        if (primaryMats.length > 0) {
+          for (const m of primaryMats) {
+            if (!originals.has(m)) originals.set(m, m.map);
+            m.map = texture;
+            m.needsUpdate = true;
+          }
+        } else {
+          texture.dispose();
+          loadedChromaTexRef.current = null;
+        }
+      })
+      .catch(() => {
+        for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
+      });
+
+    return () => {
+      cancelled = true;
+      for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
+      originals.clear();
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+    };
+  }, [scene, chromaTextureUrl]);
+
+  /* Unmount: restore original textures so useGLTF cache is never left with stale chroma */
+  useEffect(() => {
+    return () => {
+      const originals = originalTexturesRef.current;
+      for (const [mat, origTex] of originals) {
+        mat.map = origTex;
+        mat.needsUpdate = true;
+      }
+      originals.clear();
+      if (loadedChromaTexRef.current) {
+        loadedChromaTexRef.current.dispose();
+        loadedChromaTexRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setReady(false);
@@ -326,9 +445,12 @@ function LiveChampionModel({ url }: { url: string }) {
       modelHeight = size.y || 3;
     }
 
-    // Scale to target height
+    // Scale to target height (with per-champion overrides for models that size incorrectly)
     const targetHeight = 3.4;
-    const scale = targetHeight / Math.max(modelHeight, 0.01);
+    const urlMatch = url.match(/\/models\/([^/]+)\//);
+    const alias = urlMatch?.[1] ?? '';
+    const scaleMult = CHAMPION_SCALE_OVERRIDES[alias] ?? 1;
+    const scale = (targetHeight / Math.max(modelHeight, 0.01)) * scaleMult;
     scene.scale.setScalar(scale);
     scene.updateMatrixWorld(true);
 
@@ -403,7 +525,7 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 }
 
 /** Reusable 3D canvas that renders a champion model with lighting + shadows */
-function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: string }) {
+function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string }) {
   const [useFallback, setUseFallback] = useState(false);
   const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
 
@@ -412,7 +534,7 @@ function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: 
 
   return (
     <ModelErrorBoundary
-      resetKey={activeUrl}
+      resetKey={`${activeUrl}:${chromaTextureUrl ?? ''}`}
       fallback={null}
       onError={() => { if (fallbackUrl && !useFallback) setUseFallback(true); }}
     >
@@ -453,7 +575,7 @@ function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: 
           <shadowMaterial opacity={0.3} />
         </mesh>
         <Suspense fallback={<ModelLoadingIndicator />}>
-          <LiveChampionModel key={activeUrl} url={activeUrl} />
+          <LiveChampionModel key={activeUrl} url={activeUrl} chromaTextureUrl={chromaTextureUrl} />
         </Suspense>
         <OrbitControls
           enableRotate
@@ -486,28 +608,18 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     [data.players],
   );
 
-  // Resolve model URL for a player by champion name + skin
-  // Returns { url, fallbackUrl } — fallback is the base skin in case a chroma ID has no model
-  const resolveModelUrl = useCallback((player: LiveGamePlayer | undefined) => {
-    if (!player) return null;
-    const match = champions.find(
-      (c) => c.name.toLowerCase() === player.championName.toLowerCase(),
-    );
-    if (!match) return null;
-    const championKey = parseInt(match.key);
-    const skinId = `${championKey * 1000 + player.skinID}`;
-    const baseSkinId = `${championKey * 1000}`;
-    return {
-      url: getModelUrl(match.id, skinId),
-      fallbackUrl: skinId !== baseSkinId ? getModelUrl(match.id, baseSkinId) : undefined,
-    };
-  }, [champions]);
+  // Find the enemy with the most kills
+  const topEnemy = useMemo(() => {
+    if (!activePlayer) return undefined;
+    const enemyTeam = activePlayer.team === 'ORDER' ? 'CHAOS' : 'ORDER';
+    const enemies = data.players.filter((p) => p.team === enemyTeam);
+    if (enemies.length === 0) return undefined;
+    return enemies.reduce((best, p) => (p.kills > best.kills ? p : best), enemies[0]);
+  }, [data.players, activePlayer]);
 
-  // Active player's model
-  const modelUrl = useMemo(
-    () => resolveModelUrl(activePlayer),
-    [activePlayer, resolveModelUrl],
-  );
+  // Resolve model URL + chroma texture for each player (uses resolveLcuSkinNum for chroma detection)
+  const activeModelInfo = usePlayerModelInfo(activePlayer, champions);
+  const enemyModelInfo = usePlayerModelInfo(topEnemy, champions);
 
   // Fetch champion base stats for the active player
   useEffect(() => {
@@ -531,20 +643,6 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     return () => { cancelled = true; };
   }, [activePlayer?.championName, champions]);
 
-  // Find the enemy with the most kills
-  const topEnemy = useMemo(() => {
-    if (!activePlayer) return undefined;
-    const enemyTeam = activePlayer.team === 'ORDER' ? 'CHAOS' : 'ORDER';
-    const enemies = data.players.filter((p) => p.team === enemyTeam);
-    if (enemies.length === 0) return undefined;
-    return enemies.reduce((best, p) => (p.kills > best.kills ? p : best), enemies[0]);
-  }, [data.players, activePlayer]);
-
-  const enemyModelUrl = useMemo(
-    () => resolveModelUrl(topEnemy),
-    [topEnemy, resolveModelUrl],
-  );
-
   // Split players into teams, sorted by role
   const blueTeam = useMemo(
     () => sortByRole(data.players.filter((p) => p.team === 'ORDER')),
@@ -557,6 +655,12 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
 
   const blueKills = blueTeam.reduce((sum, p) => sum + p.kills, 0);
   const redKills = redTeam.reduce((sum, p) => sum + p.kills, 0);
+
+  // MVP: highest mvpScore across all players
+  const gameMvp = useMemo(() => {
+    if (data.players.length === 0) return undefined;
+    return data.players.reduce((best, p) => (mvpScore(p) > mvpScore(best) ? p : best), data.players[0]);
+  }, [data.players]);
 
   // Estimate team gold from item prices (API doesn't expose per-player gold)
   const teamItemGold = (players: typeof blueTeam) =>
@@ -585,27 +689,43 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
       {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right */}
       {activePlayer?.team === 'ORDER' ? (
         <>
-          {modelUrl && (
+          {activeModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
-              <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
+              <ChampionModelCanvas
+                url={activeModelInfo.modelUrl}
+                fallbackUrl={activeModelInfo.fallbackUrl}
+                chromaTextureUrl={activeModelInfo.chromaTextureUrl}
+              />
             </div>
           )}
-          {enemyModelUrl && (
+          {enemyModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--right">
-              <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
+              <ChampionModelCanvas
+                url={enemyModelInfo.modelUrl}
+                fallbackUrl={enemyModelInfo.fallbackUrl}
+                chromaTextureUrl={enemyModelInfo.chromaTextureUrl}
+              />
             </div>
           )}
         </>
       ) : (
         <>
-          {enemyModelUrl && (
+          {enemyModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
-              <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
+              <ChampionModelCanvas
+                url={enemyModelInfo.modelUrl}
+                fallbackUrl={enemyModelInfo.fallbackUrl}
+                chromaTextureUrl={enemyModelInfo.chromaTextureUrl}
+              />
             </div>
           )}
-          {modelUrl && (
+          {activeModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--right">
-              <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
+              <ChampionModelCanvas
+                url={activeModelInfo.modelUrl}
+                fallbackUrl={activeModelInfo.fallbackUrl}
+                chromaTextureUrl={activeModelInfo.chromaTextureUrl}
+              />
             </div>
           )}
         </>
@@ -667,7 +787,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             return (
             <div key={i} className="lg-sb-match-row">
               {blueTeam[i] ? (
-                <LgPlayerSide player={blueTeam[i]} side="blue" champions={champions} version={version} itemData={itemData} />
+                <LgPlayerSide player={blueTeam[i]} side="blue" isMvp={gameMvp?.summonerName === blueTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--blue" />
               )}
@@ -675,7 +795,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 {rolePos && <RoleIcon position={rolePos as PlayerPosition} />}
               </div>
               {redTeam[i] ? (
-                <LgPlayerSide player={redTeam[i]} side="red" champions={champions} version={version} itemData={itemData} />
+                <LgPlayerSide player={redTeam[i]} side="red" isMvp={gameMvp?.summonerName === redTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--red" />
               )}
@@ -921,12 +1041,14 @@ function KillFeed({
 function LgPlayerSide({
   player,
   side,
+  isMvp,
   champions,
   version,
   itemData,
 }: {
   player: LiveGamePlayer;
   side: 'blue' | 'red';
+  isMvp?: boolean;
   champions: ChampionBasic[];
   version: string;
   itemData: Record<number, ItemInfo>;
@@ -981,6 +1103,7 @@ function LgPlayerSide({
       <span className={`lg-sb-player-name ${isActive ? 'lg-sb-player-name--active' : ''}`}>
         {player.summonerName}
       </span>
+      {isMvp && <span className="lg-mvp-badge">MVP</span>}
     </div>
   );
 

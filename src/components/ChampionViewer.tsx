@@ -8,13 +8,14 @@ import './ChampionViewer.css';
 interface Props {
   champion: ChampionDetail;
   selectedSkin: Skin;
+  initialChromaId?: number | null;
   onBack: () => void;
   onSkinSelect: (skin: Skin) => void;
   onPrevChampion: () => void;
   onNextChampion: () => void;
 }
 
-export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, onPrevChampion, onNextChampion }: Props) {
+export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, onSkinSelect, onPrevChampion, onNextChampion }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('model');
 
   /* ── Chroma data & selection ─────────────────────────────────── */
@@ -46,6 +47,16 @@ export function ChampionViewer({ champion, selectedSkin, onBack, onSkinSelect, o
   }, []);
 
   const skinChromas = chromaMap[selectedSkin.id] ?? [];
+
+  // When companion app syncs a chroma selection, apply it here
+  useEffect(() => {
+    if (
+      initialChromaId != null &&
+      skinChromas.some((c) => c.id === initialChromaId)
+    ) {
+      setSelectedChromaId(initialChromaId);
+    }
+  }, [initialChromaId, skinChromas]);
 
   // Attempt to resolve the chroma texture URL.
   // If resolution fails the swatch stays selected but the model just keeps
