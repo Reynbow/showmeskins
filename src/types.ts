@@ -135,6 +135,12 @@ export interface LiveGameActivePlayer {
   stats: LiveGameStats;
 }
 
+/** Multi-kill: 2–5 kills in quick succession (within ~10s) */
+export type MultiKillType = 'double' | 'triple' | 'quadra' | 'penta';
+
+/** Kill streak: 3+ kills without dying (League announcer terms) */
+export type KillStreakType = 'killing_spree' | 'rampage' | 'unstoppable' | 'godlike' | 'legendary';
+
 export interface KillEvent {
   eventTime: number;
   killerName: string;   // summoner name
@@ -142,6 +148,10 @@ export interface KillEvent {
   assisters: string[];  // champion names
   killerChamp: string;  // champion id name (for icon)
   victimChamp: string;  // champion id name (for icon)
+  /** Computed: double/triple/quadra/penta when killer got 2–5 kills in quick succession */
+  multiKill?: MultiKillType;
+  /** Computed: killing_spree→legendary when killer has 3+ kills without dying */
+  killStreak?: KillStreakType;
 }
 
 export interface LiveGameData {

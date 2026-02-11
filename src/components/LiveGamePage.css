@@ -805,10 +805,76 @@
   opacity: 0.4;
 }
 
+.lg-kill-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lg-kill-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.lg-kill-badge {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.lg-kill-badge--multikill {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(234, 179, 8, 0.15));
+  border: 1px solid rgba(234, 179, 8, 0.5);
+  color: #facc15;
+}
+
+.lg-kill-badge--double { box-shadow: 0 0 8px rgba(234, 179, 8, 0.3); }
+.lg-kill-badge--triple { box-shadow: 0 0 10px rgba(249, 115, 22, 0.4); }
+.lg-kill-badge--quadra { box-shadow: 0 0 12px rgba(234, 88, 12, 0.5); }
+.lg-kill-badge--penta {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.4), rgba(234, 88, 12, 0.3));
+  border-color: rgba(251, 191, 36, 0.7);
+  color: #fbbf24;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.5);
+}
+
+.lg-kill-badge--streak {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.1));
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+}
+
+.lg-kill-badge--killing_spree { box-shadow: 0 0 6px rgba(34, 197, 94, 0.3); }
+.lg-kill-badge--rampage { box-shadow: 0 0 8px rgba(34, 197, 94, 0.35); }
+.lg-kill-badge--unstoppable {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35), rgba(34, 197, 94, 0.15));
+  color: #86efac;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.45);
+}
+.lg-kill-badge--godlike {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.4), rgba(16, 185, 129, 0.2));
+  color: #86efac;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+.lg-kill-badge--legendary {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.5), rgba(16, 185, 129, 0.25));
+  color: #a7f3d0;
+  border-color: rgba(34, 197, 94, 0.7);
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+}
+
 .lg-kill-assists {
   font-size: 13px;
   color: var(--lol-text-dim);
-  margin-left: auto;
   white-space: nowrap;
   opacity: 0.7;
 }

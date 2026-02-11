@@ -4,6 +4,7 @@ import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
 import { getChampionDetail, getChampionScale } from '../api';
+import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
 import './LiveGamePage.css';
@@ -882,7 +883,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
         {/* Kill Feed */}
         {data.killFeed && data.killFeed.length > 0 && (
           <KillFeed
-            kills={data.killFeed}
+            kills={enrichKillFeed(data.killFeed)}
             players={data.players}
             champions={champions}
             version={version}
@@ -1023,11 +1024,34 @@ function KillFeed({
                 version={version}
                 champions={champions}
               />
-              {kill.assisters.length > 0 && (
-                <span className="lg-kill-assists">
-                  + {kill.assisters.join(', ')}
-                </span>
-              )}
+              <span className="lg-kill-right">
+                {(kill.multiKill || kill.killStreak) && (
+                  <span className="lg-kill-badges">
+                    {kill.multiKill && (
+                      <span className={`lg-kill-badge lg-kill-badge--multikill lg-kill-badge--${kill.multiKill}`}>
+                        {kill.multiKill === 'double' && 'Double Kill'}
+                        {kill.multiKill === 'triple' && 'Triple Kill'}
+                        {kill.multiKill === 'quadra' && 'Quadra Kill'}
+                        {kill.multiKill === 'penta' && 'Penta Kill'}
+                      </span>
+                    )}
+                    {kill.killStreak && (
+                      <span className={`lg-kill-badge lg-kill-badge--streak lg-kill-badge--${kill.killStreak}`}>
+                        {kill.killStreak === 'killing_spree' && 'Killing Spree'}
+                        {kill.killStreak === 'rampage' && 'Rampage'}
+                        {kill.killStreak === 'unstoppable' && 'Unstoppable'}
+                        {kill.killStreak === 'godlike' && 'Godlike'}
+                        {kill.killStreak === 'legendary' && 'Legendary'}
+                      </span>
+                    )}
+                  </span>
+                )}
+                {kill.assisters.length > 0 && (
+                  <span className="lg-kill-assists">
+                    + {kill.assisters.join(', ')}
+                  </span>
+                )}
+              </span>
             </div>
           );
         })}
