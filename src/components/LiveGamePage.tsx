@@ -993,6 +993,11 @@ function KillFeed({
     return map;
   }, [players]);
 
+  const activePlayerName = useMemo(
+    () => players.find((p) => p.isActivePlayer)?.summonerName ?? null,
+    [players],
+  );
+
   // All kills, most recent first
   const allKills = useMemo(() => [...kills].reverse(), [kills]);
 
@@ -1019,8 +1024,13 @@ function KillFeed({
             : kill.victimChamp.includes('red') ? 'red'
             : 'neutral';
 
+          const isYourKill = activePlayerName != null && kill.killerName === activePlayerName;
+
           return (
-            <div key={`${kill.eventTime}-${i}`} className="lg-kill-entry">
+            <div
+              key={`${kill.eventTime}-${i}`}
+              className={`lg-kill-entry${isYourKill ? ' lg-kill-entry--your-kill' : ''}`}
+            >
               <span className="lg-kill-time">{formatTime(kill.eventTime)}</span>
               <KillFeedEntity
                 isEntity={killerIsEntity}

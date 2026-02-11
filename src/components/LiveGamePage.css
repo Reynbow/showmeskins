@@ -753,6 +753,16 @@
   background: rgba(200, 170, 110, 0.04);
 }
 
+.lg-kill-entry--your-kill {
+  background: rgba(200, 170, 110, 0.08);
+  border-left: 3px solid var(--lol-gold);
+  padding-left: 15px; /* 18 - 3 to keep content aligned */
+}
+
+.lg-kill-entry--your-kill:hover {
+  background: rgba(200, 170, 110, 0.12);
+}
+
 .lg-kill-time {
   flex-shrink: 0;
   width: 44px;

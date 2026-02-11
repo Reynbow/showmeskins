@@ -503,8 +503,15 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
   // Determine which players to show in the panels
   const defaultLeftPlayer = youAreMvp ? activePlayer : activePlayer;
   const defaultRightPlayer = youAreMvp ? activePlayer : gameMvp;
-  const leftPlayer = selectedBlue ?? defaultLeftPlayer;
-  const rightPlayer = selectedRed ?? defaultRightPlayer;
+  let leftPlayer = selectedBlue ?? defaultLeftPlayer;
+  let rightPlayer = selectedRed ?? defaultRightPlayer;
+
+  // When showing one blue and one red, always place blue on left, red on right
+  if (leftPlayer && rightPlayer && leftPlayer.team !== rightPlayer.team) {
+    if (leftPlayer.team === 'CHAOS' && rightPlayer.team === 'ORDER') {
+      [leftPlayer, rightPlayer] = [rightPlayer, leftPlayer];
+    }
+  }
 
   // Resolve model URLs + chroma textures (uses resolveLcuSkinNum for chroma detection)
   const leftModelInfo = usePlayerModelInfo(leftPlayer, champions);
@@ -573,11 +580,15 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         {/* LEFT — team border based on left player's team */}
         <div className={`pg-card pg-card--${(leftPlayer ?? activePlayer)?.team === 'ORDER' ? 'blue' : 'red'}`}>
           <div className="pg-card-label">
-            {!isCustomView && youAreMvp
-              ? 'Most Valuable Player'
-              : selectedBlue
-                ? selectedBlue.summonerName
-                : 'Your Performance'}
+            {isCustomView && selectedBlue
+              ? selectedBlue.summonerName
+              : youAreMvp && leftPlayer?.summonerName === activePlayer?.summonerName
+                ? 'Most Valuable Player'
+                : leftPlayer?.summonerName === activePlayer?.summonerName
+                  ? 'Your Performance'
+                  : leftPlayer?.summonerName === gameMvp?.summonerName
+                    ? 'Game MVP'
+                    : leftPlayer?.summonerName ?? 'Your Performance'}
           </div>
           {!isCustomView && youAreMvp && activePlayer ? (
             <div className="pg-mvp-congrats">
@@ -637,11 +648,15 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         {/* RIGHT — team border based on right player's team */}
         <div className={`pg-card pg-card--${rightPlayer?.team === 'ORDER' ? 'blue' : 'red'}`}>
           <div className="pg-card-label">
-            {!isCustomView && youAreMvp
-              ? 'Your Stats'
-              : selectedRed
-                ? selectedRed.summonerName
-                : 'Game MVP'}
+            {isCustomView && selectedRed
+              ? selectedRed.summonerName
+              : youAreMvp && rightPlayer?.summonerName === activePlayer?.summonerName
+                ? 'Your Stats'
+                : rightPlayer?.summonerName === activePlayer?.summonerName
+                  ? 'Your Performance'
+                  : rightPlayer?.summonerName === gameMvp?.summonerName
+                    ? 'Game MVP'
+                    : rightPlayer?.summonerName ?? 'Game MVP'}
           </div>
           {rightPlayer && (
             <PlayerCard

@@ -160,12 +160,25 @@
 
 .pg-card-label {
   font-family: var(--font-heading);
-  font-size: 12px;
-  letter-spacing: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  color: var(--lol-text-dim);
+  color: var(--lol-gold-light);
   margin-bottom: 12px;
   text-align: center;
+  text-shadow: 0 0 20px rgba(200, 170, 110, 0.25);
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.pg-card--blue .pg-card-label {
+  color: #7eb8ff;
+  text-shadow: 0 0 16px rgba(74, 168, 255, 0.3);
+}
+
+.pg-card--red .pg-card-label {
+  color: #ff8888;
+  text-shadow: 0 0 16px rgba(255, 85, 85, 0.3);
 }
 
 .pg-card--you .pg-card-label {
