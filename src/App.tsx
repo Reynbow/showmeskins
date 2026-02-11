@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
@@ -427,6 +428,7 @@ function App() {
           onNextChampion={handleNextChampion}
         />
       ) : null}
+      <Analytics />
     </div>
   );
 }
