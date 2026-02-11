@@ -193,13 +193,28 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
   return `${MODEL_CDN}/lol/models/${form.alias}/${skinId}/model.glb`;
 }
 
+import { getChampionScaleFromHeight } from './data/championHeights';
+
 /**
- * Per-champion scale overrides for 3D models (by Data Dragon alias, lowercase).
- * Scale is a multiplier of the auto-computed size.
+ * Manual scale overrides for 3D models (by Data Dragon alias, lowercase).
+ * Takes precedence over height-based scaling when present.
  */
 export const CHAMPION_SCALE_OVERRIDES: Record<string, number> = {
   ziggs: 0.3,
+  amumu: 0.8,
 };
+
+/** Global scale multiplier — 0.8 = 20% smaller across all champions */
+const GLOBAL_SCALE_MULTIPLIER = 0.8;
+
+/**
+ * Get scale factor for a champion (manual override or lore height-based).
+ */
+export function getChampionScale(alias: string): number {
+  const manual = CHAMPION_SCALE_OVERRIDES[alias.toLowerCase()];
+  const base = manual != null ? manual : getChampionScaleFromHeight(alias);
+  return base * GLOBAL_SCALE_MULTIPLIER;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Chroma Texture Resolution

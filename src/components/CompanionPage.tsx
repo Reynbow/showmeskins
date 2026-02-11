@@ -5,12 +5,14 @@ interface Props {
   onSampleLive: () => void;
   onSamplePostGame: () => void;
   onDev?: () => void;
+  hasLiveGame?: boolean;
+  onLiveGame?: () => void;
 }
 
 const DOWNLOAD_URL =
   'https://github.com/Reynbow/showmeskins/releases/latest/download/Show.Me.Skins.Companion.Setup.0.2.0.exe';
 
-export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev }: Props) {
+export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, hasLiveGame, onLiveGame }: Props) {
   return (
     <div className="companion-page">
       {/* Background decorations (same as champion select) */}
@@ -19,12 +21,23 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev }:
 
       <div className="companion-content">
         {/* Header */}
-        <button className="companion-back" onClick={onBack}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
+        <div className="companion-header-row">
+          <button className="companion-back" onClick={onBack}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          {hasLiveGame && onLiveGame && (
+            <button className="companion-live-game-btn" onClick={onLiveGame} title="View live game">
+              <span className="companion-live-game-dot" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="companion-live-game-icon">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+              Live Game
+            </button>
+          )}
+        </div>
 
         <div className="companion-header">
           <div className="companion-logo">

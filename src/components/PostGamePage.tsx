@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { ItemTooltip } from './ItemTooltip';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
-import { CHAMPION_SCALE_OVERRIDES } from '../api';
+import { getChampionScale } from '../api';
 import './PostGamePage.css';
 
 interface Props {
@@ -343,7 +343,7 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
     const targetHeight = 3.4;
     const urlMatch = url.match(/\/models\/([^/]+)\//);
     const alias = urlMatch?.[1] ?? '';
-    const scaleMult = CHAMPION_SCALE_OVERRIDES[alias] ?? 1;
+    const scaleMult = getChampionScale(alias);
     const scale = (targetHeight / Math.max(modelHeight, 0.01)) * scaleMult;
     scene.scale.setScalar(scale);
     scene.updateMatrixWorld(true);

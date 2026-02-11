@@ -8,11 +8,13 @@ interface Props {
   version: string;
   onSelect: (champion: ChampionBasic) => void;
   onCompanion: () => void;
+  hasLiveGame?: boolean;
+  onLiveGame?: () => void;
 }
 
 const ROLES = ['All', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'];
 
-export function ChampionSelect({ champions, version, onSelect, onCompanion }: Props) {
+export function ChampionSelect({ champions, version, onSelect, onCompanion, hasLiveGame, onLiveGame }: Props) {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('All');
   const [scrolled, setScrolled] = useState(false);
@@ -61,6 +63,15 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion }: Pr
         </div>
         <h1 className="champion-select-title">Show me skins!</h1>
         <div className="cs-companion-wrap">
+          {hasLiveGame && onLiveGame && (
+            <button className="cs-live-game-btn" onClick={onLiveGame} title="View live game">
+              <span className="cs-live-game-dot" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-live-game-icon">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+              Live Game
+            </button>
+          )}
           <button className="cs-companion-btn" onClick={onCompanion}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-companion-icon">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />

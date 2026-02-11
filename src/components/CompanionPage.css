@@ -34,6 +34,14 @@
   width: 100%;
 }
 
+/* Header row (back + live game button) */
+.companion-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
 /* Back button */
 .companion-back {
   display: inline-flex;
@@ -49,7 +57,50 @@
   padding: 6px 14px;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 24px;
+}
+
+/* Live Game button — glowing green when game in progress */
+.companion-live-game-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
+}
+
+.companion-live-game-btn:hover {
+  border-color: rgba(34, 197, 94, 0.8);
+  color: #86efac;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(34, 197, 94, 0.1) 100%);
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.4);
+}
+
+.companion-live-game-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e, 0 0 20px rgba(34, 197, 94, 0.5);
+  animation: companion-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes companion-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.9); }
+}
+
+.companion-live-game-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .companion-back svg {

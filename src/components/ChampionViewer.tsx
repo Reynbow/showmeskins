@@ -13,9 +13,11 @@ interface Props {
   onSkinSelect: (skin: Skin) => void;
   onPrevChampion: () => void;
   onNextChampion: () => void;
+  hasLiveGame?: boolean;
+  onLiveGame?: () => void;
 }
 
-export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, onSkinSelect, onPrevChampion, onNextChampion }: Props) {
+export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, onSkinSelect, onPrevChampion, onNextChampion, hasLiveGame, onLiveGame }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('model');
 
   /* ── Chroma data & selection ─────────────────────────────────── */
@@ -195,6 +197,16 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </svg>
           <span>Champions</span>
         </button>
+
+        {hasLiveGame && onLiveGame && (
+          <button className="viewer-live-game-btn" onClick={onLiveGame} title="View live game">
+            <span className="viewer-live-game-dot" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="viewer-live-game-icon">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+            Live Game
+          </button>
+        )}
 
         <div className="champ-nav">
           <button className="champ-nav-btn" onClick={onPrevChampion} title="Previous Champion">

@@ -3,7 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
-import { getChampionDetail, CHAMPION_SCALE_OVERRIDES } from '../api';
+import { getChampionDetail, getChampionScale } from '../api';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
 import './LiveGamePage.css';
@@ -449,7 +449,7 @@ function LiveChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextu
     const targetHeight = 3.4;
     const urlMatch = url.match(/\/models\/([^/]+)\//);
     const alias = urlMatch?.[1] ?? '';
-    const scaleMult = CHAMPION_SCALE_OVERRIDES[alias] ?? 1;
+    const scaleMult = getChampionScale(alias);
     const scale = (targetHeight / Math.max(modelHeight, 0.01)) * scaleMult;
     scene.scale.setScalar(scale);
     scene.updateMatrixWorld(true);

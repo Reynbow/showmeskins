@@ -12,7 +12,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ChromaInfo } from '../types';
-import { CHAMPION_SCALE_OVERRIDES } from '../api';
+import { getChampionScale } from '../api';
 import './ModelViewer.css';
 
 /* ================================================================
@@ -526,8 +526,8 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
         ?? SKIN_OVERRIDES[urlMatch[2]]                     // skinId
         ?? SKIN_OVERRIDES[urlMatch[1]])                    // alias (least specific)
       : undefined;
-    const championScale = urlMatch ? CHAMPION_SCALE_OVERRIDES[urlMatch[1]] : undefined;
-    const scale = (targetHeight / height) * (overrides?.scale ?? championScale ?? 1);
+    const championScale = urlMatch ? getChampionScale(urlMatch[1]) : 1;
+    const scale = (targetHeight / height) * (overrides?.scale ?? championScale);
 
     scene.scale.setScalar(scale);
 

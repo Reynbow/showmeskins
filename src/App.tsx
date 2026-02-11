@@ -189,6 +189,11 @@ function App() {
     window.history.pushState(null, '', '/companion');
   }, []);
 
+  const handleLiveGameNavigate = useCallback(() => {
+    setViewMode('livegame');
+    window.history.pushState(null, '', '/live');
+  }, []);
+
   const handleCompanionBack = useCallback(() => {
     setViewMode('select');
     window.history.pushState(null, '', '/');
@@ -460,6 +465,8 @@ function App() {
           version={version}
           onSelect={handleChampionSelect}
           onCompanion={handleCompanion}
+          hasLiveGame={!!liveGameData}
+          onLiveGame={handleLiveGameNavigate}
         />
       ) : viewMode === 'companion' ? (
         <CompanionPage
@@ -467,6 +474,8 @@ function App() {
           onSampleLive={handleSampleLive}
           onSamplePostGame={handleSamplePostGame}
           onDev={handleDev}
+          hasLiveGame={!!liveGameData}
+          onLiveGame={handleLiveGameNavigate}
         />
       ) : viewMode === 'dev' ? (
         <DevPage accountInfo={accountInfo} onBack={handleDevBack} />
@@ -479,6 +488,8 @@ function App() {
           onSkinSelect={handleSkinSelect}
           onPrevChampion={handlePrevChampion}
           onNextChampion={handleNextChampion}
+          hasLiveGame={!!liveGameData}
+          onLiveGame={handleLiveGameNavigate}
         />
       ) : null}
       <Analytics />
