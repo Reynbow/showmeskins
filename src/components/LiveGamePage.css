@@ -484,11 +484,13 @@
 
 .lg-sb-side--blue .lg-sb-items {
   justify-content: flex-start;
+  margin-right: 12px;
 }
 
 .lg-sb-side--red .lg-sb-items {
   flex-direction: row-reverse;
   justify-content: flex-start;
+  margin-left: 12px;
 }
 
 .lg-sb-item-slot {
@@ -829,6 +831,8 @@
   padding: 2px 8px;
   border-radius: 2px;
   white-space: nowrap;
+  cursor: default;
+  user-select: none;
 }
 
 .lg-kill-badge--multikill {

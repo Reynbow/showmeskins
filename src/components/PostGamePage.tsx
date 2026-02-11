@@ -575,8 +575,8 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
       {/* Two-panel showcase */}
       <div className="pg-showcase">
 
-        {/* LEFT — Blue team panel */}
-        <div className="pg-card pg-card--blue">
+        {/* LEFT — team border based on left player's team */}
+        <div className={`pg-card pg-card--${(leftPlayer ?? activePlayer)?.team === 'ORDER' ? 'blue' : 'red'}`}>
           <div className="pg-card-label">
             {!isCustomView && youAreMvp
               ? 'Most Valuable Player'
@@ -592,7 +592,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
 
               <div className="pg-mvp-congrats-msg">
                 {data.gameResult === 'Win'
-                  ? 'You carried your team to victory — outstanding performance!'
+                  ? 'You carried your team to victory. Outstanding performance!'
                   : 'The best player in the game. Incredible effort despite the loss.'}
               </div>
 
@@ -639,8 +639,8 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
           <span className="pg-vs">VS</span>
         </div>
 
-        {/* RIGHT — Red team panel */}
-        <div className={`pg-card pg-card--red`}>
+        {/* RIGHT — team border based on right player's team */}
+        <div className={`pg-card pg-card--${rightPlayer?.team === 'ORDER' ? 'blue' : 'red'}`}>
           <div className="pg-card-label">
             {!isCustomView && youAreMvp
               ? 'Your Stats'

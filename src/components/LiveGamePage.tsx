@@ -7,6 +7,7 @@ import { getChampionDetail, getChampionScale } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
+import { TextTooltip } from './TextTooltip';
 import './LiveGamePage.css';
 
 interface Props {
@@ -37,6 +38,21 @@ const ROLE_ICON_URL: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support',
+};
+
+const MULTI_KILL_TOOLTIPS: Record<string, string> = {
+  double: '2 kills within ~10 seconds',
+  triple: '3 kills within ~10 seconds',
+  quadra: '4 kills within ~10 seconds',
+  penta: '5 kills within ~10 seconds (Ace)',
+};
+
+const KILL_STREAK_TOOLTIPS: Record<string, string> = {
+  killing_spree: '3 kills without dying',
+  rampage: '4 kills without dying',
+  unstoppable: '5 kills without dying',
+  godlike: '6 kills without dying',
+  legendary: '7+ kills without dying',
 };
 
 function RoleIcon({ position }: { position: PlayerPosition }) {
@@ -609,18 +625,19 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     [data.players],
   );
 
-  // Find the enemy with the most kills
-  const topEnemy = useMemo(() => {
+  // Lane opponent: enemy in same position (e.g. support vs support)
+  const laneOpponent = useMemo(() => {
     if (!activePlayer) return undefined;
     const enemyTeam = activePlayer.team === 'ORDER' ? 'CHAOS' : 'ORDER';
-    const enemies = data.players.filter((p) => p.team === enemyTeam);
-    if (enemies.length === 0) return undefined;
-    return enemies.reduce((best, p) => (p.kills > best.kills ? p : best), enemies[0]);
+    const match = data.players.find(
+      (p) => p.team === enemyTeam && p.position === activePlayer.position,
+    );
+    return match;
   }, [data.players, activePlayer]);
 
   // Resolve model URL + chroma texture for each player (uses resolveLcuSkinNum for chroma detection)
   const activeModelInfo = usePlayerModelInfo(activePlayer, champions);
-  const enemyModelInfo = usePlayerModelInfo(topEnemy, champions);
+  const enemyModelInfo = usePlayerModelInfo(laneOpponent, champions);
 
   // Fetch champion base stats for the active player
   useEffect(() => {
@@ -1028,21 +1045,29 @@ function KillFeed({
                 {(kill.multiKill || kill.killStreak) && (
                   <span className="lg-kill-badges">
                     {kill.multiKill && (
-                      <span className={`lg-kill-badge lg-kill-badge--multikill lg-kill-badge--${kill.multiKill}`}>
+                      <TextTooltip
+                        text={MULTI_KILL_TOOLTIPS[kill.multiKill]}
+                        variant={kill.multiKill}
+                        className={`lg-kill-badge lg-kill-badge--multikill lg-kill-badge--${kill.multiKill}`}
+                      >
                         {kill.multiKill === 'double' && 'Double Kill'}
                         {kill.multiKill === 'triple' && 'Triple Kill'}
                         {kill.multiKill === 'quadra' && 'Quadra Kill'}
                         {kill.multiKill === 'penta' && 'Penta Kill'}
-                      </span>
+                      </TextTooltip>
                     )}
                     {kill.killStreak && (
-                      <span className={`lg-kill-badge lg-kill-badge--streak lg-kill-badge--${kill.killStreak}`}>
+                      <TextTooltip
+                        text={KILL_STREAK_TOOLTIPS[kill.killStreak]}
+                        variant={kill.killStreak}
+                        className={`lg-kill-badge lg-kill-badge--streak lg-kill-badge--${kill.killStreak}`}
+                      >
                         {kill.killStreak === 'killing_spree' && 'Killing Spree'}
                         {kill.killStreak === 'rampage' && 'Rampage'}
                         {kill.killStreak === 'unstoppable' && 'Unstoppable'}
                         {kill.killStreak === 'godlike' && 'Godlike'}
                         {kill.killStreak === 'legendary' && 'Legendary'}
-                      </span>
+                      </TextTooltip>
                     )}
                   </span>
                 )}

@@ -106,6 +106,128 @@
   z-index: 99999;
 }
 
+/* ── Text tooltip (kill feed badges, etc. — matches skin/emote style) ─── */
+.text-tooltip {
+  position: relative;
+  padding: 6px 12px;
+  background: rgb(1, 10, 19);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.text-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: var(--lol-border-gold);
+}
+
+.text-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: rgb(1, 10, 19);
+  z-index: 1;
+}
+
+.text-tooltip--portal {
+  z-index: 99999;
+}
+
+/* Kill feed tooltip variants — match badge color schemes */
+.text-tooltip--double {
+  background: linear-gradient(135deg, rgba(20, 12, 8, 0.98), rgba(15, 10, 5, 0.98));
+  border-color: rgba(234, 179, 8, 0.6);
+  color: #facc15;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.25);
+}
+.text-tooltip--double::after { border-top-color: rgba(234, 179, 8, 0.6); }
+.text-tooltip--double::before { border-top-color: rgba(20, 12, 8, 0.98); }
+
+.text-tooltip--triple {
+  background: linear-gradient(135deg, rgba(25, 12, 5, 0.98), rgba(18, 8, 3, 0.98));
+  border-color: rgba(249, 115, 22, 0.6);
+  color: #fb923c;
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.3);
+}
+.text-tooltip--triple::after { border-top-color: rgba(249, 115, 22, 0.6); }
+.text-tooltip--triple::before { border-top-color: rgba(25, 12, 5, 0.98); }
+
+.text-tooltip--quadra {
+  background: linear-gradient(135deg, rgba(28, 10, 3, 0.98), rgba(20, 6, 2, 0.98));
+  border-color: rgba(234, 88, 12, 0.65);
+  color: #f97316;
+  box-shadow: 0 0 16px rgba(234, 88, 12, 0.35);
+}
+.text-tooltip--quadra::after { border-top-color: rgba(234, 88, 12, 0.65); }
+.text-tooltip--quadra::before { border-top-color: rgba(28, 10, 3, 0.98); }
+
+.text-tooltip--penta {
+  background: linear-gradient(135deg, rgba(30, 18, 5, 0.98), rgba(22, 12, 3, 0.98));
+  border-color: rgba(251, 191, 36, 0.7);
+  color: #fbbf24;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.4);
+}
+.text-tooltip--penta::after { border-top-color: rgba(251, 191, 36, 0.7); }
+.text-tooltip--penta::before { border-top-color: rgba(30, 18, 5, 0.98); }
+
+.text-tooltip--killing_spree {
+  background: linear-gradient(135deg, rgba(5, 18, 12, 0.98), rgba(3, 12, 8, 0.98));
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #4ade80;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+}
+.text-tooltip--killing_spree::after { border-top-color: rgba(34, 197, 94, 0.55); }
+.text-tooltip--killing_spree::before { border-top-color: rgba(5, 18, 12, 0.98); }
+
+.text-tooltip--rampage {
+  background: linear-gradient(135deg, rgba(4, 20, 14, 0.98), rgba(2, 14, 10, 0.98));
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #4ade80;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.3);
+}
+.text-tooltip--rampage::after { border-top-color: rgba(34, 197, 94, 0.6); }
+.text-tooltip--rampage::before { border-top-color: rgba(4, 20, 14, 0.98); }
+
+.text-tooltip--unstoppable {
+  background: linear-gradient(135deg, rgba(3, 22, 15, 0.98), rgba(2, 16, 11, 0.98));
+  border-color: rgba(34, 197, 94, 0.65);
+  color: #86efac;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.35);
+}
+.text-tooltip--unstoppable::after { border-top-color: rgba(34, 197, 94, 0.65); }
+.text-tooltip--unstoppable::before { border-top-color: rgba(3, 22, 15, 0.98); }
+
+.text-tooltip--godlike {
+  background: linear-gradient(135deg, rgba(2, 24, 18, 0.98), rgba(1, 18, 14, 0.98));
+  border-color: rgba(16, 185, 129, 0.65);
+  color: #86efac;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.4);
+}
+.text-tooltip--godlike::after { border-top-color: rgba(16, 185, 129, 0.65); }
+.text-tooltip--godlike::before { border-top-color: rgba(2, 24, 18, 0.98); }
+
+.text-tooltip--legendary {
+  background: linear-gradient(135deg, rgba(1, 26, 20, 0.98), rgba(0, 20, 16, 0.98));
+  border-color: rgba(34, 197, 94, 0.75);
+  color: #a7f3d0;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.45);
+}
+.text-tooltip--legendary::after { border-top-color: rgba(34, 197, 94, 0.75); }
+.text-tooltip--legendary::before { border-top-color: rgba(1, 26, 20, 0.98); }
+
 /* ── Tooltip header (icon + name + gold) ─────────────────────────────── */
 
 .item-tooltip-header {

@@ -987,11 +987,13 @@
 
 .pg-sb-side--blue .pg-sb-items {
   justify-content: flex-start;
+  margin-right: 12px;
 }
 
 .pg-sb-side--red .pg-sb-items {
   flex-direction: row-reverse;
   justify-content: flex-start;
+  margin-left: 12px;
 }
 
 .pg-sb-item-slot {
