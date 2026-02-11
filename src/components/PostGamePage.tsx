@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
+import { ItemTooltip } from './ItemTooltip';
 import { getModelUrl } from '../api';
 import './PostGamePage.css';
 
@@ -664,35 +665,28 @@ function PgPlayerSide({
     <div className="pg-sb-items">
       {itemSlots.map((item, i) => {
         const info = item ? itemData[item.itemID] : undefined;
-        return (
-          <div key={i} className={`pg-sb-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
-            {item && (
-              <>
-                <img
-                  className="pg-sb-item-img"
-                  src={getItemIconUrl(version, item.itemID)}
-                  alt={item.displayName}
-                  loading="lazy"
-                />
-                {item.count > 1 && <span className="pg-sb-item-count">{item.count}</span>}
-                {info && (
-                  <div className="item-tooltip">
-                    <div className="item-tooltip-header">
-                      <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
-                      <div className="item-tooltip-title">
-                        <span className="item-tooltip-name">{info.name}</span>
-                      </div>
-                      <span className="item-tooltip-gold">
-                        <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
-                        {info.goldTotal.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: info.descriptionHtml }} />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        return item ? (
+          <ItemTooltip
+            key={i}
+            itemId={item.itemID}
+            itemDisplayName={item.displayName}
+            itemPrice={item.price}
+            itemCount={item.count}
+            info={info}
+            version={version}
+            getItemIconUrl={getItemIconUrl}
+            className="pg-sb-item-slot item-tooltip-wrap"
+          >
+            <img
+              className="pg-sb-item-img"
+              src={getItemIconUrl(version, item.itemID)}
+              alt={item.displayName}
+              loading="lazy"
+            />
+            {item.count > 1 && <span className="pg-sb-item-count">{item.count}</span>}
+          </ItemTooltip>
+        ) : (
+          <div key={i} className="pg-sb-item-slot empty" />
         );
       })}
     </div>
@@ -853,30 +847,23 @@ function PlayerCard({
       <div className="pg-items">
         {itemSlots.map((item, i) => {
           const tip = item ? itemData[item.itemID] : undefined;
-          return (
-            <div key={i} className={`pg-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
-              {item && (
-                <>
-                  <img className="pg-item-img" src={getItemIconUrl(version, item.itemID)} alt={item.displayName} />
-                  {item.count > 1 && <span className="pg-item-count">{item.count}</span>}
-                  {tip && (
-                    <div className="item-tooltip">
-                      <div className="item-tooltip-header">
-                        <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
-                        <div className="item-tooltip-title">
-                          <span className="item-tooltip-name">{tip.name}</span>
-                        </div>
-                        <span className="item-tooltip-gold">
-                          <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
-                          {tip.goldTotal.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: tip.descriptionHtml }} />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+          return item ? (
+            <ItemTooltip
+              key={i}
+              itemId={item.itemID}
+              itemDisplayName={item.displayName}
+              itemPrice={item.price}
+              itemCount={item.count}
+              info={tip}
+              version={version}
+              getItemIconUrl={getItemIconUrl}
+              className="pg-item-slot item-tooltip-wrap"
+            >
+              <img className="pg-item-img" src={getItemIconUrl(version, item.itemID)} alt={item.displayName} />
+              {item.count > 1 && <span className="pg-item-count">{item.count}</span>}
+            </ItemTooltip>
+          ) : (
+            <div key={i} className="pg-item-slot empty" />
           );
         })}
       </div>

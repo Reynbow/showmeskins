@@ -64,7 +64,28 @@
 
 .item-tooltip-wrap:hover {
   overflow: visible !important;
-  z-index: 50;
+  z-index: 9999;
+}
+
+/* Allow tooltips to escape their item slots (which have overflow: hidden) */
+.lg-sb-item-slot.item-tooltip-wrap:hover,
+.pg-sb-item-slot.item-tooltip-wrap:hover,
+.pg-item-slot.item-tooltip-wrap:hover {
+  overflow: visible !important;
+}
+
+/* Base tooltip styles (shared by in-dom and portal tooltips) */
+.item-tooltip {
+  width: 280px;
+  background: #0a0e14;
+  border: 1px solid #5b4c33;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.9), 0 6px 20px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a09b8c;
 }
 
 .item-tooltip-wrap .item-tooltip {
@@ -73,21 +94,16 @@
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 100;
-  width: 280px;
-  background: linear-gradient(180deg, #0a0e14 0%, #070b11 100%);
-  border: 1px solid #5b4c33;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), 0 6px 20px rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-  text-align: left;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #a09b8c;
+  z-index: 9999;
 }
 
 .item-tooltip-wrap:hover .item-tooltip {
   display: block;
+}
+
+/* Portal-rendered tooltips (always on top, no parent overflow clipping) */
+.item-tooltip--portal {
+  z-index: 99999;
 }
 
 /* ── Tooltip header (icon + name + gold) ─────────────────────────────── */
@@ -98,7 +114,7 @@
   gap: 10px;
   padding: 10px 12px;
   border-bottom: 1px solid #5b4c33;
-  background: rgba(30, 25, 15, 0.4);
+  background: #1e1910;
 }
 
 .item-tooltip-icon {

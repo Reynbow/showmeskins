@@ -2,8 +2,9 @@ import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
-import { getModelUrl } from '../api';
+import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
+import { getModelUrl, getChampionDetail } from '../api';
+import { ItemTooltip } from './ItemTooltip';
 import './LiveGamePage.css';
 
 interface Props {
@@ -98,6 +99,39 @@ function formatGameMode(mode: string): string {
 
 /** Max item slots per player */
 const MAX_ITEMS = 7;
+
+/** Compute champion base stat at a given level (Data Dragon formulas) */
+function getBaseStatAtLevel(
+  baseStats: ChampionStats,
+  level: number,
+  key: keyof LiveGameData['activePlayer']['stats'],
+): number | null {
+  const l = Math.max(1, Math.min(18, level));
+  const m = l - 1;
+  switch (key) {
+    case 'attackDamage':
+      return baseStats.attackdamage + (baseStats.attackdamageperlevel ?? 0) * m;
+    case 'armor':
+      return baseStats.armor + (baseStats.armorperlevel ?? 0) * m;
+    case 'magicResist':
+      return baseStats.spellblock + (baseStats.spellblockperlevel ?? 0) * m;
+    case 'maxHealth':
+      return baseStats.hp + (baseStats.hpperlevel ?? 0) * m;
+    case 'moveSpeed':
+      return baseStats.movespeed;
+    case 'attackRange':
+      return baseStats.attackrange;
+    case 'attackSpeed': {
+      const baseAS = baseStats.attackspeed;
+      const perLevel = baseStats.attackspeedperlevel ?? 0;
+      return baseAS * (1 + m * perLevel / 100);
+    }
+    case 'abilityPower':
+      return 0; // No base AP
+    default:
+      return null;
+  }
+}
 
 /** Stats we display in the panel, grouped into categories */
 type StatEntry = {
@@ -440,6 +474,7 @@ function ChampionModelCanvas({ url, fallbackUrl }: { url: string; fallbackUrl?: 
 
 export function LiveGamePage({ data, champions, version, itemData, onBack }: Props) {
   const [showStats, setShowStats] = useState(true);
+  const [championBaseStats, setChampionBaseStats] = useState<ChampionStats | null>(null);
   const toggleStats = useCallback(() => setShowStats((s) => !s), []);
 
   // Track the highest observed gold total (items + current) so it never dips on purchase
@@ -473,6 +508,28 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     () => resolveModelUrl(activePlayer),
     [activePlayer, resolveModelUrl],
   );
+
+  // Fetch champion base stats for the active player
+  useEffect(() => {
+    if (!activePlayer) {
+      setChampionBaseStats(null);
+      return;
+    }
+    const match = champions.find(
+      (c) => c.name.toLowerCase() === activePlayer.championName.toLowerCase(),
+    );
+    if (!match) {
+      setChampionBaseStats(null);
+      return;
+    }
+    let cancelled = false;
+    getChampionDetail(match.id).then((detail) => {
+      if (!cancelled && detail.stats) setChampionBaseStats(detail.stats);
+    }).catch(() => {
+      if (!cancelled) setChampionBaseStats(null);
+    });
+    return () => { cancelled = true; };
+  }, [activePlayer?.championName, champions]);
 
   // Find the enemy with the most kills
   const topEnemy = useMemo(() => {
@@ -525,18 +582,33 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
 
-      {/* Your champion model — left of scoreboard */}
-      {modelUrl && (
-        <div className="lg-model-bg lg-model-bg--left">
-          <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
-        </div>
-      )}
-
-      {/* Enemy top-killer model — right of scoreboard, mirrored */}
-      {enemyModelUrl && (
-        <div className="lg-model-bg lg-model-bg--right">
-          <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
-        </div>
+      {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right */}
+      {activePlayer?.team === 'ORDER' ? (
+        <>
+          {modelUrl && (
+            <div className="lg-model-bg lg-model-bg--left">
+              <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
+            </div>
+          )}
+          {enemyModelUrl && (
+            <div className="lg-model-bg lg-model-bg--right">
+              <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {enemyModelUrl && (
+            <div className="lg-model-bg lg-model-bg--left">
+              <ChampionModelCanvas url={enemyModelUrl.url} fallbackUrl={enemyModelUrl.fallbackUrl} />
+            </div>
+          )}
+          {modelUrl && (
+            <div className="lg-model-bg lg-model-bg--right">
+              <ChampionModelCanvas url={modelUrl.url} fallbackUrl={modelUrl.fallbackUrl} />
+            </div>
+          )}
+        </>
       )}
 
       {/* Scoreboard content — centered between the two models */}
@@ -659,10 +731,24 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                     {group.stats.map((stat) => {
                       const val = data.activePlayer.stats[stat.key] as number;
                       const formatted = stat.format ? stat.format(val) : Math.round(val).toString();
+                      const baseVal = championBaseStats && activePlayer
+                        ? getBaseStatAtLevel(championBaseStats, activePlayer.level, stat.key)
+                        : null;
+                      const baseFormatted = baseVal != null
+                        ? (stat.format ? stat.format(baseVal) : Math.round(baseVal).toString())
+                        : null;
                       return (
                         <div key={stat.key} className="lg-stat-item">
                           <span className="lg-stat-label">{stat.label}</span>
-                          <span className={`lg-stat-value ${stat.color}`}>{formatted}</span>
+                          <span className="lg-stat-values">
+                            {baseFormatted != null && (
+                              <>
+                                <span className="lg-stat-base">{baseFormatted}</span>
+                                <span className="lg-stat-base lg-stat-arrow">→</span>
+                              </>
+                            )}
+                            <span className={`lg-stat-value ${stat.color}`}>{formatted}</span>
+                          </span>
                         </div>
                       );
                     })}
@@ -863,35 +949,28 @@ function LgPlayerSide({
     <div className="lg-sb-items">
       {itemSlots.map((item, i) => {
         const info = item ? itemData[item.itemID] : undefined;
-        return (
-          <div key={i} className={`lg-sb-item-slot ${!item ? 'empty' : ''} ${item ? 'item-tooltip-wrap' : ''}`}>
-            {item && (
-              <>
-                <img
-                  className="lg-sb-item-img"
-                  src={getItemIconUrl(version, item.itemID)}
-                  alt={item.displayName}
-                  loading="lazy"
-                />
-                {item.count > 1 && <span className="lg-sb-item-count">{item.count}</span>}
-                {info && (
-                  <div className="item-tooltip">
-                    <div className="item-tooltip-header">
-                      <img className="item-tooltip-icon" src={getItemIconUrl(version, item.itemID)} alt="" />
-                      <div className="item-tooltip-title">
-                        <span className="item-tooltip-name">{info.name}</span>
-                      </div>
-                      <span className="item-tooltip-gold">
-                        <svg className="item-tooltip-coin" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" /></svg>
-                        {info.goldTotal.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="item-tooltip-body" dangerouslySetInnerHTML={{ __html: info.descriptionHtml }} />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        return item ? (
+          <ItemTooltip
+            key={i}
+            itemId={item.itemID}
+            itemDisplayName={item.displayName}
+            itemPrice={item.price}
+            itemCount={item.count}
+            info={info}
+            version={version}
+            getItemIconUrl={getItemIconUrl}
+            className="lg-sb-item-slot item-tooltip-wrap"
+          >
+            <img
+              className="lg-sb-item-img"
+              src={getItemIconUrl(version, item.itemID)}
+              alt={item.displayName}
+              loading="lazy"
+            />
+            {item.count > 1 && <span className="lg-sb-item-count">{item.count}</span>}
+          </ItemTooltip>
+        ) : (
+          <div key={i} className="lg-sb-item-slot empty" />
         );
       })}
     </div>
