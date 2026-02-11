@@ -1,13 +1,20 @@
 # Show Me Skins Companion
 
-A lightweight system-tray app that detects which champion and skin you're hovering in the League of Legends champion select lobby, and automatically opens the corresponding 3D model on the Show Me Skins website.
+A lightweight system-tray app that connects to League of Legends and syncs with Show Me Skins for champion select, live game tracking, and post-game summaries.
+
+## Features
+
+- **Champion Select Sync** — Detects which champion and skin you're hovering in the lobby and opens the 3D model on the website in real time
+- **Live Game Scoreboard** — Tracks all 10 players' KDA, items, levels, CS, ward score, and champion stats during the match
+- **Kill Feed** — Real-time champion kills, turret/dragon/baron takedowns with assist tracking
+- **Post-Game Summary** — Win/loss result, final scoreboard, and match MVP
 
 ## How it works
 
-1. The companion app detects the running League client process and connects to its local WebSocket API (LCU API)
-2. It subscribes to champion-select session events and tracks which champion/skin the local player is hovering or has selected
+1. The companion app connects to the League client (LCU API) and the Riot Live Client Data API during games
+2. It subscribes to champion-select events and polls the live game API for scoreboard and kill feed data
 3. It runs a local WebSocket server on `ws://localhost:8234` that the website automatically connects to
-4. When the champion or skin changes, the website navigates to show that model in real time
+4. The website displays real-time champion picks, live scoreboard, kill feed, and post-game summary
 
 ## Building
 
@@ -28,11 +35,10 @@ The NSIS installer compresses it further to ~2.5 MB.
 
 1. Run the companion app. A hexagon icon will appear in your system tray
 2. Open the website (https://www.showmeskins.com)
-3. Start a League of Legends game and enter champion select
-4. The website will automatically update to show the champion and skin you're looking at
+3. Start a League of Legends game — the website syncs champion select, then live scoreboard and kill feed during the match, then post-game summary when it ends
 
 **Tray menu options:**
-- Status display (waiting / connected / in champion select)
+- Status display (waiting / in champion select / in game)
 - Open Show Me Skins website
 - Start on Login toggle
 - Quit

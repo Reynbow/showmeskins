@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"os"
 	"syscall"
@@ -31,6 +32,8 @@ var (
 	kernel32       = syscall.NewLazyDLL("kernel32.dll")
 	createMutexW   = kernel32.NewProc("CreateMutexW")
 	getLastError   = kernel32.NewProc("GetLastError")
+	allocConsole   = kernel32.NewProc("AllocConsole")
+	freeConsole    = kernel32.NewProc("FreeConsole")
 )
 
 const errorAlreadyExists = 183
@@ -90,6 +93,30 @@ func setAutoLaunch(enabled bool) {
 	}
 }
 
+// ── Console show/hide (Windows GUI app: no console by default) ────────────
+
+func showConsole() bool {
+	r0, _, _ := allocConsole.Call()
+	if r0 == 0 {
+		return false // already has console or failed
+	}
+	hOut, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	if err != nil {
+		freeConsole.Call()
+		return false
+	}
+	hErr, _ := syscall.GetStdHandle(syscall.STD_ERROR_HANDLE)
+	os.Stdout = os.NewFile(uintptr(hOut), "stdout")
+	os.Stderr = os.NewFile(uintptr(hErr), "stderr")
+	log.SetOutput(os.Stderr)
+	return true
+}
+
+func hideConsole() {
+	log.SetOutput(io.Discard)
+	freeConsole.Call()
+}
+
 // ── Tray ────────────────────────────────────────────────────────────────
 
 func onReady() {
@@ -109,6 +136,7 @@ func onReady() {
 	openItem := systray.AddMenuItem("Open Show Me Skins", "Open the website in your browser")
 
 	autoStartItem := systray.AddMenuItemCheckbox("Start on Login", "Launch automatically when you log in", isAutoLaunchEnabled())
+	showConsoleItem := systray.AddMenuItemCheckbox("Show Console", "Show or hide the debug console (logs, connection status)", false)
 
 	quitItem := systray.AddMenuItem("Quit", "Exit the companion app")
 
@@ -171,6 +199,16 @@ func onReady() {
 					autoStartItem.Check()
 					setAutoLaunch(true)
 				}
+			case <-showConsoleItem.ClickedCh:
+				if showConsoleItem.Checked() {
+					if showConsole() {
+						log.Println("[console] Debug console shown")
+					} else {
+						showConsoleItem.Uncheck()
+					}
+				} else {
+					hideConsole()
+				}
 			case <-quitItem.ClickedCh:
 				systray.Quit()
 			}
@@ -193,6 +231,9 @@ func onExit() {
 // ── Entry point ─────────────────────────────────────────────────────────
 
 func main() {
+	// No console by default (windowsgui); discard logs until user enables "Show Console"
+	log.SetOutput(io.Discard)
+
 	if !acquireSingleInstanceLock() {
 		os.Exit(0)
 	}

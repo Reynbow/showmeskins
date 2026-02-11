@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. 0.2.0)'
+        description: 'Version tag (e.g. 0.3.0)'
         required: true
-        default: '0.2.0'
+        default: '0.3.0'
 
 jobs:
   build-and-release:
@@ -46,7 +46,7 @@ jobs:
         working-directory: companion
         run: |
           choco install nsis -y --no-progress
-          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DPRODUCT_VERSION=${{ steps.version.outputs.version }} installer.nsi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -57,8 +57,14 @@ jobs:
             ## Show Me Skins Companion v${{ steps.version.outputs.version }}
 
             Download the installer below and run it. The app runs in the system tray — look for the hexagon icon after launching.
+
+            ### Features
+            - **Champion Select Sync** — Detects your champion and skin pick in real time
+            - **Live Game Scoreboard** — Tracks all players' KDA, items, levels, CS, ward score, and stats during play
+            - **Kill Feed** — Real-time champion kills, turret/dragon/baron takedowns
+            - **Post-Game Summary** — Win/loss result, final scoreboard, and MVP
           files: |
-            companion/dist/Show Me Skins Companion Setup ${{ steps.version.outputs.version }}.exe
+            companion/dist/Show.Me.Skins.Companion.Setup.${{ steps.version.outputs.version }}.exe
             companion/dist/Show Me Skins Companion.exe
           draft: false
           prerelease: false

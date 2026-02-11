@@ -6,15 +6,20 @@
 !include "MUI2.nsh"
 
 ; ── App metadata ──────────────────────────────────────────────────────────────
+; PRODUCT_VERSION can be overridden: makensis /DPRODUCT_VERSION=0.3.0 installer.nsi
+
+!ifndef PRODUCT_VERSION
+!define PRODUCT_VERSION "0.3.0"
+!endif
 
 !define PRODUCT_NAME "Show Me Skins Companion"
 !define PRODUCT_EXE  "Show Me Skins Companion.exe"
-!define PRODUCT_VERSION "0.2.0"
 !define PRODUCT_PUBLISHER "Show Me Skins"
 !define PRODUCT_URL "https://www.showmeskins.com"
 
 Name "${PRODUCT_NAME}"
-OutFile "dist\Show Me Skins Companion Setup ${PRODUCT_VERSION}.exe"
+; Use dotted filename to match GitHub release asset URL pattern
+OutFile "dist\Show.Me.Skins.Companion.Setup.${PRODUCT_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
 InstallDirRegKey HKCU "Software\${PRODUCT_NAME}" "InstallDir"
 RequestExecutionLevel user
