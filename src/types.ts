@@ -152,6 +152,10 @@ export interface KillEvent {
   multiKill?: MultiKillType;
   /** Computed: killing_spree→legendary when killer has 3+ kills without dying */
   killStreak?: KillStreakType;
+  /** Computed: Nth time this champion achieved this multiKill this game (for multiplier display) */
+  multiKillCount?: number;
+  /** Computed: Nth time this champion achieved this killStreak this game (for multiplier display) */
+  killStreakCount?: number;
 }
 
 export interface LiveGameData {

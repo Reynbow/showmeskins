@@ -1,7 +1,9 @@
 .dev-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background: var(--lol-bg-primary);
   position: relative;
 }
@@ -169,6 +171,216 @@
   font-size: 11px;
   color: var(--lol-text-secondary);
   word-break: break-all;
+}
+
+.dev-hero-desc {
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+/* Break out of narrow dev column to match live page formation size exactly.
+   On the live page the formation sits inside a container with 24px horizontal
+   padding, so effective width = min(1200px, 100vw − 48px). */
+.dev-hero-formation-wrap {
+  width: calc(100vw - 48px);
+  max-width: 1200px;
+  /* Centre relative to viewport by shifting to parent midpoint then back 50% of own width */
+  margin-left: 50%;
+  transform: translateX(-50%);
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+/* Formation Position Tool */
+.dev-formation-tool {
+  margin-top: 16px;
+  border: 1px solid var(--lol-border);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dev-formation-tool-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--lol-gold-light);
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-formation-tool-toggle:hover {
+  background: rgba(200, 170, 110, 0.06);
+}
+
+.dev-formation-tool-panel {
+  padding: 16px 20px;
+  border-top: 1px solid var(--lol-border);
+}
+
+.dev-formation-tool-desc {
+  color: var(--lol-text-secondary);
+  font-size: 12px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.dev-formation-tool-camera {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.15);
+}
+
+.dev-formation-tool-camera strong {
+  display: block;
+  font-size: 12px;
+  color: var(--lol-gold);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.dev-formation-tool-camera-row {
+  margin-bottom: 8px;
+}
+
+.dev-formation-tool-camera-row:last-child {
+  margin-bottom: 0;
+}
+
+.dev-formation-tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.dev-formation-tool-team {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dev-formation-tool-team strong {
+  font-size: 12px;
+  color: var(--lol-gold);
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.dev-formation-tool-slot {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.08);
+}
+
+.dev-formation-tool-slot:last-child {
+  border-bottom: none;
+}
+
+.dev-formation-tool-label {
+  display: block;
+  font-size: 11px;
+  color: var(--lol-text-muted);
+  margin-bottom: 6px;
+}
+
+.dev-formation-tool-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--lol-text-secondary);
+}
+
+.dev-formation-tool-slider-row:last-child {
+  margin-bottom: 0;
+}
+
+.dev-formation-tool-slider-row span:first-child {
+  width: 14px;
+}
+
+.dev-formation-tool-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+}
+
+.dev-formation-tool-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lol-gold);
+  cursor: pointer;
+  border: 1px solid var(--lol-gold-dark);
+}
+
+.dev-formation-tool-slider-row input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lol-gold);
+  cursor: pointer;
+  border: 1px solid var(--lol-gold-dark);
+}
+
+.dev-formation-tool-value {
+  min-width: 36px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--lol-gold-light);
+  text-align: right;
+}
+
+.dev-formation-tool-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dev-formation-tool-btn {
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.dev-formation-tool-btn:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+}
+
+.dev-formation-tool-btn--primary {
+  background: rgba(200, 170, 110, 0.15);
+  border-color: rgba(200, 170, 110, 0.4);
+  color: var(--lol-gold-light);
+}
+
+.dev-formation-tool-btn--primary:hover {
+  background: rgba(200, 170, 110, 0.25);
+}
+
+.dev-formation-tool-hint {
+  font-size: 11px;
+  color: var(--lol-text-muted);
+  margin: 0;
+  line-height: 1.5;
 }
 
 .dev-api-note {

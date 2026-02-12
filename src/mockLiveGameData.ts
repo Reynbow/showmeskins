@@ -93,7 +93,7 @@ const sampleLiveGame: LiveGameData = {
       team: 'ORDER',
       position: 'BOTTOM',
       level: 13,
-      kills: 8,
+      kills: 10,
       deaths: 1,
       assists: 5,
       creepScore: 192,
@@ -264,18 +264,23 @@ const sampleLiveGame: LiveGameData = {
   killFeed: [
     { eventTime: 185, killerName: 'JGKing', victimName: 'ForestGuard', assisters: ['Darius'], killerChamp: 'LeeSin', victimChamp: 'Vi' },
     { eventTime: 243, killerName: 'xXSlayerXx', victimName: 'MidOrFeed', assisters: [], killerChamp: 'Yone', victimChamp: 'Ahri' },
+    // Jinx first double kill (lane skirmish)
+    { eventTime: 306, killerName: 'You', victimName: 'MidOrFeed', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Ahri' },
     { eventTime: 310, killerName: 'You', victimName: 'ADC Diff', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Caitlyn' },
     { eventTime: 412, killerName: 'ZedMain420', victimName: 'MidOrFeed', assisters: [], killerChamp: 'Zed', victimChamp: 'Ahri' },
+    // Jinx second double kill (demonstrates ×2 multiplier)
+    { eventTime: 495, killerName: 'You', victimName: 'SuppGap', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Thresh' },
     { eventTime: 498, killerName: 'You', victimName: 'WardBot', assisters: ['Thresh', 'LeeSin'], killerChamp: 'Jinx', victimChamp: 'Leona' },
     { eventTime: 560, killerName: 'TopDiff99', victimName: 'xXSlayerXx', assisters: ['LeeSin'], killerChamp: 'Darius', victimChamp: 'Yone' },
     { eventTime: 623, killerName: 'xXSlayerXx', victimName: 'TopDiff99', assisters: ['Vi'], killerChamp: 'Yone', victimChamp: 'Darius' },
     { eventTime: 624, killerName: 'xXSlayerXx', victimName: 'SuppGap', assisters: [], killerChamp: 'Yone', victimChamp: 'Thresh' },
+    // Jinx quadra kill
     { eventTime: 710, killerName: 'You', victimName: 'ZedMain420', assisters: [], killerChamp: 'Jinx', victimChamp: 'Zed' },
-    { eventTime: 784, killerName: 'MidOrFeed', victimName: 'ForestGuard', assisters: ['Jinx'], killerChamp: 'Ahri', victimChamp: 'Vi' },
-    { eventTime: 856, killerName: 'ADC Diff', victimName: 'WardBot', assisters: ['Leona'], killerChamp: 'Caitlyn', victimChamp: 'Leona' },
     { eventTime: 711, killerName: 'You', victimName: 'xXSlayerXx', assisters: ['Darius', 'Thresh'], killerChamp: 'Jinx', victimChamp: 'Yone' },
     { eventTime: 712, killerName: 'You', victimName: 'ADC Diff', assisters: ['Ahri'], killerChamp: 'Jinx', victimChamp: 'Caitlyn' },
     { eventTime: 715, killerName: 'You', victimName: 'ZedMain420', assisters: ['Thresh'], killerChamp: 'Jinx', victimChamp: 'Zed' },
+    { eventTime: 784, killerName: 'MidOrFeed', victimName: 'ForestGuard', assisters: ['Jinx'], killerChamp: 'Ahri', victimChamp: 'Vi' },
+    { eventTime: 856, killerName: 'ADC Diff', victimName: 'WardBot', assisters: ['Leona'], killerChamp: 'Caitlyn', victimChamp: 'Leona' },
     { eventTime: 1150, killerName: 'JGKing', victimName: 'WardBot', assisters: [], killerChamp: 'LeeSin', victimChamp: 'Leona' },
   ],
 };

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component, type ReactNode } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
@@ -271,8 +271,25 @@ function findBestAnimName(names: string[]): string | undefined {
   return names[0];
 }
 
-/** The 3D champion model with auto-sizing, idle animation, and optional chroma texture */
-function LiveChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextureUrl?: string | null }) {
+/** Find the best idle animation only (for hero formation pose) */
+function findBestIdleAnimName(names: string[]): string | undefined {
+  const idles = names.filter(isIdleAnim);
+  if (idles.length > 0) {
+    for (const pattern of IDLE_PATTERNS) {
+      const match = idles.find((n) => pattern.test(n));
+      if (match) return match;
+    }
+    return idles[0];
+  }
+  for (const pattern of IDLE_PATTERNS) {
+    const match = names.find((n) => pattern.test(n));
+    if (match) return match;
+  }
+  return names[0];
+}
+
+/** The 3D champion model with auto-sizing, optional chroma texture. preferIdle=true uses idle pose (hero formation). */
+function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url: string; chromaTextureUrl?: string | null; preferIdle?: boolean }) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
@@ -280,7 +297,10 @@ function LiveChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextu
   const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
   const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
-  const animName = useMemo(() => findBestAnimName(names), [names]);
+  const animName = useMemo(
+    () => (preferIdle ? findBestIdleAnimName(names) : findBestAnimName(names)),
+    [names, preferIdle],
+  );
 
   /* ── Chroma texture overlay (same logic as ModelViewer's ChampionModel) ── */
   useEffect(() => {
@@ -543,13 +563,42 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 
 /* ── Pregame hero formation (all 10 champs, Overwatch/Marvel style) ─────── */
 
-/** Formation positions: blue team left, red team right, arc layout */
-const BLUE_FORMATION_POSITIONS: [number, number, number][] = [
-  [-2.6, 0, -1.4], [-2.7, 0, -0.5], [-2.5, 0, 0.4], [-2.7, 0, 1.3], [-2.6, 0, 2.2],
+/** Formation positions by role: [0]=Top, [1]=Jungle, [2]=Mid, [3]=Bot, [4]=Support. Same order for both teams. */
+export const BLUE_FORMATION_POSITIONS: [number, number, number][] = [
+  [-1.9, 0, -3.0],   /* Top */
+  [-2.8, 0, -2.0],   /* Jungle */
+  [-3.5, 0, -1.5],   /* Mid */
+  [-3.3, 0, -0.4],   /* Bot */
+  [-5.5, 0, -3.0],   /* Support */
 ];
-const RED_FORMATION_POSITIONS: [number, number, number][] = [
-  [2.6, 0, -1.4], [2.7, 0, -0.5], [2.5, 0, 0.4], [2.7, 0, 1.3], [2.6, 0, 2.2],
+export const RED_FORMATION_POSITIONS: [number, number, number][] = [
+  [2.2, 0, -3.0],   /* Top */
+  [2.8, 0, -2.0],   /* Jungle */
+  [3.5, 0, -1.5],   /* Mid */
+  [3.3, 0, -0.4],   /* Bot */
+  [6.6, 0, -3.0],   /* Support */
 ];
+/** Camera at (0,1.5,3). Models default facing center; rotate 90° so both face +Z (camera) */
+const BLUE_FACE_CAMERA_Y = Math.PI / 2;
+const RED_FACE_CAMERA_Y = -Math.PI / 2;
+
+export const DEFAULT_CAMERA_POSITION: [number, number, number] = [0, 1.5, 5];
+export const DEFAULT_CAMERA_FOV = 20;
+export const DEFAULT_LOOK_AT_Y = 1.204;
+
+/** Updates hero formation camera position, FOV, and look-at (Canvas camera prop is only used on mount) */
+function HeroFormationCameraController({ position, fov, lookAtY }: { position: [number, number, number]; fov: number; lookAtY: number }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    camera.position.set(position[0], position[1], position[2]);
+    (camera as THREE.PerspectiveCamera).fov = fov;
+    (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+  }, [camera, position, fov]);
+  useEffect(() => {
+    camera.lookAt(0, lookAtY, 0);
+  }, [camera, lookAtY]);
+  return null;
+}
 
 function PregameChampionSlot({
   player,
@@ -568,27 +617,45 @@ function PregameChampionSlot({
     <ModelErrorBoundary fallback={null} resetKey={`${player.championName}-${player.skinID}`}>
       <group position={position} rotation={[0, rotationY, 0]} scale={[0.26, 0.26, 0.26]}>
         <Suspense fallback={null}>
-          <LiveChampionModel url={modelInfo.modelUrl} chromaTextureUrl={modelInfo.chromaTextureUrl} />
+          <LiveChampionModel url={modelInfo.modelUrl} chromaTextureUrl={modelInfo.chromaTextureUrl} preferIdle />
         </Suspense>
       </group>
     </ModelErrorBoundary>
   );
 }
 
-function PregameHeroFormation({
+export function PregameHeroFormation({
   blueTeam,
   redTeam,
   champions,
+  bluePositions,
+  redPositions,
+  cameraPosition,
+  cameraFov,
+  lookAtY,
 }: {
   blueTeam: LiveGamePlayer[];
   redTeam: LiveGamePlayer[];
   champions: ChampionBasic[];
+  bluePositions?: [number, number, number][];
+  redPositions?: [number, number, number][];
+  cameraPosition?: [number, number, number];
+  cameraFov?: number;
+  lookAtY?: number;
 }) {
+  const blueByRole = useMemo(() => sortByRole(blueTeam), [blueTeam]);
+  const redByRole = useMemo(() => sortByRole(redTeam), [redTeam]);
+  const bluePos = bluePositions ?? BLUE_FORMATION_POSITIONS;
+  const redPos = redPositions ?? RED_FORMATION_POSITIONS;
+  const camPos = cameraPosition ?? DEFAULT_CAMERA_POSITION;
+  const camFov = cameraFov ?? DEFAULT_CAMERA_FOV;
+  const lookY = lookAtY ?? DEFAULT_LOOK_AT_Y;
+
   return (
     <div className="lg-hero-formation">
       <Canvas
         shadows
-        camera={{ position: [0, 1.5, 6], fov: 50 }}
+        camera={{ position: camPos, fov: camFov }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
@@ -597,6 +664,7 @@ function PregameHeroFormation({
         }}
         style={{ background: 'transparent' }}
       >
+        <HeroFormationCameraController position={camPos} fov={camFov} lookAtY={lookY} />
         <fog attach="fog" args={['#010a13', 12, 28]} />
         <ambientLight intensity={0.5} />
         <directionalLight position={[8, 8, -2]} intensity={1.2} color="#f0e6d2" />
@@ -622,22 +690,22 @@ function PregameHeroFormation({
           <planeGeometry args={[24, 24]} />
           <shadowMaterial opacity={0.3} />
         </mesh>
-        {blueTeam.slice(0, 5).map((player, i) => (
+        {blueByRole.slice(0, 5).map((player, i) => (
           <PregameChampionSlot
             key={`blue-${player.summonerName}`}
             player={player}
             champions={champions}
-            position={BLUE_FORMATION_POSITIONS[i]}
-            rotationY={0}
+            position={bluePos[i] ?? BLUE_FORMATION_POSITIONS[i]}
+            rotationY={BLUE_FACE_CAMERA_Y}
           />
         ))}
-        {redTeam.slice(0, 5).map((player, i) => (
+        {redByRole.slice(0, 5).map((player, i) => (
           <PregameChampionSlot
             key={`red-${player.summonerName}`}
             player={player}
             champions={champions}
-            position={RED_FORMATION_POSITIONS[i]}
-            rotationY={Math.PI}
+            position={redPos[i] ?? RED_FORMATION_POSITIONS[i]}
+            rotationY={RED_FACE_CAMERA_Y}
           />
         ))}
       </Canvas>
@@ -932,11 +1000,6 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           })}
         </div>
 
-        {/* Pregame hero formation: all 10 champions below scoreboard until match starts */}
-        {isPregame && (
-          <PregameHeroFormation blueTeam={blueTeam} redTeam={redTeam} champions={champions} />
-        )}
-
         {/* Active player stats panel */}
         <div className="lg-stats-panel">
           <div className="lg-stats-header">
@@ -1020,6 +1083,11 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             champions={champions}
             version={version}
           />
+        )}
+
+        {/* Pregame hero formation: all 10 champions at bottom until match starts */}
+        {isPregame && (
+          <PregameHeroFormation blueTeam={blueTeam} redTeam={redTeam} champions={champions} />
         )}
       </div>
 
@@ -1179,6 +1247,9 @@ function KillFeed({
                         {kill.multiKill === 'triple' && 'Triple Kill'}
                         {kill.multiKill === 'quadra' && 'Quadra Kill'}
                         {kill.multiKill === 'penta' && 'Penta Kill'}
+                        {kill.multiKillCount != null && kill.multiKillCount > 1 && (
+                          <span className="lg-kill-badge-multiplier">×{kill.multiKillCount}</span>
+                        )}
                       </TextTooltip>
                     )}
                     {kill.killStreak && (
@@ -1192,6 +1263,9 @@ function KillFeed({
                         {kill.killStreak === 'unstoppable' && 'Unstoppable'}
                         {kill.killStreak === 'godlike' && 'Godlike'}
                         {kill.killStreak === 'legendary' && 'Legendary'}
+                        {kill.killStreakCount != null && kill.killStreakCount > 1 && (
+                          <span className="lg-kill-badge-multiplier">×{kill.killStreakCount}</span>
+                        )}
                       </TextTooltip>
                     )}
                   </span>

@@ -78,7 +78,12 @@ function App() {
         if (championId === 'companion') {
           setViewMode('companion');
         } else if (championId === 'dev') {
-          setViewMode('dev');
+          if (import.meta.env.DEV) {
+            setViewMode('dev');
+          } else {
+            window.history.replaceState(null, '', '/companion');
+            setViewMode('companion');
+          }
         } else if (championId === 'live' || championId === 'postgame') {
           // /live and /postgame require active session data from the companion.
           // If opened directly with no session, redirect to home.
@@ -123,6 +128,14 @@ function App() {
     }
   }, [viewMode, liveGameData, postGameData]);
 
+  // Dev page is development-only; redirect /dev to companion in production
+  useEffect(() => {
+    if (viewMode === 'dev' && import.meta.env.PROD) {
+      setViewMode('companion');
+      window.history.replaceState(null, '', '/companion');
+    }
+  }, [viewMode]);
+
   // Handle browser back/forward navigation
   useEffect(() => {
     const handlePopState = async () => {
@@ -139,7 +152,12 @@ function App() {
         return;
       }
       if (championId === 'dev') {
-        setViewMode('dev');
+        if (import.meta.env.DEV) {
+          setViewMode('dev');
+        } else {
+          window.history.replaceState(null, '', '/companion');
+          setViewMode('companion');
+        }
         return;
       }
       if (championId === 'live') {
@@ -485,12 +503,12 @@ function App() {
           onBack={handleCompanionBack}
           onSampleLive={handleSampleLive}
           onSamplePostGame={handleSamplePostGame}
-          onDev={handleDev}
+          onDev={import.meta.env.DEV ? handleDev : undefined}
           hasLiveGame={!!liveGameData}
           onLiveGame={handleLiveGameNavigate}
         />
-      ) : viewMode === 'dev' ? (
-        <DevPage accountInfo={accountInfo} onBack={handleDevBack} />
+      ) : viewMode === 'dev' && import.meta.env.DEV ? (
+        <DevPage accountInfo={accountInfo} champions={champions} onBack={handleDevBack} />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}

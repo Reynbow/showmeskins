@@ -559,7 +559,8 @@
   width: 100%;
   max-width: 1200px;
   height: 280px;
-  margin-top: 20px;
+  margin-top: 24px;
+  margin-bottom: 24px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(30, 40, 45, 0.6);
@@ -934,6 +935,13 @@
   color: #a7f3d0;
   border-color: rgba(34, 197, 94, 0.7);
   box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+}
+
+.lg-kill-badge-multiplier {
+  margin-left: 4px;
+  font-size: 9px;
+  opacity: 0.9;
+  letter-spacing: 0;
 }
 
 .lg-kill-assists {

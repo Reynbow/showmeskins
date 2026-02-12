@@ -17,6 +17,9 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
   // Track kills/deaths per player (summoner name) as we process
   const killsByPlayer: Record<string, number> = {};
   const deathsByPlayer: Record<string, number> = {};
+  // Track how many times each (player, tag) has occurred this game
+  const multiKillCountByPlayer: Record<string, number> = {};
+  const killStreakCountByPlayer: Record<string, number> = {};
 
   const enriched: KillEvent[] = [];
 
@@ -49,6 +52,9 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
       };
       if (multiCount >= 2 && multiCount <= 5) {
         kill.multiKill = multiKillMap[multiCount];
+        const key = `${kill.killerName}:${kill.multiKill}`;
+        multiKillCountByPlayer[key] = (multiKillCountByPlayer[key] ?? 0) + 1;
+        kill.multiKillCount = multiKillCountByPlayer[key];
       }
 
       // Kill streak: total kills minus deaths at time of this kill (before victim's death is counted)
@@ -65,6 +71,9 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
       };
       if (streak >= 3) {
         kill.killStreak = streakMap[Math.min(streak, 7)] ?? 'legendary';
+        const key = `${kill.killerName}:${kill.killStreak}`;
+        killStreakCountByPlayer[key] = (killStreakCountByPlayer[key] ?? 0) + 1;
+        kill.killStreakCount = killStreakCountByPlayer[key];
       }
     }
 
