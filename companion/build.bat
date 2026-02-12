@@ -4,7 +4,7 @@ REM Builds the Go binary and (optionally) the NSIS installer.
 REM Version is used for the installer; bump when releasing.
 
 setlocal
-set VERSION=0.3.1
+set VERSION=0.3.2
 
 echo [1/2] Building Go binary...
 go build -ldflags="-s -w -H windowsgui -X main.Version=%VERSION%" -o "dist\Show Me Skins Companion.exe" .
