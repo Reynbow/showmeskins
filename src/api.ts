@@ -230,8 +230,8 @@ export function getChampionScale(alias: string): number {
  */
 const BLOB_BASE_URL = (import.meta.env.VITE_BLOB_BASE_URL ?? '').replace(/\/+$/, '');
 
-/** Runtime cache of resolved chroma URLs (blob or CDragon). */
-const chromaUrlCache = new Map<number, string | null>();
+/** Runtime cache of resolved chroma URLs (blob or CDragon). Key: chromaId or "chromaId:baseSkinId". */
+const chromaUrlCache = new Map<number | string, string | null>();
 
 /**
  * Check whether a blob URL exists via a HEAD request.
@@ -255,6 +255,25 @@ async function blobExists(url: string): Promise<boolean> {
 }
 
 /* ── CommunityDragon fallback (slow path) ────────────────────────────────── */
+
+/**
+ * Fright Night skin line (id 170) uses cel-shaded textures with a different UV layout.
+ * For these skins we use the combined _tx_cm atlas instead of _body_tx_cm.
+ * Base skin IDs from CommunityDragon (skinLines id 170).
+ */
+export const FRIGHT_NIGHT_BASE_SKIN_IDS = new Set([
+  '1031',     // Annie
+  '119039',   // Draven
+  '111018',   // Nautilus
+  '888010',   // Renata Glasc
+  '48012',    // Trundle
+  '6023',     // Urgot
+  '45060',    // Veigar
+  '221028',   // Zeri
+  '35054',    // Shaco
+  '555064',   // Pyke
+  '20044',    // Nunu & Willump
+]);
 
 /** Keywords that identify accessory textures (not the main body texture) */
 const ACCESSORY_KEYWORDS = [
@@ -318,10 +337,12 @@ async function fetchDirListing(alias: string, skinNum: string): Promise<{ filena
 /**
  * Slow-path: resolve a chroma texture URL via CommunityDragon directory listing.
  * Used as fallback when the chroma is not in the pre-built manifest.
+ * @param baseSkinId - Optional base skin ID; when it's Fright Night, uses combined atlas texture
  */
 async function resolveChromaFromCDragon(
   championId: string,
   chromaId: number,
+  baseSkinId?: string,
 ): Promise<string | null> {
   const alias = championId.toLowerCase();
   const skinNum = String(chromaId % 1000).padStart(2, '0');
@@ -345,10 +366,20 @@ async function resolveChromaFromCDragon(
     return !ACCESSORY_KEYWORDS.some((kw) => lower.includes(kw));
   });
 
-  const best =
-    bodyFiles.length > 0
-      ? bodyFiles.sort((a, b) => a.length - b.length)[0]
-      : txCmFiles.sort((a, b) => a.length - b.length)[0];
+  // Fright Night (cel-shaded) uses the combined _tx_cm atlas; _body_tx_cm has
+  // misaligned UVs for this skin line.
+  const useCombined = baseSkinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(baseSkinId);
+  const candidateFiles = bodyFiles.length > 0 ? bodyFiles : txCmFiles;
+
+  let toSort: string[];
+  if (useCombined) {
+    toSort = candidateFiles.filter((f) => !f.toLowerCase().includes('_body_'));
+    if (toSort.length === 0) toSort = candidateFiles;
+  } else {
+    const bodyOnly = candidateFiles.filter((f) => f.toLowerCase().includes('_body_'));
+    toSort = bodyOnly.length > 0 ? bodyOnly : candidateFiles;
+  }
+  const best = toSort.sort((a, b) => a.length - b.length)[0];
 
   return best ? `${baseUrl}${best}` : null;
 }
@@ -359,32 +390,36 @@ async function resolveChromaFromCDragon(
  * Fast path: deterministic Vercel Blob URL with HEAD check (~50ms).
  * Slow path (fallback): CommunityDragon directory listing + pattern match.
  * Results are cached in memory so each chroma is only resolved once.
+ * @param baseSkinId - Optional base skin ID; when it's Fright Night, uses combined atlas texture
  */
 export async function resolveChromaTextureUrl(
   championId: string,
   chromaId: number,
+  baseSkinId?: string,
 ): Promise<string | null> {
-  // 1. Check runtime cache
-  if (chromaUrlCache.has(chromaId)) return chromaUrlCache.get(chromaId) ?? null;
+  const cacheKey = baseSkinId ? `${chromaId}:${baseSkinId}` : chromaId;
+  if (chromaUrlCache.has(cacheKey)) return chromaUrlCache.get(cacheKey) ?? null;
 
   // 2. Try Vercel Blob Storage (fast path – deterministic URL)
+  // Note: Blob stores one texture per chroma; re-run sync-chromas with Fright Night
+  // handling to update blob contents for this skin line
   if (BLOB_BASE_URL) {
     const alias = championId.toLowerCase();
     const skinNum = String(chromaId % 1000).padStart(2, '0');
     const blobUrl = `${BLOB_BASE_URL}/chromas/${alias}/skin${skinNum}.webp`;
 
     if (await blobExists(blobUrl)) {
-      chromaUrlCache.set(chromaId, blobUrl);
+      chromaUrlCache.set(cacheKey, blobUrl);
       return blobUrl;
     }
   }
 
   // 3. CommunityDragon fallback (slow but universal)
-  const url = await resolveChromaFromCDragon(championId, chromaId);
+  const url = await resolveChromaFromCDragon(championId, chromaId, baseSkinId);
   // Only cache successful resolutions — don't let a temporary failure
   // permanently block the chroma for the rest of the session.
   if (url) {
-    chromaUrlCache.set(chromaId, url);
+    chromaUrlCache.set(cacheKey, url);
   }
   return url;
 }

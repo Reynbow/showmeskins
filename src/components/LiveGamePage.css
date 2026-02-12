@@ -196,6 +196,36 @@
 
 /* ── Scoreboard (mirrored side-by-side) ────────────────────────────── */
 
+.lg-scoreboard-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.lg-sb-you-chevron {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.lg-sb-you-chevron--blue {
+  left: -28px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid var(--lol-gold);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
+}
+
+.lg-sb-you-chevron--red {
+  right: -28px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 14px solid var(--lol-gold);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
+}
+
 .lg-scoreboard {
   width: 100%;
   max-width: 1200px;

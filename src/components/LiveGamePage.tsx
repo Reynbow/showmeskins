@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
-import { getChampionDetail, getChampionScale } from '../api';
+import { getChampionDetail, getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
@@ -199,7 +199,10 @@ const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
     groupLabel: 'Penetration',
     stats: [
       { label: 'Phys. Lethality', key: 'physicalLethality', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
-      { label: 'Magic Pen', key: 'magicPenetrationFlat', color: 'lg-stat-ap', showIf: (v) => v > 0 },
+      { label: 'Armor Pen (Flat)', key: 'armorPenetrationFlat', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
+      { label: 'Armor Pen (%)', key: 'armorPenetrationPercent', color: 'lg-stat-lethality', format: (v) => `${Math.round(v < 1 ? v * 100 : v)}%`, showIf: (v) => v > 0 },
+      { label: 'Magic Pen (Flat)', key: 'magicPenetrationFlat', color: 'lg-stat-ap', showIf: (v) => v > 0 },
+      { label: 'Magic Pen (%)', key: 'magicPenetrationPercent', color: 'lg-stat-ap', format: (v) => `${Math.round(v < 1 ? v * 100 : v)}%`, showIf: (v) => v > 0 },
     ],
   },
 ];
@@ -297,6 +300,11 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
   const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
   const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
+  const isFrightNight = useMemo(() => {
+    const m = url.match(/\/models\/([^/]+)\/([^/]+)\//);
+    return m != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(m[2]);
+  }, [url]);
+
   const animName = useMemo(
     () => (preferIdle ? findBestIdleAnimName(names) : findBestAnimName(names)),
     [names, preferIdle],
@@ -355,6 +363,7 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
         if (loadedChromaTexRef.current) loadedChromaTexRef.current.dispose();
         loadedChromaTexRef.current = texture;
         let maxSize = 0;
+        let maxTexRef: THREE.Texture | null = null;
         const primaryMats: THREE.MeshStandardMaterial[] = [];
         scene.traverse((child) => {
           const mesh = child as THREE.Mesh;
@@ -366,12 +375,19 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
             if (tex?.image) {
               const img = tex.image as { width?: number; height?: number };
               const size = (img.width ?? 0) * (img.height ?? 0);
-              if (size > maxSize) { maxSize = size; primaryMats.length = 0; primaryMats.push(m); }
-              else if (size === maxSize && size > 0) primaryMats.push(m);
+              if (size > maxSize) { maxSize = size; maxTexRef = tex; primaryMats.length = 0; primaryMats.push(m); }
+              else if (size === maxSize && size > 0 && (isFrightNight || tex === maxTexRef)) primaryMats.push(m);
             }
           }
         });
         if (primaryMats.length > 0) {
+          const firstOrig = originals.get(primaryMats[0]) ?? primaryMats[0].map;
+          if (firstOrig) {
+            texture.offset.copy(firstOrig.offset);
+            texture.repeat.copy(firstOrig.repeat);
+            texture.wrapS = firstOrig.wrapS;
+            texture.wrapT = firstOrig.wrapT;
+          }
           for (const m of primaryMats) {
             if (!originals.has(m)) originals.set(m, m.map);
             m.map = texture;
@@ -395,7 +411,7 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
         loadedChromaTexRef.current = null;
       }
     };
-  }, [scene, chromaTextureUrl]);
+  }, [scene, chromaTextureUrl, isFrightNight]);
 
   /* Unmount: restore original textures so useGLTF cache is never left with stale chroma */
   useEffect(() => {
@@ -692,7 +708,7 @@ export function PregameHeroFormation({
         </mesh>
         {blueByRole.slice(0, 5).map((player, i) => (
           <PregameChampionSlot
-            key={`blue-${player.summonerName}`}
+            key={`blue-${player.summonerName}-${player.championName}-${player.skinID}`}
             player={player}
             champions={champions}
             position={bluePos[i] ?? BLUE_FORMATION_POSITIONS[i]}
@@ -701,7 +717,7 @@ export function PregameHeroFormation({
         ))}
         {redByRole.slice(0, 5).map((player, i) => (
           <PregameChampionSlot
-            key={`red-${player.summonerName}`}
+            key={`red-${player.summonerName}-${player.championName}-${player.skinID}`}
             player={player}
             champions={champions}
             position={redPos[i] ?? RED_FORMATION_POSITIONS[i]}
@@ -846,6 +862,41 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   const blueKills = blueTeam.reduce((sum, p) => sum + p.kills, 0);
   const redKills = redTeam.reduce((sum, p) => sum + p.kills, 0);
 
+  // Active player row index and side (for floating "you" chevron)
+  const activePlayerRow = useMemo(() => {
+    if (!activePlayer) return null;
+    const blueIdx = blueTeam.findIndex((p) => p.summonerName === activePlayer.summonerName);
+    if (blueIdx >= 0) return { index: blueIdx, side: 'blue' as const };
+    const redIdx = redTeam.findIndex((p) => p.summonerName === activePlayer.summonerName);
+    if (redIdx >= 0) return { index: redIdx, side: 'red' as const };
+    return null;
+  }, [activePlayer, blueTeam, redTeam]);
+
+  // Refs for chevron positioning
+  const scoreboardRef = useRef<HTMLDivElement>(null);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
+  const [chevronTop, setChevronTop] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!activePlayerRow || !scoreboardRef.current) {
+      setChevronTop(null);
+      return;
+    }
+    const updateChevron = () => {
+      if (!activeRowRef.current || !scoreboardRef.current) return;
+      const scoreboard = scoreboardRef.current;
+      const row = activeRowRef.current;
+      const sbRect = scoreboard.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const top = rowRect.top - sbRect.top + rowRect.height / 2 - 10; // 10px = half chevron height
+      setChevronTop(top);
+    };
+    updateChevron();
+    const ro = new ResizeObserver(updateChevron);
+    ro.observe(scoreboardRef.current);
+    return () => ro.disconnect();
+  }, [activePlayerRow]);
+
   // MVP: highest mvpScore across all players
   const gameMvp = useMemo(() => {
     if (data.players.length === 0) return undefined;
@@ -863,6 +914,10 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   const noOneHasItems = data.players.every((p) => p.items.length === 0);
   const gameTime = data.gameTime ?? 0;
   const isPregame = noOneHasItems || gameTime < 180;
+
+  // Hide hero models and pane early when kill feed has 5+ kills (give more space to the feed)
+  const killFeedCount = data.killFeed?.length ?? 0;
+  const showHeroModels = killFeedCount < 5;
 
   // Filter groups to only include stats that pass showIf, and exclude empty groups
   const visibleGroups = useMemo(() => {
@@ -882,8 +937,8 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
 
-      {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right — hidden during pregame */}
-      {!isPregame && activePlayer?.team === 'ORDER' ? (
+      {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right — hidden during pregame, hidden when kill feed has 5+ kills */}
+      {!isPregame && showHeroModels && activePlayer?.team === 'ORDER' ? (
         <>
           {activeModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
@@ -904,7 +959,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             </div>
           )}
         </>
-      ) : !isPregame ? (
+      ) : !isPregame && showHeroModels ? (
         <>
           {enemyModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
@@ -963,7 +1018,16 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
         </div>
 
         {/* Scoreboard (mirrored side-by-side) */}
-        <div className="lg-scoreboard">
+        <div className="lg-scoreboard-wrap" ref={scoreboardRef}>
+          {/* Floating chevron pointing to active player */}
+          {activePlayerRow && chevronTop != null && (
+            <div
+              className={`lg-sb-you-chevron lg-sb-you-chevron--${activePlayerRow.side}`}
+              style={{ top: chevronTop }}
+              aria-hidden
+            />
+          )}
+          <div className="lg-scoreboard">
           {/* Central score header */}
           <div className="lg-sb-header">
             <span className="lg-sb-header-blue">Blue Team</span>
@@ -980,8 +1044,13 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           {/* Rows: blue player (left) | role icon | red player (right) */}
           {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
             const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
+            const isActiveRow = activePlayerRow?.index === i;
             return (
-            <div key={i} className="lg-sb-match-row">
+            <div
+              key={i}
+              className="lg-sb-match-row"
+              ref={isActiveRow ? (el) => { activeRowRef.current = el; } : undefined}
+            >
               {blueTeam[i] ? (
                 <LgPlayerSide player={blueTeam[i]} side="blue" isMvp={gameMvp?.summonerName === blueTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
               ) : (
@@ -998,6 +1067,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             </div>
             );
           })}
+        </div>
         </div>
 
         {/* Active player stats panel */}
@@ -1085,8 +1155,8 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           />
         )}
 
-        {/* Pregame hero formation: all 10 champions at bottom until match starts */}
-        {isPregame && (
+        {/* Pregame hero formation: all 10 champions at bottom until match starts (hidden when kill feed has 5+ kills) */}
+        {isPregame && showHeroModels && (
           <PregameHeroFormation blueTeam={blueTeam} redTeam={redTeam} champions={champions} />
         )}
       </div>

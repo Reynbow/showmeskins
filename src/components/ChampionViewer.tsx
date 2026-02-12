@@ -70,7 +70,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
       return;
     }
     let cancelled = false;
-    resolveChromaTextureUrl(champion.id, selectedChromaId)
+    resolveChromaTextureUrl(champion.id, selectedChromaId, selectedSkin.id)
       .then((url) => {
         if (cancelled) return;
         if (url) {
@@ -85,7 +85,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
         setChromaResolving(false);
       });
     return () => { cancelled = true; };
-  }, [champion.id, selectedChromaId]);
+  }, [champion.id, selectedChromaId, selectedSkin.id]);
 
   /* ── Alternate form toggle (Elise spider, Nidalee cougar, etc.) ── */
   const [useAltForm, setUseAltForm] = useState(false);

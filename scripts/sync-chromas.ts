@@ -28,6 +28,12 @@ const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;
 const BATCH_DELAY_MS = 500; // delay between batches to avoid triggering abuse protection
 
+/** Fright Night base skin IDs (skin line 170) – use combined _tx_cm, not _body_tx_cm */
+const FRIGHT_NIGHT_BASE_SKIN_IDS = new Set([
+  '1031', '119039', '111018', '888010', '48012', '6023',
+  '45060', '221028', '35054', '555064', '20044',
+]);
+
 /** Keywords that identify accessory textures (not the main body texture) */
 const ACCESSORY_KEYWORDS = [
   'sword', 'wings', 'wing', 'banner', 'recall', '_ult', 'vfx',
@@ -56,6 +62,7 @@ interface CDragonChampion {
 
 interface ChromaEntry {
   chromaId: number;
+  baseSkinId: string;
   alias: string;
   skinNum: string;
   textureFilename: string | null;
@@ -102,9 +109,13 @@ function parseDirListing(html: string): string[] {
 
 /**
  * Resolve the body diffuse texture filename for a chroma from CommunityDragon.
- * Replicates the logic from src/api.ts resolveChromaTextureUrl.
+ * Replicates the logic from src/api.ts resolveChromaFromCDragon.
  */
-async function resolveTextureFilename(alias: string, skinNum: string): Promise<string | null> {
+async function resolveTextureFilename(
+  alias: string,
+  skinNum: string,
+  baseSkinId: string,
+): Promise<string | null> {
   const dirUrl = `${CDRAGON_RAW}/latest/game/assets/characters/${alias}/skins/skin${skinNum}/`;
 
   const res = await fetchWithRetry(dirUrl);
@@ -126,11 +137,18 @@ async function resolveTextureFilename(alias: string, skinNum: string): Promise<s
     return !ACCESSORY_KEYWORDS.some((kw) => lower.includes(kw));
   });
 
-  // Pick the best match: shortest name, fall back to first txCm file
-  const best =
-    bodyFiles.length > 0
-      ? bodyFiles.sort((a, b) => a.length - b.length)[0]
-      : txCmFiles.sort((a, b) => a.length - b.length)[0];
+  // Fright Night: use combined _tx_cm; others: prefer _body_tx_cm
+  const useCombined = FRIGHT_NIGHT_BASE_SKIN_IDS.has(baseSkinId);
+  const candidateFiles = bodyFiles.length > 0 ? bodyFiles : txCmFiles;
+  let toSort: string[];
+  if (useCombined) {
+    toSort = candidateFiles.filter((f) => !f.toLowerCase().includes('_body_'));
+    if (toSort.length === 0) toSort = candidateFiles;
+  } else {
+    const bodyOnly = candidateFiles.filter((f) => f.toLowerCase().includes('_body_'));
+    toSort = bodyOnly.length > 0 ? bodyOnly : candidateFiles;
+  }
+  const best = toSort.sort((a, b) => a.length - b.length)[0];
 
   return best ?? null;
 }
@@ -161,10 +179,12 @@ async function getChampionChromas(championKey: string): Promise<{ alias: string;
 
   for (const skin of data.skins) {
     if (!skin.chromas || skin.chromas.length === 0) continue;
+    const baseSkinId = String(skin.id);
     for (const chroma of skin.chromas) {
       const skinNum = String(chroma.id % 1000).padStart(2, '0');
       chromas.push({
         chromaId: chroma.id,
+        baseSkinId,
         alias,
         skinNum,
         textureFilename: null, // resolved later
@@ -223,7 +243,7 @@ async function processChroma(
   }
 
   // Resolve texture filename from CommunityDragon directory listing
-  const filename = await resolveTextureFilename(entry.alias, entry.skinNum);
+  const filename = await resolveTextureFilename(entry.alias, entry.skinNum, entry.baseSkinId);
   if (!filename) {
     console.warn(`  ⚠ No texture found for chroma ${entry.chromaId} (${entry.alias}/skin${entry.skinNum})`);
     return null;

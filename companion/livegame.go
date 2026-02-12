@@ -247,8 +247,8 @@ func (t *LiveGameTracker) computeHash(u *LiveGameUpdate) string {
 		len(u.KillFeed),
 	)
 	for _, p := range u.Players {
-		h += fmt.Sprintf("|%s:%d:%d:%d:%d:%d",
-			p.ChampionName, p.Level, p.Kills, p.Deaths, p.Assists, p.CreepScore)
+		h += fmt.Sprintf("|%s:%d:%d:%d:%d:%d:%d",
+			p.ChampionName, p.Level, p.Kills, p.Deaths, p.Assists, p.CreepScore, p.SkinID)
 		for _, item := range p.Items {
 			h += fmt.Sprintf("-%d", item.ItemID)
 		}

@@ -79,6 +79,7 @@ function App() {
   const championsRef = useRef<ChampionBasic[]>([]);
   championsRef.current = champions;
   const lastCompanionKey = useRef('');
+  const pendingChampSelectRef = useRef<{ championId: string; skinNum: number } | null>(null);
 
   // On first load: fetch champions, then check URL for deep-link
   useEffect(() => {
@@ -89,6 +90,38 @@ function App() {
         setItemData(items);
         const champList = Object.values(champs).sort((a, b) => a.name.localeCompare(b.name));
         setChampions(champList);
+
+        // Process any champ select update that arrived before champions loaded
+        const pending = pendingChampSelectRef.current;
+        if (pending) {
+          pendingChampSelectRef.current = null;
+          const match = champList.find((c) => c.id.toLowerCase() === pending.championId.toLowerCase());
+          if (match) {
+            try {
+              const detail = await getChampionDetail(match.id);
+              const resolution = await resolveLcuSkinNum(match.key, pending.skinNum);
+              let skin: Skin;
+              let chromaId: number | null = null;
+              if (resolution) {
+                skin =
+                  detail.skins.find((s) => s.id === resolution.baseSkinId) ??
+                  detail.skins.find((s) => s.num === (parseInt(resolution.baseSkinId, 10) % 1000)) ??
+                  detail.skins[0];
+                chromaId = resolution.chromaId;
+              } else {
+                skin = detail.skins.find((s) => s.num === pending.skinNum) ?? detail.skins[0];
+              }
+              setSelectedChampion(detail);
+              setSelectedSkin(skin);
+              setCompanionChromaId(chromaId);
+              setViewMode('viewer');
+              const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
+              window.history.replaceState(null, '', `/${match.id}${skinPath}`);
+            } catch (err) {
+              console.error('[companion] Failed to load champion (pending):', err);
+            }
+          }
+        }
 
         // Deep-link: check URL
         const { championId, skinSlug: urlSkinSlug } = parseUrl();
@@ -350,10 +383,20 @@ function App() {
           try {
             const data = JSON.parse(event.data as string);
 
+            // ── Champion select ended: reset so next session's picks are processed
+            if (data.type === 'champSelectEnd') {
+              lastCompanionKey.current = '';
+              pendingChampSelectRef.current = null;
+              return;
+            }
+
             // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
+              const championId = data.championId;
+              const skinNum = data.skinNum ?? 0;
+
               // De-duplicate on the website side too
-              const key = `${data.championId}:${data.skinNum}`;
+              const key = `${championId}:${skinNum}`;
               if (key === lastCompanionKey.current) return;
               lastCompanionKey.current = key;
 
@@ -361,16 +404,19 @@ function App() {
               clearTimeout(debounceTimer);
               debounceTimer = setTimeout(async () => {
                 const champs = championsRef.current;
-                if (champs.length === 0) return;
+                if (champs.length === 0) {
+                  pendingChampSelectRef.current = { championId, skinNum };
+                  return;
+                }
 
                 const match = champs.find(
-                  (c) => c.id.toLowerCase() === data.championId.toLowerCase(),
+                  (c) => c.id.toLowerCase() === championId.toLowerCase(),
                 );
                 if (!match) return;
 
                 try {
                   const detail = await getChampionDetail(match.id);
-                  const resolution = await resolveLcuSkinNum(match.key, data.skinNum);
+                  const resolution = await resolveLcuSkinNum(match.key, skinNum);
                   let skin: Skin;
                   let chromaId: number | null = null;
                   if (resolution) {
@@ -380,8 +426,7 @@ function App() {
                       detail.skins[0];
                     chromaId = resolution.chromaId;
                   } else {
-                    skin =
-                      detail.skins.find((s) => s.num === data.skinNum) ?? detail.skins[0];
+                    skin = detail.skins.find((s) => s.num === skinNum) ?? detail.skins[0];
                   }
                   setSelectedChampion(detail);
                   setSelectedSkin(skin);

@@ -683,6 +683,35 @@
   margin-bottom: 20px;
 }
 
+.pg-scoreboard-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.pg-sb-you-chevron {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.pg-sb-you-chevron--blue {
+  left: -28px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid var(--lol-gold);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
+}
+
+.pg-sb-you-chevron--red {
+  right: -28px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 14px solid var(--lol-gold);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
+}
+
 .pg-scoreboard {
   display: flex;
   flex-direction: column;

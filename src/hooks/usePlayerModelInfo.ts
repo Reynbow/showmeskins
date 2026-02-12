@@ -54,7 +54,7 @@ export function usePlayerModelInfo(
         const fallbackUrl = baseSkinId !== baseChampSkinId ? getModelUrl(championId, baseChampSkinId) : modelUrl;
 
         if (resolution?.chromaId) {
-          resolveChromaTextureUrl(championId, resolution.chromaId).then(
+          resolveChromaTextureUrl(championId, resolution.chromaId, baseSkinId).then(
             (chromaUrl) => {
               if (cancelled) return;
               setResult({

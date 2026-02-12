@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { ItemTooltip } from './ItemTooltip';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
-import { getChampionScale } from '../api';
+import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
 import './PostGamePage.css';
 
 interface Props {
@@ -174,6 +174,11 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
   const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
   const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
 
+  const isFrightNight = useMemo(() => {
+    const m = url.match(/\/models\/([^/]+)\/([^/]+)\//);
+    return m != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(m[2]);
+  }, [url]);
+
   const animName = useMemo(() => findBestAnimName(names), [names]);
 
   /* ── Chroma texture overlay (same logic as LiveGamePage's LiveChampionModel) ── */
@@ -229,6 +234,7 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
         if (loadedChromaTexRef.current) loadedChromaTexRef.current.dispose();
         loadedChromaTexRef.current = texture;
         let maxSize = 0;
+        let maxTexRef: THREE.Texture | null = null;
         const primaryMats: THREE.MeshStandardMaterial[] = [];
         scene.traverse((child) => {
           const mesh = child as THREE.Mesh;
@@ -240,12 +246,19 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
             if (tex?.image) {
               const img = tex.image as { width?: number; height?: number };
               const size = (img.width ?? 0) * (img.height ?? 0);
-              if (size > maxSize) { maxSize = size; primaryMats.length = 0; primaryMats.push(m); }
-              else if (size === maxSize && size > 0) primaryMats.push(m);
+              if (size > maxSize) { maxSize = size; maxTexRef = tex; primaryMats.length = 0; primaryMats.push(m); }
+              else if (size === maxSize && size > 0 && (isFrightNight || tex === maxTexRef)) primaryMats.push(m);
             }
           }
         });
         if (primaryMats.length > 0) {
+          const firstOrig = originals.get(primaryMats[0]) ?? primaryMats[0].map;
+          if (firstOrig) {
+            texture.offset.copy(firstOrig.offset);
+            texture.repeat.copy(firstOrig.repeat);
+            texture.wrapS = firstOrig.wrapS;
+            texture.wrapT = firstOrig.wrapT;
+          }
           for (const m of primaryMats) {
             if (!originals.has(m)) originals.set(m, m.map);
             m.map = texture;
@@ -269,7 +282,7 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
         loadedChromaTexRef.current = null;
       }
     };
-  }, [scene, chromaTextureUrl]);
+  }, [scene, chromaTextureUrl, isFrightNight]);
 
   useEffect(() => {
     return () => {
@@ -523,6 +536,40 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
   const blueKills = blueTeam.reduce((s, p) => s + p.kills, 0);
   const redKills = redTeam.reduce((s, p) => s + p.kills, 0);
 
+  // Active player row index and side (for floating "you" chevron)
+  const activePlayerRow = useMemo(() => {
+    if (!activePlayer) return null;
+    const blueIdx = blueTeam.findIndex((p) => p.summonerName === activePlayer.summonerName);
+    if (blueIdx >= 0) return { index: blueIdx, side: 'blue' as const };
+    const redIdx = redTeam.findIndex((p) => p.summonerName === activePlayer.summonerName);
+    if (redIdx >= 0) return { index: redIdx, side: 'red' as const };
+    return null;
+  }, [activePlayer, blueTeam, redTeam]);
+
+  const scoreboardRef = useRef<HTMLDivElement>(null);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
+  const [chevronTop, setChevronTop] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!activePlayerRow || !scoreboardRef.current) {
+      setChevronTop(null);
+      return;
+    }
+    const updateChevron = () => {
+      if (!activeRowRef.current || !scoreboardRef.current) return;
+      const scoreboard = scoreboardRef.current;
+      const row = activeRowRef.current;
+      const sbRect = scoreboard.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const top = rowRect.top - sbRect.top + rowRect.height / 2 - 10;
+      setChevronTop(top);
+    };
+    updateChevron();
+    const ro = new ResizeObserver(updateChevron);
+    ro.observe(scoreboardRef.current);
+    return () => ro.disconnect();
+  }, [activePlayerRow]);
+
   // Estimate team gold from item prices
   const teamItemGold = (players: typeof blueTeam) =>
     players.reduce((total, p) => total + p.items.reduce((s, item) => s + item.price * item.count, 0), 0);
@@ -684,7 +731,15 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         )}
         <div className="pg-scoreboard-title">Final Scoreboard</div>
 
-        <div className="pg-scoreboard">
+        <div className="pg-scoreboard-wrap" ref={scoreboardRef}>
+          {activePlayerRow && chevronTop != null && (
+            <div
+              className={`pg-sb-you-chevron pg-sb-you-chevron--${activePlayerRow.side}`}
+              style={{ top: chevronTop }}
+              aria-hidden
+            />
+          )}
+          <div className="pg-scoreboard">
           {/* Central score header */}
           <div className="pg-sb-header">
             <span className="pg-sb-header-blue">Blue Team</span>
@@ -714,8 +769,13 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
           {/* Rows: blue player (left) | role icon | red player (right) */}
           {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
             const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
+            const isActiveRow = activePlayerRow?.index === i;
             return (
-            <div key={i} className="pg-sb-match-row">
+            <div
+              key={i}
+              className="pg-sb-match-row"
+              ref={isActiveRow ? (el) => { activeRowRef.current = el; } : undefined}
+            >
               {blueTeam[i] ? (
                 <PgPlayerSide
                   player={blueTeam[i]}
@@ -748,6 +808,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
             </div>
             );
           })}
+        </div>
         </div>
       </div>
 

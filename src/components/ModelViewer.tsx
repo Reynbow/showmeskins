@@ -12,7 +12,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ChromaInfo } from '../types';
-import { getChampionScale } from '../api';
+import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
 import './ModelViewer.css';
 
 /* ================================================================
@@ -329,11 +329,16 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
 
-  /* ── Extract champion alias from URL for idle overrides ──── */
-  const champAlias = useMemo(() => {
-    const m = url.match(/\/models\/([^/]+)\//);
-    return m ? m[1] : undefined;
+  /* ── Extract champion alias and skin ID from URL ──── */
+  const { champAlias, skinId } = useMemo(() => {
+    const m = url.match(/\/models\/([^/]+)\/([^/]+)\//);
+    return {
+      champAlias: m ? m[1] : undefined,
+      skinId: m ? m[2] : undefined,
+    };
   }, [url]);
+
+  const isFrightNight = skinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(skinId);
 
   /* ── Idle animation name (stable for the model's lifetime) ──── */
   const idleName = useMemo(() => findIdleName(names, champAlias), [names, champAlias]);
@@ -729,9 +734,11 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
         loadedChromaTexRef.current = texture;
 
         // Find the primary body material(s) — largest ORIGINAL texture map.
-        // We compare against the stored original (not the current chroma)
-        // so the selection is consistent across chroma-to-chroma switches.
+        // Fright Night uses a dual-layer cel-shade setup; both layers need the chroma
+        // or they fight visually. So for Fright Night we include ALL materials with
+        // max size. For other skins, only materials sharing the same texture reference.
         let maxSize = 0;
+        let maxTexRef: THREE.Texture | null = null;
         const primaryMats: THREE.MeshStandardMaterial[] = [];
 
         scene.traverse((child) => {
@@ -746,10 +753,13 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
               const size = (img.width ?? 0) * (img.height ?? 0);
               if (size > maxSize) {
                 maxSize = size;
+                maxTexRef = tex;
                 primaryMats.length = 0;
                 primaryMats.push(m);
               } else if (size === maxSize && size > 0) {
-                primaryMats.push(m);
+                if (isFrightNight || tex === maxTexRef) {
+                  primaryMats.push(m);
+                }
               }
             }
           }
@@ -761,6 +771,16 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           loadedChromaTexRef.current = null;
           onChromaLoading(false);
           return;
+        }
+
+        // Copy UV transform from first primary material's original texture
+        // (offset, repeat, wrap) so chroma displays correctly with atlas mapping.
+        const firstOrig = originals.get(primaryMats[0]) ?? primaryMats[0].map;
+        if (firstOrig) {
+          texture.offset.copy(firstOrig.offset);
+          texture.repeat.copy(firstOrig.repeat);
+          texture.wrapS = firstOrig.wrapS;
+          texture.wrapT = firstOrig.wrapT;
         }
 
         // Swap the texture on each primary material
@@ -788,7 +808,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, chromaTextureUrl]);
+  }, [scene, chromaTextureUrl, isFrightNight]);
 
   /* ══════════════════════════════════════════════════════════════
      Emote Playback Effect
