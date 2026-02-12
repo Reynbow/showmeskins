@@ -19,7 +19,7 @@ function setMeta(name: string, content: string, isProperty = false) {
 }
 
 function setJsonLd(data: object) {
-  let el = document.getElementById('seo-json-ld');
+  let el = document.getElementById('seo-json-ld') as HTMLScriptElement | null;
   if (!el) {
     el = document.createElement('script');
     el.id = 'seo-json-ld';
