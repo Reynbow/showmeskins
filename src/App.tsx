@@ -9,6 +9,7 @@ import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
 import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, ItemInfo } from './types';
+import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
 
 /** Turn a skin name into a URL-friendly slug: "Dark Star Thresh" → "dark-star-thresh" */
@@ -50,6 +51,22 @@ function App() {
   const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+
+  // SEO: update document head (invisible to users; for search engines)
+  const seoTitle = 'Show Me Skins!';
+  const seoDesc = viewMode === 'select'
+    ? 'Browse and view all League of Legends champion skins in 3D. Free LoL skin viewer.'
+    : viewMode === 'companion'
+      ? 'Companion app for Show Me Skins – connect your League of Legends client.'
+      : selectedChampion && selectedSkin
+        ? `View ${selectedChampion.name} ${selectedSkin.name} skin in 3D. League of Legends skin viewer.`
+        : 'Browse and view League of Legends champion skins in 3D.';
+  const seoPath = viewMode === 'companion'
+    ? '/companion'
+    : selectedChampion && selectedSkin
+      ? `/${selectedChampion.id}${selectedSkin.num ? `/${skinSlug(selectedSkin.name)}` : ''}`
+      : '/';
+  useSeoHead({ title: seoTitle, description: seoDesc, path: seoPath });
 
   // Track whether we've already auto-navigated for this game session
   // (so we don't force the user back if they navigate away)
