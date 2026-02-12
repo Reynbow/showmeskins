@@ -160,7 +160,15 @@ export function getLoadingArtFallback(championKey: string, skinNum: number): str
 }
 
 /**
- * Champions with alternate form models on the CDN.
+ * Champions that always show both the main model and a companion model together
+ * (no toggle). E.g. Annie + Tibbers. Key = champion ID, value = companion alias.
+ */
+export const COMPANION_MODELS: Record<string, { alias: string; label: string }> = {
+  Annie: { alias: 'annietibbers', label: 'Tibbers' },
+};
+
+/**
+ * Champions with alternate form models on the CDN (toggle between forms).
  * Key = Data Dragon champion ID, value = alternate alias + display label.
  */
 export const ALTERNATE_FORMS: Record<string, { alias: string; label: string }> = {
@@ -191,6 +199,16 @@ export function getAlternateModelUrl(championId: string, skinId: string): string
   const form = ALTERNATE_FORMS[championId];
   if (!form) return null;
   return `${MODEL_CDN}/lol/models/${form.alias}/${skinId}/model.glb`;
+}
+
+/**
+ * Get the URL for a champion's companion model (.glb), shown alongside the main model.
+ * Returns null if the champion has no companion.
+ */
+export function getCompanionModelUrl(championId: string, skinId: string): string | null {
+  const comp = COMPANION_MODELS[championId];
+  if (!comp) return null;
+  return `${MODEL_CDN}/lol/models/${comp.alias}/${skinId}/model.glb`;
 }
 
 import { getChampionScaleFromHeight } from './data/championHeights';
@@ -343,8 +361,9 @@ async function resolveChromaFromCDragon(
   championId: string,
   chromaId: number,
   baseSkinId?: string,
+  modelAlias?: string,
 ): Promise<string | null> {
-  const alias = championId.toLowerCase();
+  const alias = (modelAlias ?? championId).toLowerCase();
   const skinNum = String(chromaId % 1000).padStart(2, '0');
 
   const { filenames: files, baseUrl } = await fetchDirListing(alias, skinNum);
@@ -391,22 +410,26 @@ async function resolveChromaFromCDragon(
  * Slow path (fallback): CommunityDragon directory listing + pattern match.
  * Results are cached in memory so each chroma is only resolved once.
  * @param baseSkinId - Optional base skin ID; when it's Fright Night, uses combined atlas texture
+ * @param modelAlias - Optional model alias (e.g. "annietibbers") for companion/pet chromas; uses championId when omitted
  */
 export async function resolveChromaTextureUrl(
   championId: string,
   chromaId: number,
   baseSkinId?: string,
+  modelAlias?: string,
 ): Promise<string | null> {
-  const cacheKey = baseSkinId ? `${chromaId}:${baseSkinId}` : chromaId;
+  const aliasForPath = (modelAlias ?? championId).toLowerCase();
+  const cacheKey = modelAlias
+    ? (baseSkinId ? `${chromaId}:${baseSkinId}:${aliasForPath}` : `${chromaId}:${aliasForPath}`)
+    : (baseSkinId ? `${chromaId}:${baseSkinId}` : String(chromaId));
   if (chromaUrlCache.has(cacheKey)) return chromaUrlCache.get(cacheKey) ?? null;
 
   // 2. Try Vercel Blob Storage (fast path – deterministic URL)
   // Note: Blob stores one texture per chroma; re-run sync-chromas with Fright Night
   // handling to update blob contents for this skin line
   if (BLOB_BASE_URL) {
-    const alias = championId.toLowerCase();
     const skinNum = String(chromaId % 1000).padStart(2, '0');
-    const blobUrl = `${BLOB_BASE_URL}/chromas/${alias}/skin${skinNum}.webp`;
+    const blobUrl = `${BLOB_BASE_URL}/chromas/${aliasForPath}/skin${skinNum}.webp`;
 
     if (await blobExists(blobUrl)) {
       chromaUrlCache.set(cacheKey, blobUrl);
@@ -415,7 +438,7 @@ export async function resolveChromaTextureUrl(
   }
 
   // 3. CommunityDragon fallback (slow but universal)
-  const url = await resolveChromaFromCDragon(championId, chromaId, baseSkinId);
+  const url = await resolveChromaFromCDragon(championId, chromaId, baseSkinId, modelAlias);
   // Only cache successful resolutions — don't let a temporary failure
   // permanently block the chroma for the rest of the session.
   if (url) {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, ALTERNATE_FORMS, getChampionChromas, resolveChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, getChampionChromas, resolveChromaTextureUrl } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -25,6 +25,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [selectedChromaId, setSelectedChromaId] = useState<number | null>(null);
   const [chromaResolving, setChromaResolving] = useState(false);
   const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
+  const [companionChromaTextureUrl, setCompanionChromaTextureUrl] = useState<string | null>(null);
 
   // Track which skin the current chroma state belongs to.
   // When the skin changes we clear chroma state synchronously during render
@@ -34,6 +35,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     chromaSkinRef.current = selectedSkin.id;
     if (selectedChromaId !== null) setSelectedChromaId(null);
     if (chromaTextureUrl !== null) setChromaTextureUrl(null);
+    if (companionChromaTextureUrl !== null) setCompanionChromaTextureUrl(null);
     if (chromaResolving) setChromaResolving(false);
   }
 
@@ -60,32 +62,34 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     }
   }, [initialChromaId, skinChromas]);
 
-  // Attempt to resolve the chroma texture URL.
+  // Attempt to resolve the chroma texture URL(s).
+  // For champions with companions (e.g. Annie + Tibbers), resolve both separately.
   // If resolution fails the swatch stays selected but the model just keeps
   // showing the base skin — no deselection, no error UI.
+  const companion = COMPANION_MODELS[champion.id];
   useEffect(() => {
     if (selectedChromaId == null) {
       setChromaTextureUrl(null);
+      setCompanionChromaTextureUrl(null);
       setChromaResolving(false);
       return;
     }
     let cancelled = false;
-    resolveChromaTextureUrl(champion.id, selectedChromaId, selectedSkin.id)
-      .then((url) => {
-        if (cancelled) return;
-        if (url) {
-          setChromaTextureUrl(url);
-        }
-        // If url is null the base skin stays visible — that's fine.
-        setChromaResolving(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Silently fall back to the base skin.
-        setChromaResolving(false);
-      });
+    const resolveMain = resolveChromaTextureUrl(champion.id, selectedChromaId, selectedSkin.id);
+    const resolveCompanion = companion
+      ? resolveChromaTextureUrl(champion.id, selectedChromaId, selectedSkin.id, companion.alias)
+      : Promise.resolve(null);
+    Promise.all([resolveMain, resolveCompanion]).then(([mainUrl, compUrl]) => {
+      if (cancelled) return;
+      if (mainUrl) setChromaTextureUrl(mainUrl);
+      if (compUrl) setCompanionChromaTextureUrl(compUrl);
+      setChromaResolving(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setChromaResolving(false);
+    });
     return () => { cancelled = true; };
-  }, [champion.id, selectedChromaId, selectedSkin.id]);
+  }, [champion.id, selectedChromaId, selectedSkin.id, companion?.alias]);
 
   /* ── Alternate form toggle (Elise spider, Nidalee cougar, etc.) ── */
   const [useAltForm, setUseAltForm] = useState(false);
@@ -109,6 +113,9 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     img.onerror = () => setSplashUrl(getSplashArtFallback(champion.key, selectedSkin.num));
     return () => { img.onload = null; img.onerror = null; };
   }, [champion.id, champion.key, selectedSkin.num]);
+
+  // Companion model (e.g. Annie + Tibbers) — shown alongside main, no toggle
+  const companionModelUrl = getCompanionModelUrl(champion.id, selectedSkin.id);
 
   // Model URL — use alternate form URL if toggled, otherwise default
   const modelUrl = useAltForm && altForm
@@ -249,7 +256,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </button>
         </div>
 
-        {altForm && (
+        {altForm && !companionModelUrl && (
           <button
             className={`form-toggle-btn${useAltForm ? ' active' : ''}`}
             onClick={() => setUseAltForm((prev) => !prev)}
@@ -296,11 +303,13 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
         <div className="viewer-model-panel">
           <ModelViewer
             modelUrl={modelUrl}
+            companionModelUrl={companionModelUrl}
+            chromaTextureUrl={chromaTextureUrl}
+            companionChromaTextureUrl={companionModelUrl ? companionChromaTextureUrl : null}
             splashUrl={splashUrl}
             viewMode={viewMode}
             chromas={skinChromas}
             selectedChromaId={selectedChromaId}
-            chromaTextureUrl={chromaTextureUrl}
             chromaResolving={chromaResolving}
             onChromaSelect={handleChromaSelect}
           />

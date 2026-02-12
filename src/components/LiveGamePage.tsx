@@ -451,6 +451,12 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
           m.depthWrite = true;
           m.needsUpdate = true;
         }
+        // Fright Night: ClampToEdgeWrapping prevents atlas bleed from UV overshoot
+        if (isFrightNight && m.map) {
+          m.map.wrapS = THREE.ClampToEdgeWrapping;
+          m.map.wrapT = THREE.ClampToEdgeWrapping;
+          m.map.needsUpdate = true;
+        }
       }
     });
 
@@ -539,7 +545,7 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
     // Reveal
     scene.visible = true;
     setReady(true);
-  }, [scene, actions, names, animName, url]);
+  }, [scene, actions, names, animName, url, isFrightNight]);
 
 
   return (

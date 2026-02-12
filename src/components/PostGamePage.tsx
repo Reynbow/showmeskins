@@ -312,6 +312,11 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
         const m = mat as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> };
         if (m.userData?.visible === false) { mesh.visible = false; mesh.castShadow = false; }
         if (m.transparent) { m.alphaTest = m.alphaTest || 0.1; m.depthWrite = true; m.needsUpdate = true; }
+        if (isFrightNight && m.map) {
+          m.map.wrapS = THREE.ClampToEdgeWrapping;
+          m.map.wrapT = THREE.ClampToEdgeWrapping;
+          m.map.needsUpdate = true;
+        }
       }
     });
 
@@ -380,7 +385,7 @@ function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaT
 
     scene.position.set(-centerX, -footY - 1.7, -centerZ);
     scene.visible = true;
-  }, [scene, actions, names, animName, url]);
+  }, [scene, actions, names, animName, url, isFrightNight]);
 
 
   return (

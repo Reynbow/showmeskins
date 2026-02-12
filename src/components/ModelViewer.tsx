@@ -61,11 +61,13 @@ interface EmoteRequest {
 
 interface Props {
   modelUrl: string;
+  companionModelUrl?: string | null;
+  chromaTextureUrl: string | null;
+  companionChromaTextureUrl?: string | null;
   splashUrl: string;
   viewMode: ViewMode;
   chromas: ChromaInfo[];
   selectedChromaId: number | null;
-  chromaTextureUrl: string | null;
   chromaResolving: boolean;
   onChromaSelect: (chromaId: number | null) => void;
 }
@@ -316,6 +318,10 @@ interface ChampionModelProps {
   emoteRequest: EmoteRequest | null;
   chromaTextureUrl: string | null;
   facingRotationY: number;
+  /** World-space offset [x, y, z] applied to the model root (for dual-model layouts) */
+  positionOffset?: [number, number, number];
+  /** When true, skips reporting emotes/height to parent (for companion models) */
+  isCompanion?: boolean;
   onChromaLoading: (loading: boolean) => void;
   onEmotesAvailable: (emotes: EmoteType[]) => void;
   onEmoteFinished: () => void;
@@ -324,7 +330,7 @@ interface ChampionModelProps {
   onModelHeight: (height: number) => void;
 }
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = [0, 0, 0], isCompanion = false, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -379,6 +385,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   /* ── Report available emotes and their animation names to parent ─ */
   const prevEmotesKey = useRef('');
   useEffect(() => {
+    if (isCompanion) return;
     // Always include 'idle' since every model has at least one idle animation
     const emotes: EmoteType[] = ['idle', ...Array.from(emoteMap.keys())];
     const key = emotes.join(',');
@@ -394,7 +401,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       }
       onEmoteNames(nameMap);
     }
-  }, [emoteMap, allIdleNames, idleName, onEmotesAvailable, onEmoteNames]);
+  }, [isCompanion, emoteMap, allIdleNames, idleName, onEmotesAvailable, onEmoteNames]);
 
   /* ── Ref to clean up the current emote playback ────────────── */
   const emoteCleanupRef = useRef<(() => void) | null>(null);
@@ -430,6 +437,15 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           m.depthWrite = true;
           m.needsUpdate = true;
         }
+
+        // Fright Night: use ClampToEdgeWrapping to prevent atlas bleed.
+        // The combined texture has multiple regions; RepeatWrapping can sample
+        // adjacent regions when UVs overshoot, causing "two faces" overlap.
+        if (isFrightNight && m.map) {
+          m.map.wrapS = THREE.ClampToEdgeWrapping;
+          m.map.wrapT = THREE.ClampToEdgeWrapping;
+          m.map.needsUpdate = true;
+        }
       }
     });
 
@@ -454,7 +470,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       idle.reset().play();
       idle.getMixer().update(0);
       idleRef.current = idle;
-      onAnimationName(idleName);
+      if (!isCompanion) onAnimationName(idleName);
     }
 
     /* 4. Force skeleton / skinned-mesh world-matrix update */
@@ -517,7 +533,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
 
     // Record raw height for relative sizing in ingame mode
     rawHeightRef.current = Math.max(modelHeight, 0.01);
-    onModelHeight(rawHeightRef.current);
+    if (!isCompanion) onModelHeight(rawHeightRef.current);
 
     /* 6. Scale based on HEIGHT (Y) so all champions appear the same
           height regardless of how wide their geometry is */
@@ -594,9 +610,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     const footY   = groundPos ? groundPos.y : fallbackFootY;
 
     scene.position.set(
-      -centerX + (overrides?.xShift ?? 0),
-      -footY - 1.7 + (overrides?.yShift ?? 0),
-      -centerZ + (overrides?.zShift ?? 0),
+      -centerX + (overrides?.xShift ?? 0) + positionOffset[0],
+      -footY - 1.7 + (overrides?.yShift ?? 0) + positionOffset[1],
+      -centerZ + (overrides?.zShift ?? 0) + positionOffset[2],
     );
 
     // Signal the useFrame reveal loop to start counting frames.
@@ -610,7 +626,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       pendingRevealRef.current = false;
       Object.values(actions).forEach((a) => a?.stop());
     };
-  }, [scene, actions, names, idleName]);
+  }, [scene, actions, names, idleName, isFrightNight, positionOffset]);
 
   /* ── Reveal-after-settle: keep the model invisible while the animation
        mixer ticks naturally for several real-time frames.  This guarantees
@@ -828,7 +844,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       if (idleRef.current) {
         idleRef.current.reset().fadeIn(0.3).play();
       }
-      onAnimationName(idleName ?? '');
+      if (!isCompanion) onAnimationName(idleName ?? '');
       return;
     }
 
@@ -839,7 +855,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
         if (idleRef.current) {
           idleRef.current.reset().play();
         }
-        onAnimationName(idleName ?? '');
+        if (!isCompanion) onAnimationName(idleName ?? '');
       } else {
         // Multiple idles — crossfade to the next one
         if (idleRef.current) {
@@ -855,7 +871,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
           nextIdle.fadeIn(0.3).play();
           idleRef.current = nextIdle;
         }
-        onAnimationName(nextIdleName);
+        if (!isCompanion) onAnimationName(nextIdleName);
       }
       // Don't call onEmoteFinished — idle IS the base state
       return;
@@ -866,7 +882,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
 
     // Pick a random variant
     const variant = variants[Math.floor(Math.random() * variants.length)];
-    onAnimationName(variant.intro ?? variant.main);
+    if (!isCompanion) onAnimationName(variant.intro ?? variant.main);
 
     // Fade out idle
     if (idleRef.current) {
@@ -878,7 +894,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       if (idleRef.current) {
         idleRef.current.reset().fadeIn(0.3).play();
       }
-      onAnimationName(idleName ?? '');
+      if (!isCompanion) onAnimationName(idleName ?? '');
       onEmoteFinished();
     };
 
@@ -1695,7 +1711,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaTextureUrl, chromaResolving, onChromaSelect }: Props) {
+export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, companionChromaTextureUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -1722,7 +1738,7 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
     setChromaLoading(false);
     setCurrentAnimName('');
     setEmoteAnimNames({});
-  }, [modelUrl]);
+  }, [modelUrl, companionModelUrl]);
 
   const handleChromaLoading = useCallback((loading: boolean) => {
     setChromaLoading(loading);
@@ -1801,22 +1817,60 @@ export function ModelViewer({ modelUrl, splashUrl, viewMode, chromas, selectedCh
 
             {viewMode === 'model' ? <ModelViewerLighting /> : <IngameLighting />}
 
-            {/* Champion 3D model with emote support */}
+            {/* Champion 3D model(s) with emote support */}
             <Suspense fallback={<LoadingIndicator />}>
-              <ChampionModel
-                key={modelUrl}
-                url={modelUrl}
-                viewMode={viewMode}
-                emoteRequest={emoteRequest}
-                chromaTextureUrl={chromaTextureUrl}
-                facingRotationY={facingRotationY}
-                onChromaLoading={handleChromaLoading}
-                onEmotesAvailable={handleEmotesAvailable}
-                onEmoteFinished={handleEmoteFinished}
-                onAnimationName={handleAnimationName}
-                onEmoteNames={handleEmoteNames}
-                onModelHeight={handleModelHeight}
-              />
+              {companionModelUrl ? (
+                <>
+                  {/* Main champion (e.g. Annie) — off-center front-left */}
+                  <ChampionModel
+                    key={modelUrl}
+                    url={modelUrl}
+                    viewMode={viewMode}
+                    emoteRequest={emoteRequest}
+                    chromaTextureUrl={chromaTextureUrl}
+                    facingRotationY={facingRotationY}
+                    positionOffset={[0.4, 0, 0.4]}
+                    onChromaLoading={handleChromaLoading}
+                    onEmotesAvailable={handleEmotesAvailable}
+                    onEmoteFinished={handleEmoteFinished}
+                    onAnimationName={handleAnimationName}
+                    onEmoteNames={handleEmoteNames}
+                    onModelHeight={handleModelHeight}
+                  />
+                  {/* Companion (e.g. Tibbers) — off-center back-right */}
+                  <ChampionModel
+                    key={companionModelUrl}
+                    url={companionModelUrl}
+                    viewMode={viewMode}
+                    emoteRequest={emoteRequest}
+                    chromaTextureUrl={companionChromaTextureUrl ?? null}
+                    facingRotationY={facingRotationY}
+                    positionOffset={[-0.4, 0, -0.4]}
+                    isCompanion
+                    onChromaLoading={() => {}}
+                    onEmotesAvailable={() => {}}
+                    onEmoteFinished={() => {}}
+                    onAnimationName={() => {}}
+                    onEmoteNames={() => {}}
+                    onModelHeight={() => {}}
+                  />
+                </>
+              ) : (
+                <ChampionModel
+                  key={modelUrl}
+                  url={modelUrl}
+                  viewMode={viewMode}
+                  emoteRequest={emoteRequest}
+                  chromaTextureUrl={chromaTextureUrl}
+                  facingRotationY={facingRotationY}
+                  onChromaLoading={handleChromaLoading}
+                  onEmotesAvailable={handleEmotesAvailable}
+                  onEmoteFinished={handleEmoteFinished}
+                  onAnimationName={handleAnimationName}
+                  onEmoteNames={handleEmoteNames}
+                  onModelHeight={handleModelHeight}
+                />
+              )}
             </Suspense>
 
             {/* Shadow-casting light from the south-west — shadow falls to upper-right */}
