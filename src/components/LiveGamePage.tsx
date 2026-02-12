@@ -541,6 +541,110 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
   render() { return this.state.hasError ? this.props.fallback : this.props.children; }
 }
 
+/* ── Pregame hero formation (all 10 champs, Overwatch/Marvel style) ─────── */
+
+/** Formation positions: blue team left, red team right, arc layout */
+const BLUE_FORMATION_POSITIONS: [number, number, number][] = [
+  [-2.6, 0, -1.4], [-2.7, 0, -0.5], [-2.5, 0, 0.4], [-2.7, 0, 1.3], [-2.6, 0, 2.2],
+];
+const RED_FORMATION_POSITIONS: [number, number, number][] = [
+  [2.6, 0, -1.4], [2.7, 0, -0.5], [2.5, 0, 0.4], [2.7, 0, 1.3], [2.6, 0, 2.2],
+];
+
+function PregameChampionSlot({
+  player,
+  champions,
+  position,
+  rotationY,
+}: {
+  player: LiveGamePlayer;
+  champions: ChampionBasic[];
+  position: [number, number, number];
+  rotationY: number;
+}) {
+  const modelInfo = usePlayerModelInfo(player, champions);
+  if (!modelInfo?.modelUrl) return null;
+  return (
+    <ModelErrorBoundary fallback={null} resetKey={`${player.championName}-${player.skinID}`}>
+      <group position={position} rotation={[0, rotationY, 0]} scale={[0.26, 0.26, 0.26]}>
+        <Suspense fallback={null}>
+          <LiveChampionModel url={modelInfo.modelUrl} chromaTextureUrl={modelInfo.chromaTextureUrl} />
+        </Suspense>
+      </group>
+    </ModelErrorBoundary>
+  );
+}
+
+function PregameHeroFormation({
+  blueTeam,
+  redTeam,
+  champions,
+}: {
+  blueTeam: LiveGamePlayer[];
+  redTeam: LiveGamePlayer[];
+  champions: ChampionBasic[];
+}) {
+  return (
+    <div className="lg-hero-formation">
+      <Canvas
+        shadows
+        camera={{ position: [0, 1.5, 6], fov: 50 }}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+          alpha: true,
+        }}
+        style={{ background: 'transparent' }}
+      >
+        <fog attach="fog" args={['#010a13', 12, 28]} />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[8, 8, -2]} intensity={1.2} color="#f0e6d2" />
+        <directionalLight position={[0, 4, -6]} intensity={0.4} color="#0ac8b9" />
+        <pointLight position={[1, 3, -5]} intensity={0.6} color="#0ac8b9" />
+        <pointLight position={[5, 3, 2]} intensity={0.6} color="#c8aa6e" />
+        <pointLight position={[-5, 4, 4]} intensity={0.5} color="#ff69b4" />
+        <spotLight position={[0, 8, 0]} intensity={0.8} color="#f0e6d2" angle={0.5} penumbra={0.8} />
+        <directionalLight
+          position={[-5, 10, 5]}
+          intensity={0.25}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+          shadow-camera-left={-8}
+          shadow-camera-right={8}
+          shadow-camera-top={8}
+          shadow-camera-bottom={-8}
+          shadow-bias={-0.002}
+          shadow-radius={50}
+        />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.69, 0]} receiveShadow>
+          <planeGeometry args={[24, 24]} />
+          <shadowMaterial opacity={0.3} />
+        </mesh>
+        {blueTeam.slice(0, 5).map((player, i) => (
+          <PregameChampionSlot
+            key={`blue-${player.summonerName}`}
+            player={player}
+            champions={champions}
+            position={BLUE_FORMATION_POSITIONS[i]}
+            rotationY={0}
+          />
+        ))}
+        {redTeam.slice(0, 5).map((player, i) => (
+          <PregameChampionSlot
+            key={`red-${player.summonerName}`}
+            player={player}
+            champions={champions}
+            position={RED_FORMATION_POSITIONS[i]}
+            rotationY={Math.PI}
+          />
+        ))}
+      </Canvas>
+    </div>
+  );
+}
+
 /** Reusable 3D canvas that renders a champion model with lighting + shadows */
 function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string }) {
   const [useFallback, setUseFallback] = useState(false);
@@ -686,6 +790,12 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   const blueGold = teamItemGold(blueTeam);
   const redGold = teamItemGold(redTeam);
 
+  // Show hero formation during pre-game (loading / fountain before minions); clear once match starts
+  // Use both gameTime and items: Riot's gameTime format can vary; "no items" = true fountain phase
+  const noOneHasItems = data.players.every((p) => p.items.length === 0);
+  const gameTime = data.gameTime ?? 0;
+  const isPregame = noOneHasItems || gameTime < 180;
+
   // Filter groups to only include stats that pass showIf, and exclude empty groups
   const visibleGroups = useMemo(() => {
     return STAT_GROUPS
@@ -704,8 +814,8 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
 
-      {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right */}
-      {activePlayer?.team === 'ORDER' ? (
+      {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right — hidden during pregame */}
+      {!isPregame && activePlayer?.team === 'ORDER' ? (
         <>
           {activeModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
@@ -726,7 +836,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             </div>
           )}
         </>
-      ) : (
+      ) : !isPregame ? (
         <>
           {enemyModelInfo?.modelUrl && (
             <div className="lg-model-bg lg-model-bg--left">
@@ -747,7 +857,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             </div>
           )}
         </>
-      )}
+      ) : null}
 
       {/* Scoreboard content — centered between the two models */}
       <div className="live-game-content">
@@ -821,6 +931,11 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             );
           })}
         </div>
+
+        {/* Pregame hero formation: all 10 champions below scoreboard until match starts */}
+        {isPregame && (
+          <PregameHeroFormation blueTeam={blueTeam} redTeam={redTeam} champions={champions} />
+        )}
 
         {/* Active player stats panel */}
         <div className="lg-stats-panel">
