@@ -79,10 +79,11 @@ function App() {
           setViewMode('companion');
         } else if (championId === 'dev') {
           setViewMode('dev');
-        } else if (championId === 'live') {
-          setViewMode('livegame');
-        } else if (championId === 'postgame') {
-          setViewMode('postgame');
+        } else if (championId === 'live' || championId === 'postgame') {
+          // /live and /postgame require active session data from the companion.
+          // If opened directly with no session, redirect to home.
+          setViewMode('select');
+          window.history.replaceState(null, '', '/');
         } else if (championId) {
           // Find the champion (case-insensitive match against id)
           const match = Object.values(champs).find(
@@ -110,6 +111,17 @@ function App() {
     }
     load();
   }, []);
+
+  // Redirect to home if on /live or /postgame without session data
+  useEffect(() => {
+    if (viewMode === 'livegame' && !liveGameData) {
+      setViewMode('select');
+      window.history.replaceState(null, '', '/');
+    } else if (viewMode === 'postgame' && !postGameData) {
+      setViewMode('select');
+      window.history.replaceState(null, '', '/');
+    }
+  }, [viewMode, liveGameData, postGameData]);
 
   // Handle browser back/forward navigation
   useEffect(() => {

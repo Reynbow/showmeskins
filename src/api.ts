@@ -215,7 +215,7 @@ export function getChampionScale(alias: string): number {
   const base = manual != null ? manual : getChampionScaleFromHeight(alias);
   return base * GLOBAL_SCALE_MULTIPLIER;
 }
-
+  ``  ``
 /* ═══════════════════════════════════════════════════════════════════════════
    Chroma Texture Resolution
    Uses Vercel Blob Storage as primary source (deterministic URLs, no manifest
