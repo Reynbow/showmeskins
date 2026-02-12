@@ -7,7 +7,7 @@ setlocal
 set VERSION=0.3.1
 
 echo [1/2] Building Go binary...
-go build -ldflags="-s -w -H windowsgui" -o "dist\Show Me Skins Companion.exe" .
+go build -ldflags="-s -w -H windowsgui -X main.Version=%VERSION%" -o "dist\Show Me Skins Companion.exe" .
 if %errorlevel% neq 0 (
     echo Build failed!
     exit /b 1

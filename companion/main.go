@@ -19,11 +19,16 @@ const (
 	regValueName = "Show Me Skins Companion"
 )
 
+// Version is set at build time via -ldflags "-X main.Version=0.3.1"
+var Version = "0.0.0"
+
 var (
-	lcu         *LCUConnector
-	liveGame    *LiveGameTracker
-	bridgeSrv   *BridgeServer
-	statusItem  *systray.MenuItem
+	lcu            *LCUConnector
+	liveGame       *LiveGameTracker
+	bridgeSrv      *BridgeServer
+	statusItem     *systray.MenuItem
+	updateItem     *systray.MenuItem
+	updateReadyItem *systray.MenuItem
 )
 
 // ── Single instance lock ────────────────────────────────────────────────
@@ -122,10 +127,18 @@ func hideConsole() {
 func onReady() {
 	// Set tray icon
 	systray.SetIcon(pngToICO(iconPNG))
-	systray.SetTooltip("Show Me Skins Companion")
+	tooltipPrefix := "Show Me Skins Companion"
+	if Version != "0.0.0" {
+		tooltipPrefix += " v" + Version
+	}
+	systray.SetTooltip(tooltipPrefix)
 
 	// Build menu
-	titleItem := systray.AddMenuItem("Show Me Skins Companion (Beta)", "")
+	titleText := "Show Me Skins Companion (Beta)"
+	if Version != "0.0.0" {
+		titleText += " v" + Version
+	}
+	titleItem := systray.AddMenuItem(titleText, "")
 	titleItem.Disable()
 
 	statusItem = systray.AddMenuItem("Starting…", "")
@@ -134,6 +147,10 @@ func onReady() {
 	systray.AddSeparator()
 
 	openItem := systray.AddMenuItem("Open Show Me Skins", "Open the website in your browser")
+
+	updateItem = systray.AddMenuItem("Check for Updates", "Check for a new version on GitHub")
+	updateReadyItem = systray.AddMenuItem("Update available – click to install", "")
+	updateReadyItem.Hide()
 
 	autoStartItem := systray.AddMenuItemCheckbox("Start on Login", "Launch automatically when you log in", isAutoLaunchEnabled())
 	showConsoleItem := systray.AddMenuItemCheckbox("Show Console", "Show or hide the debug console (logs, connection status)", false)
@@ -147,7 +164,8 @@ func onReady() {
 	// Status callback shared by LCU and live game tracker
 	setStatus := func(status string) {
 		statusItem.SetTitle(status)
-		systray.SetTooltip("Show Me Skins Companion – " + status)
+		tt := tooltipPrefix + " – " + status
+		systray.SetTooltip(tt)
 	}
 
 	// Start the LCU connector (champion select detection)
@@ -185,12 +203,19 @@ func onReady() {
 	)
 	liveGame.Start()
 
+	// Update checker: periodic check and on menu click
+	go runUpdateChecker(updateItem, updateReadyItem, setStatus)
+
 	// Handle menu clicks
 	go func() {
 		for {
 			select {
 			case <-openItem.ClickedCh:
 				browser.OpenURL(websiteURL)
+			case <-updateItem.ClickedCh:
+				checkUpdateAndNotify(updateItem, updateReadyItem, setStatus)
+			case <-updateReadyItem.ClickedCh:
+				applyUpdate(updateReadyItem)
 			case <-autoStartItem.ClickedCh:
 				if autoStartItem.Checked() {
 					autoStartItem.Uncheck()
