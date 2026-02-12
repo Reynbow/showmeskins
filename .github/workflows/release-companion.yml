@@ -48,6 +48,10 @@ jobs:
           choco install nsis -y --no-progress
           & "C:\Program Files (x86)\NSIS\makensis.exe" /DPRODUCT_VERSION=${{ steps.version.outputs.version }} installer.nsi
 
+      - name: Create stable-named download (always Show.Me.Skins.Companion.Setup.exe)
+        working-directory: companion/dist
+        run: copy "Show.Me.Skins.Companion.Setup.${{ steps.version.outputs.version }}.exe" "Show.Me.Skins.Companion.Setup.exe"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -64,6 +68,7 @@ jobs:
             - **Kill Feed** — Real-time champion kills, turret/dragon/baron takedowns
             - **Post-Game Summary** — Win/loss result, final scoreboard, and MVP
           files: |
+            companion/dist/Show.Me.Skins.Companion.Setup.exe
             companion/dist/Show.Me.Skins.Companion.Setup.${{ steps.version.outputs.version }}.exe
             companion/dist/Show Me Skins Companion.exe
           draft: false
