@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { ChampionBasic } from '../types';
+import type { ChampionBasic, LiveGamePlayer } from '../types';
 import { PregameHeroFormation, BLUE_FORMATION_POSITIONS, RED_FORMATION_POSITIONS, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_FOV, DEFAULT_LOOK_AT_Y } from './LiveGamePage';
 import { sampleLiveGameData } from '../mockLiveGameData';
 import './DevPage.css';
@@ -28,12 +28,12 @@ function FormationPositionTool({
   redTeam,
   champions,
 }: {
-  blueTeam: { summonerName: string; championName: string; team: string; position: string }[];
-  redTeam: { summonerName: string; championName: string; team: string; position: string }[];
+  blueTeam: LiveGamePlayer[];
+  redTeam: LiveGamePlayer[];
   champions: ChampionBasic[];
 }) {
-  const [bluePos, setBluePos] = useState<[number, number, number][]>(() => BLUE_FORMATION_POSITIONS.map((p) => [...p]));
-  const [redPos, setRedPos] = useState<[number, number, number][]>(() => RED_FORMATION_POSITIONS.map((p) => [...p]));
+  const [bluePos, setBluePos] = useState<[number, number, number][]>(() => BLUE_FORMATION_POSITIONS.map((p) => [p[0], p[1], p[2]]));
+  const [redPos, setRedPos] = useState<[number, number, number][]>(() => RED_FORMATION_POSITIONS.map((p) => [p[0], p[1], p[2]]));
   const [camPos, setCamPos] = useState<[number, number, number]>(() => [...DEFAULT_CAMERA_POSITION]);
   const [camFov, setCamFov] = useState(DEFAULT_CAMERA_FOV);
   const [lookAtY, setLookAtY] = useState(DEFAULT_LOOK_AT_Y);
@@ -42,7 +42,7 @@ function FormationPositionTool({
 
   const updateBlue = useCallback((i: number, axis: 0 | 1 | 2, value: number) => {
     setBluePos((prev) => {
-      const next = prev.map((p) => [...p]);
+      const next = prev.map((p) => [p[0], p[1], p[2]] as [number, number, number]);
       next[i][axis] = value;
       return next;
     });
@@ -50,7 +50,7 @@ function FormationPositionTool({
 
   const updateRed = useCallback((i: number, axis: 0 | 1 | 2, value: number) => {
     setRedPos((prev) => {
-      const next = prev.map((p) => [...p]);
+      const next = prev.map((p) => [p[0], p[1], p[2]] as [number, number, number]);
       next[i][axis] = value;
       return next;
     });
@@ -65,8 +65,8 @@ function FormationPositionTool({
   }, []);
 
   const resetPositions = useCallback(() => {
-    setBluePos(BLUE_FORMATION_POSITIONS.map((p) => [...p]));
-    setRedPos(RED_FORMATION_POSITIONS.map((p) => [...p]));
+    setBluePos(BLUE_FORMATION_POSITIONS.map((p) => [p[0], p[1], p[2]]));
+    setRedPos(RED_FORMATION_POSITIONS.map((p) => [p[0], p[1], p[2]]));
     setCamPos([...DEFAULT_CAMERA_POSITION]);
     setCamFov(DEFAULT_CAMERA_FOV);
     setLookAtY(DEFAULT_LOOK_AT_Y);
