@@ -929,6 +929,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
      ══════════════════════════════════════════════════════════════ */
   const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
   const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
+  const ggmfBodyMapOriginalRef = useRef<THREE.Texture | null | undefined>(undefined);
+  const ggmfBodyMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const ggmfBodySwapTexRef = useRef<THREE.Texture | null>(null);
 
   /* ── Unmount safety: restore original textures on the useGLTF-cached
        scene so the cache is never left with stale chroma textures.
@@ -936,6 +939,16 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
        because useGLTF returns the same (mutated) scene object. ────── */
   useEffect(() => {
     return () => {
+      if (ggmfBodyMatRef.current && ggmfBodyMapOriginalRef.current !== undefined) {
+        ggmfBodyMatRef.current.map = ggmfBodyMapOriginalRef.current;
+        ggmfBodyMatRef.current.needsUpdate = true;
+      }
+      if (ggmfBodySwapTexRef.current) {
+        ggmfBodySwapTexRef.current.dispose();
+        ggmfBodySwapTexRef.current = null;
+      }
+      ggmfBodyMatRef.current = null;
+      ggmfBodyMapOriginalRef.current = undefined;
       const originals = originalTexturesRef.current;
       for (const [mat, origTex] of originals) {
         mat.map = origTex;
@@ -949,6 +962,138 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* Gun Goddess MF form texture sync:
+     form toggles switch Weapon0..3 meshes, while body has separate gear textures.
+     Use the dedicated gear body atlas from CDragon for forms 1..3. */
+  useEffect(() => {
+    const isGunGoddessMissFortune = champAlias === 'missfortune' && skinId === '21016';
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const restoreBody = () => {
+      if (ggmfBodyMatRef.current && ggmfBodyMapOriginalRef.current !== undefined) {
+        ggmfBodyMatRef.current.map = ggmfBodyMapOriginalRef.current;
+        ggmfBodyMatRef.current.needsUpdate = true;
+      }
+      if (ggmfBodySwapTexRef.current) {
+        ggmfBodySwapTexRef.current.dispose();
+        ggmfBodySwapTexRef.current = null;
+      }
+      ggmfBodyMatRef.current = null;
+      ggmfBodyMapOriginalRef.current = undefined;
+    };
+
+    if (!isGunGoddessMissFortune || !levelForm || chromaTextureUrl) {
+      restoreBody();
+      onChromaLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+
+    const weaponToken = levelForm.show.find((v) => /^weapon[0-3]$/i.test(v));
+    const weaponIndex = weaponToken ? weaponToken.match(/[0-3]/)?.[0] : undefined;
+    if (weaponIndex == null) {
+      restoreBody();
+      onChromaLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+
+    let bodyMat: any = null;
+
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const mat = m as any;
+        if (!mat?.name) continue;
+        if (!bodyMat && mat.name === 'Body') bodyMat = mat;
+      }
+    });
+
+    if (!bodyMat) {
+      restoreBody();
+      onChromaLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+    const bodyMaterial: any = bodyMat;
+
+    if (ggmfBodyMatRef.current !== bodyMaterial) {
+      ggmfBodyMatRef.current = bodyMaterial as THREE.MeshStandardMaterial;
+      ggmfBodyMapOriginalRef.current = (bodyMaterial.map ?? null) as THREE.Texture | null;
+    }
+
+    // Default form uses the base body texture.
+    if (weaponIndex === '0') {
+      restoreBody();
+      onChromaLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+
+    const gearTextureUrl = `/cdragon/latest/game/assets/characters/missfortune/skins/skin16/missfortune_skin16_gear${weaponIndex}_tx_cm.png`;
+    const bodyRefTex = ggmfBodyMapOriginalRef.current ?? (bodyMaterial.map as THREE.Texture | null) ?? null;
+    onChromaLoading(true);
+
+    const load = async () => {
+      try {
+        const res = await fetch(gearTextureUrl, { signal: controller.signal, cache: 'force-cache' });
+        if (!res.ok) throw new Error(`Failed to load Gun Goddess texture ${gearTextureUrl}`);
+        const blob = await res.blob();
+        const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' });
+        if (cancelled) return;
+        const swappedTex = new THREE.Texture(bitmap);
+        swappedTex.needsUpdate = true;
+
+        if (bodyRefTex) {
+          swappedTex.colorSpace = bodyRefTex.colorSpace;
+          swappedTex.flipY = bodyRefTex.flipY;
+          swappedTex.offset.copy(bodyRefTex.offset);
+          swappedTex.repeat.copy(bodyRefTex.repeat);
+          swappedTex.center.copy(bodyRefTex.center);
+          swappedTex.rotation = bodyRefTex.rotation;
+          swappedTex.wrapS = bodyRefTex.wrapS;
+          swappedTex.wrapT = bodyRefTex.wrapT;
+          swappedTex.magFilter = bodyRefTex.magFilter;
+          swappedTex.minFilter = bodyRefTex.minFilter;
+          swappedTex.anisotropy = bodyRefTex.anisotropy;
+          swappedTex.premultiplyAlpha = bodyRefTex.premultiplyAlpha;
+          swappedTex.generateMipmaps = bodyRefTex.generateMipmaps;
+        } else {
+          swappedTex.flipY = false;
+          swappedTex.colorSpace = THREE.SRGBColorSpace;
+        }
+        swappedTex.needsUpdate = true;
+
+        if (ggmfBodySwapTexRef.current) ggmfBodySwapTexRef.current.dispose();
+        ggmfBodySwapTexRef.current = swappedTex;
+        bodyMaterial.map = swappedTex;
+        bodyMaterial.needsUpdate = true;
+        onChromaLoading(false);
+      } catch {
+        if (cancelled) return;
+        restoreBody();
+        onChromaLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [scene, champAlias, skinId, levelForm, chromaTextureUrl]);
 
   useEffect(() => {
     const originals = originalTexturesRef.current;

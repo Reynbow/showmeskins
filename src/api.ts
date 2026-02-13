@@ -239,31 +239,32 @@ export const LEVEL_FORM_CHAMPIONS: Record<string, LevelFormChampion> = {
  * Takes precedence over LEVEL_FORM_CHAMPIONS when the selected skin matches.
  */
 export const LEVEL_FORM_SKINS: Record<string, LevelFormChampion> = {
-  /* Gun Goddess Miss Fortune (skin 21016) — 4 exo-suit forms.
-     The model contains shared body meshes plus form-specific exosuit meshes.
-     exosuit01 is visible by default; exosuit02–04 are hidden (userData.visible=false). */
+  /* Gun Goddess Miss Fortune (skin 21016) — 4 weapon/exosuit forms.
+     In this GLB, form-specific geometry is keyed by MATERIAL names:
+       Weapon0 (default visible), Weapon1/2/3 (default hidden).
+     Form buttons must toggle those material-tagged meshes. */
   '21016': {
     label: 'Exosuit',
     forms: [
       {
         label: 'Zero Hour',
-        show: [],
-        hide: ['exosuit02', 'exosuit03', 'exosuit04'],
+        show: ['weapon0'],
+        hide: ['weapon1', 'weapon2', 'weapon3'],
       },
       {
         label: 'Scarlet Fair',
-        show: ['exosuit02'],
-        hide: ['exosuit01'],
+        show: ['weapon1'],
+        hide: ['weapon0', 'weapon2', 'weapon3'],
       },
       {
         label: 'Royal Arms',
-        show: ['exosuit03'],
-        hide: ['exosuit01'],
+        show: ['weapon2'],
+        hide: ['weapon0', 'weapon1', 'weapon3'],
       },
       {
         label: 'Starswarm',
-        show: ['exosuit04'],
-        hide: ['exosuit01'],
+        show: ['weapon3'],
+        hide: ['weapon0', 'weapon1', 'weapon2'],
       },
     ],
   },
