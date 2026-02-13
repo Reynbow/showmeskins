@@ -313,15 +313,26 @@ type actionEntry struct {
 	ChampionId  int    `json:"championId"`
 }
 
+func teamCellIds(team []teamMember) []int {
+	ids := make([]int, len(team))
+	for i := range team {
+		ids[i] = team[i].CellId
+	}
+	return ids
+}
+
 func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 	var event lcuEvent
 	if err := json.Unmarshal(raw, &event); err != nil {
+		log.Printf("[lcu] Event parse error: %v", err)
 		return
 	}
 
 	if event.URI != "/lol-champ-select/v1/session" {
 		return
 	}
+
+	log.Printf("[lcu] Champ select event: %s", event.EventType)
 
 	if event.EventType == "Delete" {
 		l.lastUpdate = ""
@@ -339,9 +350,11 @@ func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 func (l *LCUConnector) processSession(raw json.RawMessage) {
 	var session champSelectSession
 	if err := json.Unmarshal(raw, &session); err != nil {
+		log.Printf("[lcu] Session parse error: %v", err)
 		return
 	}
 	if len(session.MyTeam) == 0 {
+		log.Printf("[lcu] Session has empty myTeam")
 		return
 	}
 
@@ -354,6 +367,8 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 		}
 	}
 	if localPlayer == nil {
+		log.Printf("[lcu] Local player not found (localPlayerCellId=%d, myTeam cells: %v)",
+			session.LocalPlayerCellId, teamCellIds(session.MyTeam))
 		return
 	}
 
@@ -387,11 +402,14 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 	}
 
 	if championKey == 0 {
+		log.Printf("[lcu] No champion selected yet (championId=0, pickIntent=%d)",
+			localPlayer.ChampionPickIntent)
 		return
 	}
 
 	champInfo, ok := l.championMap[strconv.Itoa(championKey)]
 	if !ok {
+		log.Printf("[lcu] Champion key %d not in map (new champion?)", championKey)
 		return
 	}
 

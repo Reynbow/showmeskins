@@ -9,7 +9,7 @@
 ; PRODUCT_VERSION can be overridden: makensis /DPRODUCT_VERSION=0.3.0 installer.nsi
 
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "0.3.2"
+!define PRODUCT_VERSION "0.3.3"
 !endif
 
 !define PRODUCT_NAME "Show Me Skins Companion"
@@ -62,8 +62,9 @@ Section "Install"
   ; Kill any running instance before overwriting
   nsExec::ExecToLog 'taskkill /F /IM "${PRODUCT_EXE}"'
 
-  ; Install the single executable
-  File "dist\${PRODUCT_EXE}"
+  ; Install the single executable (build outputs to Companion-Build.exe to avoid locked exe)
+  File "dist\Companion-Build.exe"
+  Rename "$INSTDIR\Companion-Build.exe" "$INSTDIR\${PRODUCT_EXE}"
 
   ; Remove any stale auto-start entry (re-added by finish page if checked)
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"

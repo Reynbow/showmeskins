@@ -4,14 +4,16 @@ REM Builds the Go binary and (optionally) the NSIS installer.
 REM Version is used for the installer; bump when releasing.
 
 setlocal
-set VERSION=0.3.2
+set VERSION=0.3.3
 
 echo [1/2] Building Go binary...
-go build -ldflags="-s -w -H windowsgui -X main.Version=%VERSION%" -o "dist\Show Me Skins Companion.exe" .
+REM Build to temp name first (in case exe is locked by running instance)
+go build -ldflags="-s -w -H windowsgui -X main.Version=%VERSION%" -o "dist\Companion-Build.exe" .
 if %errorlevel% neq 0 (
     echo Build failed!
     exit /b 1
 )
+copy /Y "dist\Companion-Build.exe" "dist\Show Me Skins Companion.exe" >nul
 for %%I in ("dist\Show Me Skins Companion.exe") do echo       Binary size: %%~zI bytes
 
 echo [2/2] Building NSIS installer...

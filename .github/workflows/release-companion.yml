@@ -40,7 +40,11 @@ jobs:
 
       - name: Build Go binary
         working-directory: companion
-        run: go build -ldflags="-s -w -H windowsgui -X main.Version=${{ steps.version.outputs.version }}" -o "dist\Show Me Skins Companion.exe" .
+        run: go build -ldflags="-s -w -H windowsgui -X main.Version=${{ steps.version.outputs.version }}" -o "dist\Companion-Build.exe" .
+
+      - name: Copy portable exe
+        working-directory: companion/dist
+        run: cmd /c copy Companion-Build.exe "Show Me Skins Companion.exe"
 
       - name: Build NSIS installer
         working-directory: companion

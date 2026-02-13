@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
@@ -161,16 +162,29 @@ func onReady() {
 	bridgeSrv = NewBridgeServer(bridgePort)
 	bridgeSrv.Start()
 
-	// Status callback shared by LCU and live game tracker
-	setStatus := func(status string) {
+	// Status callback shared by LCU and live game tracker.
+	// inChampSelect prevents LiveGame from overwriting "In Champion Select" when
+	// the user is in champ select (e.g. after a game ends and they queue again).
+	var inChampSelect atomic.Bool
+	applyStatus := func(status string) {
 		statusItem.SetTitle(status)
 		tt := tooltipPrefix + " – " + status
 		systray.SetTooltip(tt)
 	}
+	lcuSetStatus := func(status string) {
+		inChampSelect.Store(status == "In Champion Select")
+		applyStatus(status)
+	}
+	liveGameSetStatus := func(status string) {
+		if status == "Connected – Waiting for Champion Select…" && inChampSelect.Load() {
+			return // Don't overwrite "In Champion Select" when user is in champ select
+		}
+		applyStatus(status)
+	}
 
 	// Start the LCU connector (champion select detection)
 	lcu = NewLCUConnector(
-		setStatus,
+		lcuSetStatus,
 		func(update ChampSelectUpdate) {
 			bridgeSrv.Broadcast(update)
 		},
@@ -189,7 +203,7 @@ func onReady() {
 
 	// Start the live game tracker (in-game items & stats)
 	liveGame = NewLiveGameTracker(
-		setStatus,
+		liveGameSetStatus,
 		func(update LiveGameUpdate) {
 			bridgeSrv.Broadcast(update)
 		},
@@ -204,7 +218,7 @@ func onReady() {
 	liveGame.Start()
 
 	// Update checker: periodic check and on menu click
-	go runUpdateChecker(updateItem, updateReadyItem, setStatus)
+	go runUpdateChecker(updateItem, updateReadyItem, applyStatus)
 
 	// Handle menu clicks
 	go func() {
@@ -213,7 +227,7 @@ func onReady() {
 			case <-openItem.ClickedCh:
 				browser.OpenURL(websiteURL)
 			case <-updateItem.ClickedCh:
-				checkUpdateAndNotify(updateItem, updateReadyItem, setStatus)
+				checkUpdateAndNotify(updateItem, updateReadyItem, applyStatus)
 			case <-updateReadyItem.ClickedCh:
 				applyUpdate(updateReadyItem)
 			case <-autoStartItem.ClickedCh:
