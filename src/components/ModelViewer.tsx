@@ -330,7 +330,10 @@ interface ChampionModelProps {
   onModelHeight: (height: number) => void;
 }
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = [0, 0, 0], isCompanion = false, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+/** Stable reference for models that don't need a position offset (avoids effect re-runs) */
+const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
+
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -1863,6 +1866,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
                   emoteRequest={emoteRequest}
                   chromaTextureUrl={chromaTextureUrl}
                   facingRotationY={facingRotationY}
+                  positionOffset={ZERO_OFFSET}
                   onChromaLoading={handleChromaLoading}
                   onEmotesAvailable={handleEmotesAvailable}
                   onEmoteFinished={handleEmoteFinished}
