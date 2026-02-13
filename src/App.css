@@ -146,6 +146,90 @@
   z-index: 99999;
 }
 
+.text-tooltip--mvp {
+  min-width: 280px;
+  max-width: 320px;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+  padding: 8px 10px;
+}
+
+.mvp-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mvp-breakdown-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.25);
+}
+
+.mvp-breakdown-title {
+  font-family: var(--font-heading);
+  letter-spacing: 0.8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #f0e6d2;
+}
+
+.mvp-breakdown-total {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.mvp-breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mvp-breakdown-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 11px;
+}
+
+.mvp-breakdown-key {
+  color: rgba(240, 230, 210, 0.9);
+}
+
+.mvp-breakdown-calc {
+  color: rgba(240, 230, 210, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+.mvp-breakdown-calc-value {
+  color: rgba(240, 230, 210, 0.95);
+}
+
+.mvp-breakdown-calc-op {
+  color: rgba(240, 230, 210, 0.55);
+}
+
+.mvp-breakdown-calc-mult {
+  color: rgba(139, 206, 232, 0.92);
+}
+
+.mvp-breakdown-value {
+  color: #86efac;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mvp-breakdown-value--penalty {
+  color: #fca5a5;
+}
+
 /* Kill feed tooltip variants — match badge color schemes */
 .text-tooltip--double {
   background: linear-gradient(135deg, rgba(20, 12, 8, 0.98), rgba(15, 10, 5, 0.98));

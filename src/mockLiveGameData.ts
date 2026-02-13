@@ -1,4 +1,4 @@
-import type { LiveGameData } from './types';
+import type { LiveGameData, LiveGamePlayer, KillEventPlayerSnapshot } from './types';
 
 /**
  * Sample live game data for the demo/preview pages.
@@ -288,20 +288,80 @@ const sampleLiveGame: LiveGameData = {
 /** Sample data for the live game demo page */
 export const sampleLiveGameData: LiveGameData = sampleLiveGame;
 
+/**
+ * Build synthetic kill-feed snapshots for sample data.
+ * Interpolates player levels and items based on each kill's eventTime
+ * relative to the total game duration, simulating progressive game state.
+ * Keyed by eventTime (same as the live game snapshot mechanism).
+ */
+function buildSampleSnapshots(
+  finalPlayers: LiveGamePlayer[],
+  killFeed: NonNullable<LiveGameData['killFeed']>,
+  totalGameTime: number,
+): Record<number, KillEventPlayerSnapshot> {
+  const snapshots: Record<number, KillEventPlayerSnapshot> = {};
+
+  for (const kill of killFeed) {
+    // Skip if we already have a snapshot for this eventTime
+    if (kill.eventTime in snapshots) continue;
+
+    // Progress ratio: 0 at game start → 1 at game end
+    const progress = Math.min(kill.eventTime / totalGameTime, 1);
+
+    const byName: Record<string, LiveGamePlayer> = {};
+    const byChamp: Record<string, LiveGamePlayer> = {};
+
+    for (const p of finalPlayers) {
+      // Interpolate level: 1 at start → finalLevel at end
+      const level = Math.max(1, Math.round(1 + (p.level - 1) * progress));
+      // Interpolate items: show a subset proportional to progress
+      const itemCount = Math.max(0, Math.round(p.items.length * progress));
+      const items = p.items.slice(0, itemCount).map((it) => ({ ...it }));
+      // Interpolate CS
+      const creepScore = Math.round(p.creepScore * progress);
+
+      const frozen: LiveGamePlayer = {
+        ...p,
+        level,
+        items,
+        creepScore,
+        kills: Math.round(p.kills * progress),
+        deaths: Math.round(p.deaths * progress),
+        assists: Math.round(p.assists * progress),
+        isDead: false,
+        respawnTimer: 0,
+      };
+      byName[p.summonerName] = frozen;
+      byChamp[p.championName] = frozen;
+    }
+
+    snapshots[kill.eventTime] = { byName, byChamp };
+  }
+
+  return snapshots;
+}
+
 /** Sample data for the post-game demo page (same game, with a Win result) */
+const postGamePlayers = sampleLiveGame.players.map((p) => {
+  // Bump kills / CS a bit for the final snapshot
+  if (p.team === 'ORDER') {
+    return { ...p, kills: p.kills + 2, creepScore: p.creepScore + 30, level: Math.min(p.level + 2, 18) };
+  }
+  // Give Yone a big late-game pop-off so he's the game MVP (enemy carry scenario)
+  if (p.championName === 'Yone') {
+    return { ...p, kills: 14, deaths: 4, assists: 6, creepScore: p.creepScore + 40, level: Math.min(p.level + 3, 18) };
+  }
+  return { ...p, deaths: p.deaths + 1, creepScore: p.creepScore + 20, level: Math.min(p.level + 1, 18) };
+});
+
 export const samplePostGameData: LiveGameData = {
   ...sampleLiveGame,
   gameTime: 1680, // 28:00
   gameResult: 'Win',
-  players: sampleLiveGame.players.map((p) => {
-    // Bump kills / CS a bit for the final snapshot
-    if (p.team === 'ORDER') {
-      return { ...p, kills: p.kills + 2, creepScore: p.creepScore + 30 };
-    }
-    // Give Yone a big late-game pop-off so he's the game MVP (enemy carry scenario)
-    if (p.championName === 'Yone') {
-      return { ...p, kills: 14, deaths: 4, assists: 6, creepScore: p.creepScore + 40 };
-    }
-    return { ...p, deaths: p.deaths + 1, creepScore: p.creepScore + 20 };
-  }),
+  players: postGamePlayers,
+  killFeedSnapshots: buildSampleSnapshots(
+    postGamePlayers,
+    sampleLiveGame.killFeed!,
+    1680,
+  ),
 };

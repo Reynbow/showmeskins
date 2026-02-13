@@ -158,6 +158,11 @@ export interface KillEvent {
   killStreakCount?: number;
 }
 
+export interface KillEventPlayerSnapshot {
+  byName: Record<string, LiveGamePlayer>;
+  byChamp: Record<string, LiveGamePlayer>;
+}
+
 export interface LiveGameData {
   gameTime: number;
   gameMode: string;
@@ -165,4 +170,6 @@ export interface LiveGameData {
   activePlayer: LiveGameActivePlayer;
   players: LiveGamePlayer[];
   killFeed?: KillEvent[];
+  /** Frozen player state at the moment each kill happened, keyed by eventTime */
+  killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;
 }

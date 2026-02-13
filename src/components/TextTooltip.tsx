@@ -2,7 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 interface TextTooltipProps {
-  text: string;
+  text?: string;
+  content?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   /** Optional variant for styling (e.g. 'double', 'penta', 'rampage', 'legendary') */
@@ -10,13 +11,14 @@ interface TextTooltipProps {
 }
 
 /** Simple text tooltip — matches skin/emote/chroma tooltip style, rendered via portal to avoid overflow clipping */
-export function TextTooltip({ text, children, className = '', variant }: TextTooltipProps) {
+export function TextTooltip({ text, content, children, className = '', variant }: TextTooltipProps) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLSpanElement>(null);
 
-  const handleMouseEnter = useCallback(() => {
-    const el = ref.current;
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    const target = e.target instanceof Element ? e.target : null;
+    const el = target ?? ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     setPos({
@@ -40,7 +42,7 @@ export function TextTooltip({ text, children, className = '', variant }: TextToo
         transform: 'translate(-50%, -100%)',
       }}
     >
-      {text}
+      {content ?? text ?? ''}
     </div>
   );
 

@@ -234,6 +234,42 @@ export const LEVEL_FORM_CHAMPIONS: Record<string, LevelFormChampion> = {
 };
 
 /**
+ * Skin-specific level-form definitions.
+ * Keyed by skin ID string (e.g. "21016" for Gun Goddess Miss Fortune).
+ * Takes precedence over LEVEL_FORM_CHAMPIONS when the selected skin matches.
+ */
+export const LEVEL_FORM_SKINS: Record<string, LevelFormChampion> = {
+  /* Gun Goddess Miss Fortune (skin 21016) — 4 exo-suit forms.
+     The model contains shared body meshes plus form-specific exosuit meshes.
+     exosuit01 is visible by default; exosuit02–04 are hidden (userData.visible=false). */
+  '21016': {
+    label: 'Exosuit',
+    forms: [
+      {
+        label: 'Zero Hour',
+        show: [],
+        hide: ['exosuit02', 'exosuit03', 'exosuit04'],
+      },
+      {
+        label: 'Scarlet Fair',
+        show: ['exosuit02'],
+        hide: ['exosuit01'],
+      },
+      {
+        label: 'Royal Arms',
+        show: ['exosuit03'],
+        hide: ['exosuit01'],
+      },
+      {
+        label: 'Starswarm',
+        show: ['exosuit04'],
+        hide: ['exosuit01'],
+      },
+    ],
+  },
+};
+
+/**
  * Get the URL for a champion skin's 3D model (.glb)
  * Models are hosted on cdn.modelviewer.lol and proxied through Vite.
  *

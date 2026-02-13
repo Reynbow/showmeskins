@@ -354,8 +354,26 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   const isFrightNight = skinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(skinId);
   const isKayle = champAlias?.toLowerCase() === 'kayle';
 
-  /* ── Idle animation name (stable for the model's lifetime) ──── */
-  const idleName = useMemo(() => findIdleName(names, champAlias), [names, champAlias]);
+  const isKayleLevel16 = isKayle && !!levelForm && /\b16\b/.test(levelForm.label);
+
+  /* ── Idle animation name (stable for the current model/form) ─── */
+  const idleName = useMemo(() => {
+    if (isKayle) {
+      if (isKayleLevel16) {
+        const level16Idle =
+          names.find((n) => /^idle_?passive(?:\.anm)?$/i.test(n))
+          ?? names.find((n) => /^idle1_?base(?:\.anm)?$/i.test(n))
+          ?? names.find((n) => /^idle_?base(?:\.anm)?$/i.test(n));
+        if (level16Idle) return level16Idle;
+      } else {
+        const pre16Idle =
+          names.find((n) => /^idle1_?base(?:\.anm)?$/i.test(n))
+          ?? names.find((n) => /^idle_?base(?:\.anm)?$/i.test(n));
+        if (pre16Idle) return pre16Idle;
+      }
+    }
+    return findIdleName(names, champAlias);
+  }, [names, champAlias, isKayle, isKayleLevel16]);
 
   /* ── All idle animation names for cycling ────────────────────── */
   const allIdleNames = useMemo(() => findAllIdleNames(names), [names]);
@@ -650,6 +668,21 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   useEffect(() => {
     if (!levelForm) return;                       // no form system → setup effect's defaults win
 
+    // Debug: dump all mesh/material names to help discover correct identifiers
+    if (typeof window !== 'undefined') {
+      const matNames = new Set<string>();
+      scene.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) {
+          if (m.name) matNames.add(m.name);
+        }
+      });
+      console.debug('[LevelForm] All material names in model:', [...matNames].sort());
+      console.debug('[LevelForm] Active form:', levelForm.label, '| show:', levelForm.show, '| hide:', levelForm.hide);
+    }
+
     /** Match pattern as a "whole token" inside a material name.
      *  Treats underscores as word characters so "sword_hilt" does NOT match
      *  "sword_hilt_combined", and "level1" does NOT match "level11". */
@@ -760,29 +793,109 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       }
       if (bestBone) sourceSide = sideOf(bestBone.name);
     }
+    const sourceAnchor: THREE.Object3D | null = sourceBone ?? swordMeshes[0].parent ?? null;
+    if (!sourceAnchor) return;
+    const sourcePos = new THREE.Vector3();
+    sourceAnchor.getWorldPosition(sourcePos);
     const targetSide = sourceSide === 'left' ? 'right' : sourceSide === 'right' ? 'left' : null;
-    if (!targetSide) return;
 
-    const targetHand = handLikeBones.find((bone) => {
-      const n = bone.name.toLowerCase();
-      return sideOf(n) === targetSide && /(hand|weapon|wrist)/.test(n);
-    }) ?? bones.find((bone) => sideOf(bone.name) === targetSide);
-    if (!targetHand) return;
+    const oppositeSideBones = targetSide ? bones.filter((bone) => sideOf(bone.name) === targetSide) : [];
+    const sideTarget = oppositeSideBones.find((bone) => /(hand|weapon|wrist)/i.test(bone.name))
+      ?? oppositeSideBones[0]
+      ?? null;
 
+    const targetPool = handLikeBones.length > 0 ? handLikeBones : bones;
+    const fallbackTarget = targetPool
+      .filter((bone) => bone !== sourceBone)
+      .map((bone) => {
+        const p = new THREE.Vector3();
+        bone.getWorldPosition(p);
+        return { bone, d2: p.distanceToSquared(sourcePos) };
+      })
+      .sort((a, b) => b.d2 - a.d2)[0]?.bone;
+
+    const targetHand = sideTarget ?? fallbackTarget;
+    if (!targetHand || sourceBone === targetHand || sourceAnchor === targetHand) return;
+
+    scene.updateMatrixWorld(true);
+    targetHand.updateMatrixWorld(true);
+    const sceneWorld = new THREE.Matrix4().copy(scene.matrixWorld);
+    const invSceneWorld = new THREE.Matrix4().copy(sceneWorld).invert();
+    const invTargetWorld = new THREE.Matrix4().copy(targetHand.matrixWorld).invert();
+    const sceneLocalMatrix = new THREE.Matrix4();
+    const mirroredSceneLocalMatrix = new THREE.Matrix4();
+    const desiredWorldMatrix = new THREE.Matrix4();
+    const targetLocalMatrix = new THREE.Matrix4();
+    const mirrorX = new THREE.Matrix4().makeScale(-1, 1, 1);
+    const relPos = new THREE.Vector3();
+    const relQuat = new THREE.Quaternion();
+    const relScale = new THREE.Vector3();
+    const axisX = new THREE.Vector3(1, 0, 0);
+    const axisY = new THREE.Vector3(0, 1, 0);
+    const axisZ = new THREE.Vector3(0, 0, 1);
+    const rollFix = new THREE.Quaternion();
     for (const sword of swordMeshes) {
-      const swordParentBone = findParentBone(sword);
-      if (!swordParentBone || swordParentBone === targetHand) continue;
+      sword.updateMatrixWorld(true);
+      // Mirror sword across the champion's own X axis in scene-local space.
+      // This avoids hand-bone-axis mismatch that can twist the clone.
+      sceneLocalMatrix.copy(invSceneWorld).multiply(sword.matrixWorld);
+      mirroredSceneLocalMatrix.copy(mirrorX).multiply(sceneLocalMatrix).multiply(mirrorX);
+      desiredWorldMatrix.copy(sceneWorld).multiply(mirroredSceneLocalMatrix);
+      targetLocalMatrix.copy(invTargetWorld).multiply(desiredWorldMatrix);
+      targetLocalMatrix.decompose(relPos, relQuat, relScale);
 
-      const clone = sword.clone(true);
+      // Correct upside-down off-hand sword by rolling around the blade's long axis.
+      const geom = (sword as THREE.Mesh).geometry;
+      if (geom && !geom.boundingBox) geom.computeBoundingBox();
+      const bb = geom?.boundingBox;
+      if (bb) {
+        const size = new THREE.Vector3();
+        bb.getSize(size);
+        const dominantAxis =
+          size.x >= size.y && size.x >= size.z ? axisX :
+          size.y >= size.z ? axisY : axisZ;
+        rollFix.setFromAxisAngle(dominantAxis, Math.PI);
+        relQuat.multiply(rollFix);
+      }
+
+      const swordMesh = sword as THREE.Mesh & { isSkinnedMesh?: boolean };
+      let clone: THREE.Object3D;
+      if (swordMesh.isSkinnedMesh) {
+        // Rebuild as rigid mesh so the clone follows the new parent hand bone.
+        const rigid = new THREE.Mesh(sword.geometry, sword.material);
+        rigid.castShadow = sword.castShadow;
+        rigid.receiveShadow = sword.receiveShadow;
+        clone = rigid;
+      } else {
+        clone = sword.clone(true);
+      }
+
       clone.name = `${sword.name || 'sword'}_runtime_clone`;
       clone.matrixAutoUpdate = true;
-      (clone as THREE.Mesh).frustumCulled = false;
-      clone.position.copy(sword.position);
-      clone.quaternion.copy(sword.quaternion);
-      clone.scale.copy(sword.scale);
+      clone.visible = true;
+      clone.position.copy(relPos);
+      clone.quaternion.copy(relQuat);
+      clone.scale.copy(relScale);
+      clone.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.frustumCulled = false;
+        mesh.visible = true;
+      });
+
       targetHand.add(clone);
       kayleSwordClonesRef.current.push(clone);
     }
+
+    // Runtime trace for Kayle L16 sword duplication debugging.
+    console.debug('[Kayle L16 swords]', {
+      level: levelForm.label,
+      swordMeshCount: swordMeshes.length,
+      sourceBone: sourceBone?.name ?? null,
+      sourceAnchor: sourceAnchor.name,
+      targetHand: targetHand.name,
+      cloneCount: kayleSwordClonesRef.current.length,
+    });
 
     return () => {
       for (const clone of kayleSwordClonesRef.current) {

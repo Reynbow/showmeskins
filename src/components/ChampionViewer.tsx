@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, getChampionChromas, resolveChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, getChampionChromas, resolveChromaTextureUrl } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -100,14 +100,15 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     setUseAltForm(false);
   }, [champion.id]);
 
-  /* ── Level-form selector (Kayle ascension levels, etc.) ──── */
-  const levelFormChamp = LEVEL_FORM_CHAMPIONS[champion.id] ?? null;
+  /* ── Level-form selector (Kayle ascension levels, Gun Goddess MF exosuits, etc.) ──── */
+  // Skin-specific forms take precedence over champion-level forms
+  const levelFormChamp = LEVEL_FORM_SKINS[selectedSkin.id] ?? LEVEL_FORM_CHAMPIONS[champion.id] ?? null;
   const [levelFormIndex, setLevelFormIndex] = useState(0);
 
-  // Reset form index when switching champions
+  // Reset form index when switching champions or skins
   useEffect(() => {
     setLevelFormIndex(0);
-  }, [champion.id]);
+  }, [champion.id, selectedSkin.id]);
 
   // The active form definition (null when champion has no level forms)
   const activeLevelForm = levelFormChamp ? levelFormChamp.forms[levelFormIndex] ?? null : null;

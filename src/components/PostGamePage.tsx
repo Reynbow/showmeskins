@@ -2,10 +2,13 @@ import { useMemo, useRef, useState, useEffect, useCallback, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
+import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { ItemTooltip } from './ItemTooltip';
+import { TextTooltip } from './TextTooltip';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
+import { enrichKillFeed } from '../utils/killFeed';
+import { buildKillEventKeys } from '../utils/killFeedKey';
 import './PostGamePage.css';
 
 interface Props {
@@ -93,6 +96,60 @@ function getItemIconUrl(version: string, itemId: number): string {
 /** MVP score: weighted formula favouring kills, assists, low deaths, and CS */
 function mvpScore(p: LiveGamePlayer): number {
   return p.kills * 3 + p.assists * 1.5 - p.deaths * 1.2 + p.creepScore * 0.012;
+}
+
+function getMvpScoreBreakdown(p: LiveGamePlayer): ReactNode {
+  const killScore = p.kills * 3;
+  const assistScore = p.assists * 1.5;
+  const deathPenalty = p.deaths * 1.2;
+  const csScore = p.creepScore * 0.012;
+  const total = killScore + assistScore - deathPenalty + csScore;
+  return (
+    <div className="mvp-breakdown">
+      <div className="mvp-breakdown-header">
+        <span className="mvp-breakdown-title">MVP Score</span>
+        <span className="mvp-breakdown-total">{total.toFixed(1)}</span>
+      </div>
+      <div className="mvp-breakdown-rows">
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Kills</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.kills}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">3</span>
+          </span>
+          <span className="mvp-breakdown-value">+{killScore.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Assists</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.assists}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">1.5</span>
+          </span>
+          <span className="mvp-breakdown-value">+{assistScore.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Deaths</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.deaths}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">1.2</span>
+          </span>
+          <span className="mvp-breakdown-value mvp-breakdown-value--penalty">-{deathPenalty.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">CS</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.creepScore}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">0.012</span>
+          </span>
+          <span className="mvp-breakdown-value">+{csScore.toFixed(1)}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** KDA ratio as a string */
@@ -551,29 +608,49 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     return null;
   }, [activePlayer, blueTeam, redTeam]);
 
+  // MVP row index and side (for floating MVP badge)
+  const mvpRow = useMemo(() => {
+    if (!gameMvp) return null;
+    const blueIdx = blueTeam.findIndex((p) => p.summonerName === gameMvp.summonerName);
+    if (blueIdx >= 0) return { index: blueIdx, side: 'blue' as const };
+    const redIdx = redTeam.findIndex((p) => p.summonerName === gameMvp.summonerName);
+    if (redIdx >= 0) return { index: redIdx, side: 'red' as const };
+    return null;
+  }, [gameMvp, blueTeam, redTeam]);
+
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
+  const mvpRowRef = useRef<HTMLDivElement | null>(null);
   const [chevronTop, setChevronTop] = useState<number | null>(null);
+  const [mvpTop, setMvpTop] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!activePlayerRow || !scoreboardRef.current) {
+    if ((!activePlayerRow && !mvpRow) || !scoreboardRef.current) {
       setChevronTop(null);
+      setMvpTop(null);
       return;
     }
-    const updateChevron = () => {
-      if (!activeRowRef.current || !scoreboardRef.current) return;
-      const scoreboard = scoreboardRef.current;
-      const row = activeRowRef.current;
-      const sbRect = scoreboard.getBoundingClientRect();
-      const rowRect = row.getBoundingClientRect();
-      const top = rowRect.top - sbRect.top + rowRect.height / 2 - 10;
-      setChevronTop(top);
+    const update = () => {
+      if (!scoreboardRef.current) return;
+      const sbRect = scoreboardRef.current.getBoundingClientRect();
+      if (activePlayerRow && activeRowRef.current) {
+        const rowRect = activeRowRef.current.getBoundingClientRect();
+        setChevronTop(rowRect.top - sbRect.top + rowRect.height / 2 - 10);
+      } else {
+        setChevronTop(null);
+      }
+      if (mvpRow && mvpRowRef.current) {
+        const rowRect = mvpRowRef.current.getBoundingClientRect();
+        setMvpTop(rowRect.top - sbRect.top + rowRect.height / 2 - 10);
+      } else {
+        setMvpTop(null);
+      }
     };
-    updateChevron();
-    const ro = new ResizeObserver(updateChevron);
+    update();
+    const ro = new ResizeObserver(update);
     ro.observe(scoreboardRef.current);
     return () => ro.disconnect();
-  }, [activePlayerRow]);
+  }, [activePlayerRow, mvpRow]);
 
   // Estimate team gold from item prices
   const teamItemGold = (players: typeof blueTeam) =>
@@ -644,7 +721,9 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
           </div>
           {!isCustomView && youAreMvp && activePlayer ? (
             <div className="pg-mvp-congrats">
-              <div className="pg-mvp-congrats-badge">MVP</div>
+              <TextTooltip content={getMvpScoreBreakdown(activePlayer)} variant="mvp" className="pg-mvp-congrats-badge-wrap">
+                <div className="pg-mvp-congrats-badge">MVP</div>
+              </TextTooltip>
               <div className="pg-mvp-congrats-name">{activePlayer.summonerName}</div>
               <div className="pg-mvp-congrats-champ">{activePlayer.championName}</div>
 
@@ -692,10 +771,8 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
           )}
         </div>
 
-        {/* Divider */}
-        <div className="pg-divider">
-          <span className="pg-vs">VS</span>
-        </div>
+        {/* Divider (spacing only) */}
+        <div className="pg-divider" />
 
         {/* RIGHT — team border based on right player's team */}
         <div className={`pg-card pg-card--${rightPlayer?.team === 'ORDER' ? 'blue' : 'red'}`}>
@@ -739,10 +816,21 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         <div className="pg-scoreboard-wrap" ref={scoreboardRef}>
           {activePlayerRow && chevronTop != null && (
             <div
-              className={`pg-sb-you-chevron pg-sb-you-chevron--${activePlayerRow.side}`}
+              className={`pg-sb-you-chevron pg-sb-you-chevron--${activePlayerRow.side}${activePlayerRow.index === mvpRow?.index && activePlayerRow.side === mvpRow?.side ? ' pg-sb-you-chevron--with-mvp' : ''}`}
               style={{ top: chevronTop }}
               aria-hidden
             />
+          )}
+          {mvpRow && mvpTop != null && gameMvp && (
+            <TextTooltip content={getMvpScoreBreakdown(gameMvp)} variant="mvp">
+              <div
+                className={`pg-sb-mvp-float pg-sb-mvp-float--${mvpRow.side}`}
+                style={{ top: mvpTop }}
+                aria-hidden
+              >
+                MVP
+              </div>
+            </TextTooltip>
           )}
           <div className="pg-scoreboard">
           {/* Central score header */}
@@ -775,16 +863,21 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
           {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
             const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
             const isActiveRow = activePlayerRow?.index === i;
+            const isMvpRow = mvpRow?.index === i;
             return (
             <div
               key={i}
               className="pg-sb-match-row"
-              ref={isActiveRow ? (el) => { activeRowRef.current = el; } : undefined}
+              ref={(el) => {
+                if (isActiveRow) activeRowRef.current = el;
+                if (isMvpRow) mvpRowRef.current = el;
+              }}
             >
               {blueTeam[i] ? (
                 <PgPlayerSide
                   player={blueTeam[i]}
                   side="blue"
+                  isMvp={gameMvp?.summonerName === blueTeam[i].summonerName}
                   champions={champions}
                   version={version}
                   itemData={itemData}
@@ -801,6 +894,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
                 <PgPlayerSide
                   player={redTeam[i]}
                   side="red"
+                  isMvp={gameMvp?.summonerName === redTeam[i].summonerName}
                   champions={champions}
                   version={version}
                   itemData={itemData}
@@ -817,6 +911,20 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         </div>
       </div>
 
+      {/* ── Full Kill Feed ────────────────────────────────────────── */}
+      {data.killFeed && data.killFeed.length > 0 && (
+        <div className="pg-killfeed-section">
+          <PostGameKillFeed
+            kills={enrichKillFeed(data.killFeed)}
+            players={data.players}
+            killFeedSnapshots={data.killFeedSnapshots}
+            champions={champions}
+            version={version}
+            itemData={itemData}
+          />
+        </div>
+      )}
+
       <div className="cs-bottom-border" />
     </div>
   );
@@ -827,6 +935,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
 function PgPlayerSide({
   player,
   side,
+  isMvp,
   champions,
   version,
   itemData,
@@ -835,6 +944,7 @@ function PgPlayerSide({
 }: {
   player: LiveGamePlayer;
   side: 'blue' | 'red';
+  isMvp?: boolean;
   champions: ChampionBasic[];
   version: string;
   itemData: Record<number, ItemInfo>;
@@ -900,7 +1010,7 @@ function PgPlayerSide({
   const cs = <div className="pg-sb-cs">{player.creepScore}</div>;
 
   const portrait = (
-    <div className={`pg-sb-portrait pg-sb-portrait--${side}`}>
+    <div className={`pg-sb-portrait pg-sb-portrait--${side}${isMvp ? ' pg-sb-portrait--mvp' : ''}`}>
       <img
         className="pg-sb-portrait-img"
         src={getChampionIconUrl(version, player.championName, champions)}
@@ -987,7 +1097,11 @@ function PlayerCard({
           <span className="pg-player-name">{player.summonerName}</span>
           <span className="pg-player-champ">{player.championName}</span>
         </div>
-        {isMvp && <span className="pg-mvp-badge">MVP</span>}
+        {isMvp && (
+          <TextTooltip content={getMvpScoreBreakdown(player)} variant="mvp">
+            <span className="pg-mvp-badge">MVP</span>
+          </TextTooltip>
+        )}
       </div>
 
       {/* KDA big display */}
@@ -1063,6 +1177,295 @@ function StatRow({ label, value, className }: { label: string; value: string | n
     <div className="pg-detail-row">
       <span className="pg-detail-label">{label}</span>
       <span className={`pg-detail-value ${className ?? ''}`}>{value}</span>
+    </div>
+  );
+}
+
+/* ── Post-Game Kill Feed ─────────────────────────────────────────────── */
+
+const ENTITY_ICONS: Record<string, string> = {
+  _turret: '\u{1F3F0}', _turret_blue: '\u{1F3F0}', _turret_red: '\u{1F3F0}',
+  _baron: '\u{1F47E}', _dragon: '\u{1F409}', _herald: '\u{1F441}',
+  _voidgrub: '\u{1FAB2}', _minion: '\u2694', _minion_blue: '\u2694',
+  _minion_red: '\u2694', _jungle: '\u{1F33F}', _unknown: '\u2753',
+};
+
+const MULTI_KILL_TOOLTIPS: Record<string, string> = {
+  double: '2 kills within ~10 seconds',
+  triple: '3 kills within ~10 seconds',
+  quadra: '4 kills within ~10 seconds',
+  penta: '5 kills within ~10 seconds (Ace)',
+};
+
+const KILL_STREAK_TOOLTIPS: Record<string, string> = {
+  killing_spree: '3 kills without dying',
+  rampage: '4 kills without dying',
+  unstoppable: '5 kills without dying',
+  godlike: '6 kills without dying',
+  legendary: '7+ kills without dying',
+};
+
+function PgKillFeedEntity({
+  isEntity, champ, displayName, side, version: ver, champions: champs, level,
+}: {
+  isEntity: boolean; champ: string; displayName: string;
+  side: string; version: string; champions: ChampionBasic[]; level?: number;
+}) {
+  if (isEntity) {
+    return (
+      <>
+        <span className={`pg-kf-entity-icon pg-kf-icon--${side}`}>{ENTITY_ICONS[champ] ?? '\u2753'}</span>
+        <span className={`pg-kf-name pg-kf-name--${side}`}>{displayName}</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className={`pg-kf-portrait pg-kf-icon--${side}`}>
+        <img className="pg-kf-portrait-img" src={getChampionIconUrl(ver, champ, champs)} alt={champ} />
+        {level != null && <span className="pg-kf-portrait-level">{level}</span>}
+      </span>
+      <span className={`pg-kf-name pg-kf-name--${side}`}>{champ}</span>
+    </>
+  );
+}
+
+function PgKillDetailColumn({
+  label, player, champ, isEntity, side, version: ver, champions: champs, itemData: items,
+}: {
+  label: string; player?: LiveGamePlayer; champ: string; isEntity: boolean;
+  side: string; version: string; champions: ChampionBasic[]; itemData: Record<number, ItemInfo>;
+}) {
+  if (isEntity) {
+    return (
+      <div className="pg-kf-detail-col">
+        <span className="pg-kf-detail-label">{label}</span>
+        <div className="pg-kf-detail-entity">
+          <span className={`pg-kf-entity-icon pg-kf-icon--${side}`}>{ENTITY_ICONS[champ] ?? '\u2753'}</span>
+          <span className={`pg-kf-name pg-kf-name--${side}`}>{champ.replace(/^_/, '')}</span>
+        </div>
+      </div>
+    );
+  }
+  if (!player) {
+    return (
+      <div className="pg-kf-detail-col">
+        <span className="pg-kf-detail-label">{label}</span>
+        <span className="pg-kf-detail-unknown">Unknown</span>
+      </div>
+    );
+  }
+  const playerItems = player.items.filter((it) => it.itemID > 0);
+  return (
+    <div className="pg-kf-detail-col">
+      <span className="pg-kf-detail-label">{label}</span>
+      <div className="pg-kf-detail-champ">
+        <img className={`pg-kf-detail-champ-icon pg-kf-icon--${side}`} src={getChampionIconUrl(ver, player.championName, champs)} alt={player.championName} />
+        <div className="pg-kf-detail-champ-info">
+          <span className={`pg-kf-detail-champ-name pg-kf-name--${side}`}>{player.championName}</span>
+          <span className="pg-kf-detail-summoner">{player.summonerName}</span>
+        </div>
+      </div>
+      <div className="pg-kf-detail-stats">
+        <div className="pg-kf-detail-stat"><span className="pg-kf-detail-stat-label">Level</span><span className="pg-kf-detail-stat-value">{player.level}</span></div>
+        <div className="pg-kf-detail-stat">
+          <span className="pg-kf-detail-stat-label">KDA</span>
+          <span className="pg-kf-detail-stat-value">
+            <span className="pg-kda-k">{player.kills}</span><span className="pg-kda-slash">/</span>
+            <span className="pg-kda-d">{player.deaths}</span><span className="pg-kda-slash">/</span>
+            <span className="pg-kda-a">{player.assists}</span>
+          </span>
+        </div>
+        <div className="pg-kf-detail-stat"><span className="pg-kf-detail-stat-label">CS</span><span className="pg-kf-detail-stat-value">{player.creepScore}</span></div>
+      </div>
+      {playerItems.length > 0 && (
+        <div className="pg-kf-detail-items">
+          {playerItems.map((item, idx) => {
+            const info = items[item.itemID];
+            return (
+              <ItemTooltip key={idx} itemId={item.itemID} itemDisplayName={item.displayName} itemPrice={item.price} itemCount={item.count} info={info} version={ver} getItemIconUrl={getItemIconUrl} className="pg-kf-detail-item-slot">
+                <img className="pg-kf-detail-item-img" src={getItemIconUrl(ver, item.itemID)} alt={item.displayName} />
+              </ItemTooltip>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostGameKillFeed({
+  kills, players, killFeedSnapshots, champions: champs, version: ver, itemData: items,
+}: {
+  kills: KillEvent[]; players: LiveGamePlayer[]; champions: ChampionBasic[];
+  killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;
+  version: string; itemData: Record<number, ItemInfo>;
+}) {
+  const nameToTeam = useMemo(() => {
+    const map: Record<string, 'ORDER' | 'CHAOS'> = {};
+    for (const p of players) map[p.summonerName] = p.team;
+    return map;
+  }, [players]);
+
+  const nameToPlayer = useMemo(() => {
+    const map: Record<string, LiveGamePlayer> = {};
+    for (const p of players) map[p.summonerName] = p;
+    return map;
+  }, [players]);
+
+  const champToPlayer = useMemo(() => {
+    const map: Record<string, LiveGamePlayer> = {};
+    for (const p of players) map[p.championName] = p;
+    return map;
+  }, [players]);
+
+  const activePlayerName = useMemo(
+    () => players.find((p) => p.isActivePlayer)?.summonerName ?? null,
+    [players],
+  );
+
+  const killKeys = useMemo(() => buildKillEventKeys(kills), [kills]);
+  const allKillEntries = useMemo(
+    () => kills.map((kill, idx) => ({ kill, key: killKeys[idx] })).reverse(),
+    [kills, killKeys],
+  );
+
+  const [expandedKillKey, setExpandedKillKey] = useState<string | null>(null);
+
+  const handleExpand = useCallback((killKey: string) => {
+    setExpandedKillKey((prev) => (prev === killKey ? null : killKey));
+  }, []);
+
+  return (
+    <div className="pg-killfeed">
+      <div className="pg-killfeed-header">
+        <span className="pg-killfeed-title">Kill Feed</span>
+        <span className="pg-killfeed-count">{kills.length} kills</span>
+      </div>
+      <div className="pg-killfeed-list">
+        {allKillEntries.map(({ kill, key }, i) => {
+          const killerIsEntity = kill.killerChamp.startsWith('_');
+          const victimIsEntity = kill.victimChamp.startsWith('_');
+          const killerTeam = nameToTeam[kill.killerName];
+          const victimTeam = nameToTeam[kill.victimName];
+          const killerSide = killerTeam === 'ORDER' ? 'blue'
+            : killerTeam === 'CHAOS' ? 'red'
+            : kill.killerChamp.includes('blue') ? 'blue'
+            : kill.killerChamp.includes('red') ? 'red' : 'neutral';
+          const victimSide = victimTeam === 'ORDER' ? 'blue'
+            : victimTeam === 'CHAOS' ? 'red'
+            : kill.victimChamp.includes('blue') ? 'blue'
+            : kill.victimChamp.includes('red') ? 'red' : 'neutral';
+
+          const isYourKill = activePlayerName != null && kill.killerName === activePlayerName;
+          const isExpanded = expandedKillKey === key;
+          const snapshot = killFeedSnapshots?.[kill.eventTime];
+
+          const liveAssisterPlayers = kill.assisters
+            .map((champName) => champToPlayer[champName])
+            .filter(Boolean) as LiveGamePlayer[];
+
+          const assisterPlayers = kill.assisters
+            .map((champName) => snapshot?.byChamp[champName] ?? champToPlayer[champName])
+            .filter(Boolean) as LiveGamePlayer[];
+
+          const killerPlayer = snapshot?.byName[kill.killerName] ?? nameToPlayer[kill.killerName];
+          const victimPlayer = snapshot?.byName[kill.victimName] ?? nameToPlayer[kill.victimName];
+
+          return (
+            <div
+              key={`${key}-${i}`}
+              className="pg-kf-wrapper"
+            >
+              <div
+                className={`pg-kf-entry${isYourKill ? ' pg-kf-entry--your-kill' : ''}${isExpanded ? ' pg-kf-entry--expanded' : ''}`}
+                onClick={() => handleExpand(key)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExpand(key); } }}
+              >
+                <span className="pg-kf-time">{formatTime(kill.eventTime)}</span>
+                <PgKillFeedEntity isEntity={killerIsEntity} champ={kill.killerChamp} displayName={kill.killerName} side={killerSide} version={ver} champions={champs} level={killerPlayer?.level} />
+                {liveAssisterPlayers.length > 0 && (
+                  <span className="pg-kf-assist-icons">
+                    <span className="pg-kf-assist-plus">+</span>
+                    {liveAssisterPlayers.map((ap) => {
+                      const apSide = nameToTeam[ap.summonerName] === 'ORDER' ? 'blue' : nameToTeam[ap.summonerName] === 'CHAOS' ? 'red' : 'neutral';
+                      return (
+                        <img key={ap.summonerName} className={`pg-kf-assist-mini-icon pg-kf-icon--${apSide}`} src={getChampionIconUrl(ver, ap.championName, champs)} alt={ap.championName} title={ap.championName} />
+                      );
+                    })}
+                  </span>
+                )}
+                <svg className="pg-kf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M13 5l6 7-6 7" />
+                </svg>
+                <PgKillFeedEntity isEntity={victimIsEntity} champ={kill.victimChamp} displayName={kill.victimName} side={victimSide} version={ver} champions={champs} level={victimPlayer?.level} />
+                <span className="pg-kf-right">
+                  {(kill.multiKill || kill.killStreak) && (
+                    <span className="pg-kf-badges">
+                      {kill.multiKill && (
+                        <TextTooltip text={MULTI_KILL_TOOLTIPS[kill.multiKill]} variant={kill.multiKill} className={`pg-kf-badge pg-kf-badge--multikill pg-kf-badge--${kill.multiKill}`}>
+                          {kill.multiKill === 'double' && 'Double Kill'}
+                          {kill.multiKill === 'triple' && 'Triple Kill'}
+                          {kill.multiKill === 'quadra' && 'Quadra Kill'}
+                          {kill.multiKill === 'penta' && 'Penta Kill'}
+                          {kill.multiKillCount != null && kill.multiKillCount > 1 && <span className="pg-kf-badge-multiplier">\u00d7{kill.multiKillCount}</span>}
+                        </TextTooltip>
+                      )}
+                      {kill.killStreak && (
+                        <TextTooltip text={KILL_STREAK_TOOLTIPS[kill.killStreak]} variant={kill.killStreak} className={`pg-kf-badge pg-kf-badge--streak pg-kf-badge--${kill.killStreak}`}>
+                          {kill.killStreak === 'killing_spree' && 'Killing Spree'}
+                          {kill.killStreak === 'rampage' && 'Rampage'}
+                          {kill.killStreak === 'unstoppable' && 'Unstoppable'}
+                          {kill.killStreak === 'godlike' && 'Godlike'}
+                          {kill.killStreak === 'legendary' && 'Legendary'}
+                          {kill.killStreakCount != null && kill.killStreakCount > 1 && <span className="pg-kf-badge-multiplier">\u00d7{kill.killStreakCount}</span>}
+                        </TextTooltip>
+                      )}
+                    </span>
+                  )}
+                </span>
+                <svg className={`pg-kf-chevron${isExpanded ? ' pg-kf-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+
+              {isExpanded && (
+                <div className="pg-kf-detail">
+                  <div className="pg-kf-detail-columns">
+                    <PgKillDetailColumn label="Killer" player={killerPlayer} champ={kill.killerChamp} isEntity={killerIsEntity} side={killerSide} version={ver} champions={champs} itemData={items} />
+                    {assisterPlayers.length > 0 && (
+                      <div className="pg-kf-detail-col pg-kf-detail-col--assists">
+                        <span className="pg-kf-detail-label">Assists</span>
+                        <div className="pg-kf-detail-assist-list">
+                          {assisterPlayers.map((ap) => {
+                            const apSide = nameToTeam[ap.summonerName] === 'ORDER' ? 'blue' : nameToTeam[ap.summonerName] === 'CHAOS' ? 'red' : 'neutral';
+                            return (
+                              <div key={ap.summonerName} className="pg-kf-detail-assist-player">
+                                <img className={`pg-kf-detail-assist-icon pg-kf-icon--${apSide}`} src={getChampionIconUrl(ver, ap.championName, champs)} alt={ap.championName} />
+                                <div className="pg-kf-detail-assist-info">
+                                  <span className={`pg-kf-detail-assist-name pg-kf-name--${apSide}`}>{ap.championName}</span>
+                                  <span className="pg-kf-detail-assist-kda">{ap.kills}/{ap.deaths}/{ap.assists}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <div className="pg-kf-detail-vs">
+                      <span className="pg-kf-detail-vs-text">VS</span>
+                      <span className="pg-kf-detail-vs-time">{formatTime(kill.eventTime)}</span>
+                    </div>
+                    <PgKillDetailColumn label="Killed" player={victimPlayer} champ={kill.victimChamp} isEntity={victimIsEntity} side={victimSide} version={ver} champions={champs} itemData={items} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

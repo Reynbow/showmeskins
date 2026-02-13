@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
+import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
 import { getChampionDetail, getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS, getLoadingArt, getLoadingArtFallback } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
@@ -98,6 +98,60 @@ function getItemIconUrl(version: string, itemId: number): string {
 /** MVP score: weighted formula favouring kills, assists, low deaths, and CS */
 function mvpScore(p: LiveGamePlayer): number {
   return p.kills * 3 + p.assists * 1.5 - p.deaths * 1.2 + p.creepScore * 0.012;
+}
+
+function getMvpScoreBreakdown(p: LiveGamePlayer): ReactNode {
+  const killScore = p.kills * 3;
+  const assistScore = p.assists * 1.5;
+  const deathPenalty = p.deaths * 1.2;
+  const csScore = p.creepScore * 0.012;
+  const total = killScore + assistScore - deathPenalty + csScore;
+  return (
+    <div className="mvp-breakdown">
+      <div className="mvp-breakdown-header">
+        <span className="mvp-breakdown-title">MVP Score</span>
+        <span className="mvp-breakdown-total">{total.toFixed(1)}</span>
+      </div>
+      <div className="mvp-breakdown-rows">
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Kills</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.kills}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">3</span>
+          </span>
+          <span className="mvp-breakdown-value">+{killScore.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Assists</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.assists}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">1.5</span>
+          </span>
+          <span className="mvp-breakdown-value">+{assistScore.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">Deaths</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.deaths}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">1.2</span>
+          </span>
+          <span className="mvp-breakdown-value mvp-breakdown-value--penalty">-{deathPenalty.toFixed(1)}</span>
+        </div>
+        <div className="mvp-breakdown-row">
+          <span className="mvp-breakdown-key">CS</span>
+          <span className="mvp-breakdown-calc">
+            <span className="mvp-breakdown-calc-value">{p.creepScore}</span>
+            <span className="mvp-breakdown-calc-op"> x </span>
+            <span className="mvp-breakdown-calc-mult">0.012</span>
+          </span>
+          <span className="mvp-breakdown-value">+{csScore.toFixed(1)}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Readable game mode names (Riot uses fruit codenames for rotating modes) */
@@ -804,33 +858,55 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   // Refs for chevron positioning
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
+  const mvpRowRef = useRef<HTMLDivElement | null>(null);
   const [chevronTop, setChevronTop] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!activePlayerRow || !scoreboardRef.current) {
-      setChevronTop(null);
-      return;
-    }
-    const updateChevron = () => {
-      if (!activeRowRef.current || !scoreboardRef.current) return;
-      const scoreboard = scoreboardRef.current;
-      const row = activeRowRef.current;
-      const sbRect = scoreboard.getBoundingClientRect();
-      const rowRect = row.getBoundingClientRect();
-      const top = rowRect.top - sbRect.top + rowRect.height / 2 - 10; // 10px = half chevron height
-      setChevronTop(top);
-    };
-    updateChevron();
-    const ro = new ResizeObserver(updateChevron);
-    ro.observe(scoreboardRef.current);
-    return () => ro.disconnect();
-  }, [activePlayerRow]);
+  const [mvpTop, setMvpTop] = useState<number | null>(null);
 
   // MVP: highest mvpScore across all players
   const gameMvp = useMemo(() => {
     if (data.players.length === 0) return undefined;
+    const totalKills = data.players.reduce((sum, p) => sum + p.kills, 0);
+    if (totalKills === 0) return undefined;
     return data.players.reduce((best, p) => (mvpScore(p) > mvpScore(best) ? p : best), data.players[0]);
   }, [data.players]);
+
+  // MVP row index and side (for floating MVP badge)
+  const mvpRow = useMemo(() => {
+    if (!gameMvp) return null;
+    const blueIdx = blueTeam.findIndex((p) => p.summonerName === gameMvp.summonerName);
+    if (blueIdx >= 0) return { index: blueIdx, side: 'blue' as const };
+    const redIdx = redTeam.findIndex((p) => p.summonerName === gameMvp.summonerName);
+    if (redIdx >= 0) return { index: redIdx, side: 'red' as const };
+    return null;
+  }, [gameMvp, blueTeam, redTeam]);
+
+  useEffect(() => {
+    if ((!activePlayerRow && !mvpRow) || !scoreboardRef.current) {
+      setChevronTop(null);
+      setMvpTop(null);
+      return;
+    }
+    const update = () => {
+      if (!scoreboardRef.current) return;
+      const sbRect = scoreboardRef.current.getBoundingClientRect();
+      if (activePlayerRow && activeRowRef.current) {
+        const rowRect = activeRowRef.current.getBoundingClientRect();
+        setChevronTop(rowRect.top - sbRect.top + rowRect.height / 2 - 10);
+      } else {
+        setChevronTop(null);
+      }
+      if (mvpRow && mvpRowRef.current) {
+        const rowRect = mvpRowRef.current.getBoundingClientRect();
+        setMvpTop(rowRect.top - sbRect.top + rowRect.height / 2 - 10);
+      } else {
+        setMvpTop(null);
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(scoreboardRef.current);
+    return () => ro.disconnect();
+  }, [activePlayerRow, mvpRow]);
 
   // Estimate team gold from item prices (API doesn't expose per-player gold)
   const teamItemGold = (players: typeof blueTeam) =>
@@ -951,10 +1027,25 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           {/* Floating chevron pointing to active player */}
           {activePlayerRow && chevronTop != null && (
             <div
-              className={`lg-sb-you-chevron lg-sb-you-chevron--${activePlayerRow.side}`}
+              className={`lg-sb-you-chevron lg-sb-you-chevron--${activePlayerRow.side}${activePlayerRow.index === mvpRow?.index && activePlayerRow.side === mvpRow?.side ? ' lg-sb-you-chevron--with-mvp' : ''}`}
               style={{ top: chevronTop }}
               aria-hidden
             />
+          )}
+          {/* Floating MVP badge */}
+          {mvpRow && mvpTop != null && gameMvp && (
+            <TextTooltip
+              content={getMvpScoreBreakdown(gameMvp)}
+              variant="mvp"
+            >
+              <div
+                className={`lg-sb-mvp-float lg-sb-mvp-float--${mvpRow.side}`}
+                style={{ top: mvpTop }}
+                aria-hidden
+              >
+                MVP
+              </div>
+            </TextTooltip>
           )}
           <div className="lg-scoreboard">
           {/* Central score header */}
@@ -974,11 +1065,15 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           {Array.from({ length: Math.max(blueTeam.length, redTeam.length) }).map((_, i) => {
             const rolePos = blueTeam[i]?.position || redTeam[i]?.position || '';
             const isActiveRow = activePlayerRow?.index === i;
+            const isMvpRow = mvpRow?.index === i;
             return (
             <div
               key={i}
               className="lg-sb-match-row"
-              ref={isActiveRow ? (el) => { activeRowRef.current = el; } : undefined}
+              ref={(el) => {
+                if (isActiveRow) activeRowRef.current = el;
+                if (isMvpRow) mvpRowRef.current = el;
+              }}
             >
               {blueTeam[i] ? (
                 <LgPlayerSide player={blueTeam[i]} side="blue" isMvp={gameMvp?.summonerName === blueTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
@@ -1079,6 +1174,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
           <KillFeed
             kills={enrichKillFeed(data.killFeed)}
             players={data.players}
+            killFeedSnapshots={data.killFeedSnapshots}
             champions={champions}
             version={version}
             itemData={itemData}
@@ -1120,6 +1216,7 @@ function KillFeedEntity({
   side,
   version,
   champions,
+  level,
 }: {
   isEntity: boolean;
   champ: string;
@@ -1127,6 +1224,7 @@ function KillFeedEntity({
   side: string;
   version: string;
   champions: ChampionBasic[];
+  level?: number;
 }) {
   if (isEntity) {
     return (
@@ -1142,11 +1240,14 @@ function KillFeedEntity({
   }
   return (
     <>
-      <img
-        className={`lg-kill-icon lg-kill-icon--${side}`}
-        src={getChampionIconUrl(version, champ, champions)}
-        alt={champ}
-      />
+      <span className={`lg-kill-portrait lg-kill-icon--${side}`}>
+        <img
+          className="lg-kill-portrait-img"
+          src={getChampionIconUrl(version, champ, champions)}
+          alt={champ}
+        />
+        {level != null && <span className="lg-kill-portrait-level">{level}</span>}
+      </span>
       <span className={`lg-kill-name lg-kill-name--${side}`}>
         {champ}
       </span>
@@ -1159,12 +1260,14 @@ function KillFeedEntity({
 function KillFeed({
   kills,
   players,
+  killFeedSnapshots,
   champions,
   version,
   itemData,
 }: {
   kills: KillEvent[];
   players: LiveGamePlayer[];
+  killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;
   champions: ChampionBasic[];
   version: string;
   itemData: Record<number, ItemInfo>;
@@ -1203,29 +1306,6 @@ function KillFeed({
 
   // All kills, most recent first
   const allKills = useMemo(() => [...kills].reverse(), [kills]);
-
-  // ── Snapshot player data at time of each kill ─────────────────────────
-  // Maps eventTime → { byName: Record<summonerName, player>, byChamp: Record<champName, player> }
-  type PlayerSnapshot = {
-    byName: Record<string, LiveGamePlayer>;
-    byChamp: Record<string, LiveGamePlayer>;
-  };
-  const snapshotsRef = useRef<Record<number, PlayerSnapshot>>({});
-
-  // On each render, snapshot player state for any new kills we haven't seen yet
-  for (const kill of kills) {
-    if (!(kill.eventTime in snapshotsRef.current)) {
-      const byName: Record<string, LiveGamePlayer> = {};
-      const byChamp: Record<string, LiveGamePlayer> = {};
-      for (const p of players) {
-        // Deep-clone the player so the snapshot is frozen
-        const frozen = { ...p, items: p.items.map((it) => ({ ...it })) };
-        byName[p.summonerName] = frozen;
-        byChamp[p.championName] = frozen;
-      }
-      snapshotsRef.current[kill.eventTime] = { byName, byChamp };
-    }
-  }
 
   // Track which kill is expanded using eventTime (stable across re-renders when new kills arrive)
   const [expandedTime, setExpandedTime] = useState<number | null>(null);
@@ -1286,11 +1366,11 @@ function KillFeed({
             .filter(Boolean) as LiveGamePlayer[];
 
           // Snapshot data (frozen at time of kill) for the expanded detail panel
-          const snapshot = snapshotsRef.current[kill.eventTime];
-          const killerPlayer = snapshot?.byName[kill.killerName];
-          const victimPlayer = snapshot?.byName[kill.victimName];
+          const snapshot = killFeedSnapshots?.[kill.eventTime];
+          const killerPlayer = snapshot?.byName[kill.killerName] ?? nameToPlayer[kill.killerName];
+          const victimPlayer = snapshot?.byName[kill.victimName] ?? nameToPlayer[kill.victimName];
           const assisterPlayers = kill.assisters
-            .map((champName) => snapshot?.byChamp[champName])
+            .map((champName) => snapshot?.byChamp[champName] ?? champToPlayer[champName])
             .filter(Boolean) as LiveGamePlayer[];
 
           return (
@@ -1314,6 +1394,7 @@ function KillFeed({
                   side={killerSide}
                   version={version}
                   champions={champions}
+                  level={killerPlayer?.level}
                 />
                 {/* Assister icons inline next to the killer */}
                 {liveAssisterPlayers.length > 0 && (
@@ -1344,6 +1425,7 @@ function KillFeed({
                   side={victimSide}
                   version={version}
                   champions={champions}
+                  level={victimPlayer?.level}
                 />
                 <span className="lg-kill-right">
                   {(kill.multiKill || kill.killStreak) && (
@@ -1643,12 +1725,6 @@ function LgPlayerSide({
     </div>
   );
 
-  const mvpSlot = (
-    <div className="lg-sb-mvp-slot">
-      {isMvp && <span className="lg-mvp-badge">MVP</span>}
-    </div>
-  );
-
   const kda = (
     <div className="lg-sb-kda">
       <span className="lg-kda-k">{player.kills}</span>
@@ -1662,7 +1738,7 @@ function LgPlayerSide({
   const cs = <div className="lg-sb-cs">{player.creepScore}</div>;
 
   const portrait = (
-    <div className={`lg-sb-portrait lg-sb-portrait--${side}`}>
+    <div className={`lg-sb-portrait lg-sb-portrait--${side}${isMvp ? ' lg-sb-portrait--mvp' : ''}`}>
       <img
         className="lg-sb-portrait-img"
         src={getChampionIconUrl(version, player.championName, champions)}
@@ -1677,13 +1753,12 @@ function LgPlayerSide({
     <span className="lg-sb-respawn">{Math.ceil(player.respawnTimer)}s</span>
   ) : null;
 
-  // Blue: items → MVP → name → KDA → CS → portrait
-  // Red:  portrait → CS → KDA → name → MVP → items
+  // Blue: items → name → KDA → CS → portrait
+  // Red:  portrait → CS → KDA → name → items
   if (side === 'blue') {
     return (
       <div className={sideClass}>
         {items}
-        {mvpSlot}
         {info}
         {kda}
         {cs}
@@ -1699,7 +1774,6 @@ function LgPlayerSide({
       {cs}
       {kda}
       {info}
-      {mvpSlot}
       {items}
       {respawn}
     </div>

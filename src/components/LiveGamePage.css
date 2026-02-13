@@ -226,6 +226,15 @@
   filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
 }
 
+/* When active player IS the MVP, push the chevron outside the MVP badge */
+.lg-sb-you-chevron--with-mvp.lg-sb-you-chevron--blue {
+  left: -66px;
+}
+
+.lg-sb-you-chevron--with-mvp.lg-sb-you-chevron--red {
+  right: -66px;
+}
+
 .lg-scoreboard {
   width: 100%;
   max-width: 1200px;
@@ -334,28 +343,14 @@
   background: rgba(200, 170, 110, 0.03);
 }
 
-/* Blue side: items | MVP | name | kda | cs | portrait */
+/* Blue side: items | name | kda | cs | portrait */
 .lg-sb-side--blue {
-  grid-template-columns: 210px auto 1fr 80px 40px 42px;
+  grid-template-columns: 210px 1fr 80px 40px 42px;
 }
 
-/* Red side: portrait | cs | kda | name | MVP | items */
+/* Red side: portrait | cs | kda | name | items */
 .lg-sb-side--red {
-  grid-template-columns: 42px 40px 80px 1fr auto 210px;
-}
-
-.lg-sb-mvp-slot {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.lg-sb-side--blue .lg-sb-mvp-slot {
-  justify-content: flex-end;
-}
-
-.lg-sb-side--red .lg-sb-mvp-slot {
-  justify-content: flex-start;
+  grid-template-columns: 42px 40px 80px 1fr 210px;
 }
 
 /* Active player highlight */
@@ -424,6 +419,10 @@
 
 .lg-sb-portrait--blue { border-color: rgba(0, 130, 220, 0.4); }
 .lg-sb-portrait--red  { border-color: rgba(220, 50, 50, 0.4); }
+.lg-sb-portrait--mvp  {
+  border-color: var(--lol-gold) !important;
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.7), 0 0 16px rgba(200, 170, 110, 0.35);
+}
 .lg-sb-side--active .lg-sb-portrait { border-color: var(--lol-gold-dark); }
 
 .lg-sb-portrait-img {
@@ -461,18 +460,37 @@
   gap: 8px;
 }
 
-.lg-mvp-badge {
+/* ── Floating MVP badge (outside scoreboard, like the YOU chevron) ──── */
+
+.lg-sb-mvp-float {
+  position: absolute;
+  z-index: 20;
+  pointer-events: auto;
+  cursor: default;
+  user-select: none;
   font-family: var(--font-heading);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: linear-gradient(135deg, rgba(200, 170, 110, 0.2), rgba(200, 170, 110, 0.08));
-  border: 1px solid rgba(200, 170, 110, 0.4);
+  background: linear-gradient(135deg, rgba(200, 170, 110, 0.25), rgba(200, 170, 110, 0.1));
+  border: 1px solid rgba(200, 170, 110, 0.5);
   color: var(--lol-gold-light);
   text-shadow: 0 0 8px rgba(200, 170, 110, 0.4);
-  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.35));
+  white-space: nowrap;
+  transform: translateY(-50%);
+  /* Vertically center on the row — top is set to row center via JS */
+  margin-top: 10px; /* offset to match chevron's -10px centering */
+}
+
+.lg-sb-mvp-float--blue {
+  right: calc(100% + 8px);
+}
+
+.lg-sb-mvp-float--red {
+  left: calc(100% + 8px);
 }
 
 .lg-sb-side--blue .lg-sb-player-info {
@@ -978,12 +996,42 @@
   text-align: right;
 }
 
-.lg-kill-icon {
+/* Champion portrait in kill feed row (wrapper with level badge) */
+.lg-kill-portrait {
   width: 32px;
   height: 32px;
   border-radius: 50%;
   flex-shrink: 0;
   border: 2px solid var(--lol-border);
+  position: relative;
+  display: inline-block;
+}
+
+.lg-kill-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+}
+
+.lg-kill-portrait-level {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(10, 14, 22, 0.92);
+  border: 1px solid rgba(60, 70, 80, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--lol-text-primary);
+  line-height: 1;
 }
 
 .lg-kill-icon--blue {
@@ -1453,10 +1501,10 @@
 
 @media (max-width: 1100px) {
   .lg-sb-side--blue {
-    grid-template-columns: 160px auto 1fr 70px 36px 38px;
+    grid-template-columns: 160px 1fr 70px 36px 38px;
   }
   .lg-sb-side--red {
-    grid-template-columns: 38px 36px 70px 1fr auto 160px;
+    grid-template-columns: 38px 36px 70px 1fr 160px;
   }
   .lg-sb-item-slot {
     width: 22px;
@@ -1478,10 +1526,10 @@
   .lg-sb-items { display: none; }
 
   .lg-sb-side--blue {
-    grid-template-columns: 0 auto 1fr 70px 36px 38px;
+    grid-template-columns: 1fr 70px 36px 38px;
   }
   .lg-sb-side--red {
-    grid-template-columns: 38px 36px 70px 1fr auto 0;
+    grid-template-columns: 38px 36px 70px 1fr;
   }
 
   .lg-sb-side {
@@ -1513,10 +1561,10 @@
   .lg-sb-cs { display: none; }
 
   .lg-sb-side--blue {
-    grid-template-columns: 0 auto 1fr 60px 32px;
+    grid-template-columns: 1fr 60px 32px;
   }
   .lg-sb-side--red {
-    grid-template-columns: 32px 60px 1fr auto 0;
+    grid-template-columns: 32px 60px 1fr;
   }
 
   .lg-sb-side {
@@ -1545,6 +1593,19 @@
 
   .lg-sb-header-score {
     font-size: 18px;
+  }
+
+  .lg-sb-mvp-float {
+    display: none;
+  }
+
+  /* Reset chevron to normal position when MVP badge is hidden */
+  .lg-sb-you-chevron--with-mvp.lg-sb-you-chevron--blue {
+    left: -28px;
+  }
+
+  .lg-sb-you-chevron--with-mvp.lg-sb-you-chevron--red {
+    right: -28px;
   }
 
   .lg-stats-groups {

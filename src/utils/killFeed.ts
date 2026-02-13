@@ -20,6 +20,9 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
   // Track how many times each (player, tag) has occurred this game
   const multiKillCountByPlayer: Record<string, number> = {};
   const killStreakCountByPlayer: Record<string, number> = {};
+  // Track whether a player has already been shown a streak (green) tag in their current life.
+  // Only the first streak tag per life is shown; subsequent ones are suppressed until the player dies.
+  const hasShownStreakThisLife: Record<string, boolean> = {};
 
   const enriched: KillEvent[] = [];
 
@@ -69,7 +72,10 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
         6: 'godlike',
         7: 'legendary',
       };
-      if (streak >= 3) {
+      // Only show the first streak (green) tag per life — suppress successive ones
+      // until the player dies and earns a new streak.
+      if (streak >= 3 && !hasShownStreakThisLife[kill.killerName]) {
+        hasShownStreakThisLife[kill.killerName] = true;
         kill.killStreak = streakMap[Math.min(streak, 7)] ?? 'legendary';
         const key = `${kill.killerName}:${kill.killStreak}`;
         killStreakCountByPlayer[key] = (killStreakCountByPlayer[key] ?? 0) + 1;
@@ -80,6 +86,9 @@ export function enrichKillFeed(kills: KillEvent[]): KillEvent[] {
     if (isPlayerVictim) {
       deathsByPlayer[kill.victimName] ??= 0;
       deathsByPlayer[kill.victimName]++;
+      // Reset streak tag tracking — the player died, so they can earn a new
+      // streak tag in their next life.
+      hasShownStreakThisLife[kill.victimName] = false;
     }
 
     enriched.push(kill);

@@ -8,7 +8,7 @@ import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
-import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, ItemInfo } from './types';
+import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, LiveGamePlayer, ItemInfo, KillEventPlayerSnapshot } from './types';
 import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
 
@@ -37,6 +37,19 @@ function findSkinBySlug(skins: Skin[], slug: string): Skin | undefined {
   const num = Number(slug);
   if (!isNaN(num)) return skins.find((s) => s.num === num);
   return undefined;
+}
+
+function snapshotPlayers(players: LiveGamePlayer[]): KillEventPlayerSnapshot {
+  const byName: Record<string, LiveGamePlayer> = {};
+  const byChamp: Record<string, LiveGamePlayer> = {};
+
+  for (const player of players) {
+    const frozen = { ...player, items: player.items.map((item) => ({ ...item })) };
+    byName[player.summonerName] = frozen;
+    byChamp[player.championName] = frozen;
+  }
+
+  return { byName, byChamp };
 }
 
 function App() {
@@ -453,13 +466,33 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
-              setLiveGameData({
-                gameTime: data.gameTime ?? 0,
-                gameMode: data.gameMode ?? 'CLASSIC',
-                gameResult: data.gameResult || undefined,
-                activePlayer: data.activePlayer ?? {},
-                players: data.players ?? [],
-                killFeed: data.killFeed ?? [],
+              setLiveGameData((prev) => {
+                const players = data.players ?? [];
+                const killFeed = data.killFeed ?? [];
+                const gameTime = data.gameTime ?? 0;
+
+                const isNewTimeline =
+                  !prev ||
+                  gameTime < prev.gameTime ||
+                  killFeed.length < (prev.killFeed?.length ?? 0);
+                const snapshots: Record<number, KillEventPlayerSnapshot> =
+                  isNewTimeline ? {} : { ...(prev.killFeedSnapshots ?? {}) };
+
+                for (const kill of killFeed) {
+                  if (!(kill.eventTime in snapshots)) {
+                    snapshots[kill.eventTime] = snapshotPlayers(players);
+                  }
+                }
+
+                return {
+                  gameTime,
+                  gameMode: data.gameMode ?? 'CLASSIC',
+                  gameResult: data.gameResult || undefined,
+                  activePlayer: data.activePlayer ?? {},
+                  players,
+                  killFeed,
+                  killFeedSnapshots: snapshots,
+                };
               });
 
               // Auto-navigate to the live game page on first detection
