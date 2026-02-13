@@ -540,6 +540,7 @@ function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: stri
    ================================================================ */
 
 export function PostGamePage({ data, champions, version, itemData, onBack, backLabel = 'Continue' }: Props) {
+  const pageRef = useRef<HTMLDivElement | null>(null);
   const [enterAnim, setEnterAnim] = useState(false);
   useEffect(() => {
     requestAnimationFrame(() => setEnterAnim(true));
@@ -687,8 +688,23 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
   const blueGold = teamItemGold(blueTeam);
   const redGold = teamItemGold(redTeam);
 
+  // App/root overflow is hidden, so wheel events outside the postgame container
+  // can be dropped. Forward those wheel deltas into the postgame scroller.
+  useEffect(() => {
+    const onWindowWheel = (event: WheelEvent) => {
+      const page = pageRef.current;
+      const target = event.target as Node | null;
+      if (!page || !target) return;
+      if (page.contains(target)) return;
+      page.scrollBy({ top: event.deltaY });
+    };
+
+    window.addEventListener('wheel', onWindowWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWindowWheel);
+  }, []);
+
   return (
-    <div className={`pg-page ${enterAnim ? 'pg-page--enter' : ''}`}>
+    <div ref={pageRef} className={`pg-page ${enterAnim ? 'pg-page--enter' : ''}`}>
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
 
@@ -1401,6 +1417,7 @@ function PostGameKillFeed({
 
           const isYourKill = activePlayerName != null && kill.killerName === activePlayerName;
           const isExpanded = expandedKillKey === key;
+          const isPentaAnnouncement = kill.multiKill === 'penta';
           const snapshot = killFeedSnapshots?.[kill.eventTime];
 
           const liveAssisterPlayers = kill.assisters
@@ -1420,7 +1437,7 @@ function PostGameKillFeed({
               className="pg-kf-wrapper"
             >
               <div
-                className={`pg-kf-entry${isYourKill ? ' pg-kf-entry--your-kill' : ''}${isExpanded ? ' pg-kf-entry--expanded' : ''}`}
+                className={`pg-kf-entry${isYourKill ? ' pg-kf-entry--your-kill' : ''}${isExpanded ? ' pg-kf-entry--expanded' : ''}${isPentaAnnouncement ? ' pg-kf-entry--penta' : ''}`}
                 onClick={() => handleExpand(key)}
                 role="button"
                 tabIndex={0}

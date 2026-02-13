@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100vw;
   min-height: 100vh;
   background: var(--lol-bg-primary);
   position: fixed;
@@ -1242,6 +1243,54 @@
   background: rgba(200, 170, 110, 0.12);
 }
 
+/* Over-the-top treatment for penta kill announcements */
+.pg-kf-entry--penta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.2), transparent 45%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.2), transparent 45%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.42), rgba(251, 191, 36, 0.28), rgba(120, 53, 15, 0.42));
+  border-top: 1px solid rgba(251, 191, 36, 0.5);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(254, 240, 138, 0.28),
+    inset 0 0 30px rgba(251, 191, 36, 0.2),
+    0 0 20px rgba(251, 191, 36, 0.35);
+}
+
+.pg-kf-entry--penta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(254, 240, 138, 0.35) 45%, transparent 75%);
+  transform: translateX(-120%);
+  animation: pg-penta-sheen 1.9s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pg-kf-entry--penta > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pg-kf-entry--penta:hover {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.3), transparent 50%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.3), transparent 50%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.55), rgba(251, 191, 36, 0.35), rgba(120, 53, 15, 0.55));
+}
+
+.pg-kf-entry--penta .pg-kf-time,
+.pg-kf-entry--penta .pg-kf-arrow,
+.pg-kf-entry--penta .pg-kf-chevron {
+  color: #fde68a;
+  opacity: 0.95;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
 .pg-kf-entry--expanded {
   background: rgba(200, 170, 110, 0.06);
   border-bottom-color: transparent;
@@ -1249,6 +1298,24 @@
 
 .pg-kf-entry--expanded.pg-kf-entry--your-kill {
   background: rgba(200, 170, 110, 0.13);
+}
+
+.pg-kf-entry--expanded.pg-kf-entry--penta {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.24), transparent 45%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.24), transparent 45%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.48), rgba(251, 191, 36, 0.32), rgba(120, 53, 15, 0.48));
+}
+
+.pg-kf-entry--expanded.pg-kf-entry--your-kill.pg-kf-entry--penta {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.3), transparent 50%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.3), transparent 50%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.58), rgba(251, 191, 36, 0.38), rgba(120, 53, 15, 0.58));
+}
+
+@keyframes pg-penta-sheen {
+  100% { transform: translateX(130%); }
 }
 
 /* ── Time ────────────────────────────────────────────────────────────── */

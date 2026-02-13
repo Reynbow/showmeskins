@@ -383,11 +383,9 @@
   background: rgba(80, 20, 20, 0.15);
 }
 
-.lg-sb-side--dead .lg-sb-portrait,
 .lg-sb-side--dead .lg-sb-player-info,
 .lg-sb-side--dead .lg-sb-kda,
-.lg-sb-side--dead .lg-sb-cs,
-.lg-sb-side--dead .lg-sb-respawn {
+.lg-sb-side--dead .lg-sb-cs {
   opacity: 0.35;
 }
 
@@ -404,7 +402,8 @@
 }
 
 .lg-sb-side--dead .lg-sb-portrait-img {
-  filter: grayscale(0.7);
+  filter: grayscale(1);
+  opacity: 0.4;
 }
 
 /* Portrait */
@@ -609,16 +608,18 @@
 /* Respawn timer */
 .lg-sb-respawn {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: none;
   font-size: 11px;
-  color: #f87171;
-  font-weight: 600;
+  color: #ff3b3b;
+  font-weight: 700;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 0 8px rgba(255, 59, 59, 0.9);
   font-variant-numeric: tabular-nums;
 }
-
-.lg-sb-side--blue .lg-sb-respawn { right: 14px; }
-.lg-sb-side--red  .lg-sb-respawn { left: 14px; }
 
 /* ── Pregame hero formation (loading art row) ──────────────────────── */
 
@@ -969,7 +970,9 @@
   padding-left: 28px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .lg-kill-entry {
@@ -1007,6 +1010,54 @@
 
 .lg-kill-entry--your-kill:hover {
   background: rgba(200, 170, 110, 0.12);
+}
+
+/* Over-the-top treatment for penta kill announcements */
+.lg-kill-entry--penta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.2), transparent 45%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.2), transparent 45%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.42), rgba(251, 191, 36, 0.28), rgba(120, 53, 15, 0.42));
+  border-top: 1px solid rgba(251, 191, 36, 0.5);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(254, 240, 138, 0.28),
+    inset 0 0 30px rgba(251, 191, 36, 0.2),
+    0 0 20px rgba(251, 191, 36, 0.35);
+}
+
+.lg-kill-entry--penta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(254, 240, 138, 0.35) 45%, transparent 75%);
+  transform: translateX(-120%);
+  animation: lg-penta-sheen 1.9s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lg-kill-entry--penta > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lg-kill-entry--penta:hover {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.3), transparent 50%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.3), transparent 50%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.55), rgba(251, 191, 36, 0.35), rgba(120, 53, 15, 0.55));
+}
+
+.lg-kill-entry--penta .lg-kill-time,
+.lg-kill-entry--penta .lg-kill-arrow,
+.lg-kill-entry--penta .lg-kill-chevron {
+  color: #fde68a;
+  opacity: 0.95;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
 }
 
 .lg-kill-time {
@@ -1277,6 +1328,24 @@
 
 .lg-kill-entry--expanded.lg-kill-entry--your-kill {
   background: rgba(200, 170, 110, 0.13);
+}
+
+.lg-kill-entry--expanded.lg-kill-entry--penta {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.24), transparent 45%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.24), transparent 45%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.48), rgba(251, 191, 36, 0.32), rgba(120, 53, 15, 0.48));
+}
+
+.lg-kill-entry--expanded.lg-kill-entry--your-kill.lg-kill-entry--penta {
+  background:
+    radial-gradient(circle at 10% 50%, rgba(250, 204, 21, 0.3), transparent 50%),
+    radial-gradient(circle at 90% 50%, rgba(251, 191, 36, 0.3), transparent 50%),
+    linear-gradient(90deg, rgba(120, 53, 15, 0.58), rgba(251, 191, 36, 0.38), rgba(120, 53, 15, 0.58));
+}
+
+@keyframes lg-penta-sheen {
+  100% { transform: translateX(130%); }
 }
 
 .lg-kill-chevron {

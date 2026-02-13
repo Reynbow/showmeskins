@@ -91,8 +91,8 @@ function App() {
   // Refs for the companion-app WebSocket hook (avoids stale closures)
   const championsRef = useRef<ChampionBasic[]>([]);
   championsRef.current = champions;
-  const lastCompanionKey = useRef('');
   const pendingChampSelectRef = useRef<{ championId: string; skinNum: number } | null>(null);
+  const champSelectSeenSinceLastLiveGame = useRef(false);
 
   // On first load: fetch champions, then check URL for deep-link
   useEffect(() => {
@@ -398,7 +398,6 @@ function App() {
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
-              lastCompanionKey.current = '';
               pendingChampSelectRef.current = null;
               return;
             }
@@ -408,10 +407,7 @@ function App() {
               const championId = data.championId;
               const skinNum = data.skinNum ?? 0;
 
-              // De-duplicate on the website side too
-              const key = `${championId}:${skinNum}`;
-              if (key === lastCompanionKey.current) return;
-              lastCompanionKey.current = key;
+              champSelectSeenSinceLastLiveGame.current = true;
 
               // Debounce: wait 300ms of no change before navigating
               clearTimeout(debounceTimer);
@@ -466,6 +462,12 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
+              // Reset champ-select dedup once a game is in progress.
+              // If champ-select end is ever missed, the next lobby should still
+              // be able to re-emit the same champion/skin combination.
+              champSelectSeenSinceLastLiveGame.current = false;
+              pendingChampSelectRef.current = null;
+
               setLiveGameData((prev) => {
                 const players = data.players ?? [];
                 const killFeed = data.killFeed ?? [];
@@ -506,6 +508,13 @@ function App() {
 
             // ── Game ended ── transition to post-game summary
             if (data.type === 'liveGameEnd') {
+              // Ensure next champ-select session can emit the same champion/skin.
+              if (champSelectSeenSinceLastLiveGame.current) {
+                liveGameAutoNavDone.current = false;
+                return;
+              }
+              pendingChampSelectRef.current = null;
+
               const endResult: string | undefined = data.gameResult || undefined;
               // Capture the final snapshot before clearing live data
               setLiveGameData((lastSnapshot) => {

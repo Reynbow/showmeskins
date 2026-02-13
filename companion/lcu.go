@@ -350,6 +350,10 @@ func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 	}
 
 	if event.EventType == "Create" {
+		// Start of a fresh champ-select session: always clear dedupe.
+		// Some client flows may skip a prior "Delete", and without this reset
+		// selecting the same champion/skin in the next game can be ignored.
+		l.lastUpdate = ""
 		go l.refreshPartyMembers()
 	}
 

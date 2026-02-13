@@ -1399,6 +1399,7 @@ function KillFeed({
 
           const isYourKill = activePlayerName != null && kill.killerName === activePlayerName;
           const isExpanded = expandedTime === kill.eventTime;
+          const isPentaAnnouncement = kill.multiKill === 'penta';
 
           // Live player data (for inline assister icons in the row)
           const liveAssisterPlayers = kill.assisters
@@ -1420,7 +1421,7 @@ function KillFeed({
               ref={(el) => { wrapperRefs.current[kill.eventTime] = el; }}
             >
               <div
-                className={`lg-kill-entry${isYourKill ? ' lg-kill-entry--your-kill' : ''}${isExpanded ? ' lg-kill-entry--expanded' : ''}`}
+                className={`lg-kill-entry${isYourKill ? ' lg-kill-entry--your-kill' : ''}${isExpanded ? ' lg-kill-entry--expanded' : ''}${isPentaAnnouncement ? ' lg-kill-entry--penta' : ''}`}
                 onClick={() => handleExpand(kill.eventTime)}
                 role="button"
                 tabIndex={0}
@@ -1824,13 +1825,12 @@ function LgPlayerSide({
         alt={player.championName}
         loading="lazy"
       />
+      {player.isDead && player.respawnTimer > 0 && (
+        <span className="lg-sb-respawn">{Math.ceil(player.respawnTimer)}s</span>
+      )}
       <span className="lg-sb-portrait-level">{player.level}</span>
     </div>
   );
-
-  const respawn = player.isDead && player.respawnTimer > 0 ? (
-    <span className="lg-sb-respawn">{Math.ceil(player.respawnTimer)}s</span>
-  ) : null;
 
   // Blue: items → name → KDA → CS → portrait
   // Red:  portrait → CS → KDA → name → items
@@ -1842,7 +1842,6 @@ function LgPlayerSide({
         {kda}
         {cs}
         {portrait}
-        {respawn}
       </div>
     );
   }
@@ -1854,7 +1853,6 @@ function LgPlayerSide({
       {kda}
       {info}
       {items}
-      {respawn}
     </div>
   );
 }
