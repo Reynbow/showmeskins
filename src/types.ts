@@ -152,6 +152,14 @@ export interface KillEvent {
   multiKill?: MultiKillType;
   /** Computed: killing_spree→legendary when killer has 3+ kills without dying */
   killStreak?: KillStreakType;
+  /** Computed: first player-vs-player champion kill of the match */
+  firstBlood?: boolean;
+  /** Computed: victim had a kill streak (3+) that was ended by this kill */
+  shutdown?: boolean;
+  /** Computed: this kill resulted in all 5 enemies of the victim team being dead */
+  ace?: boolean;
+  /** Computed: victim died to non-player source with no assisters */
+  execute?: boolean;
   /** Computed: Nth time this champion achieved this multiKill this game (for multiplier display) */
   multiKillCount?: number;
   /** Computed: Nth time this champion achieved this killStreak this game (for multiplier display) */

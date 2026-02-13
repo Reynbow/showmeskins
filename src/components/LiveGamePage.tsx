@@ -55,6 +55,13 @@ const KILL_STREAK_TOOLTIPS: Record<string, string> = {
   legendary: '7+ kills without dying',
 };
 
+const SPECIAL_KILL_TOOLTIPS: Record<string, string> = {
+  first_blood: 'First champion-vs-champion kill of the match',
+  shutdown: 'Ended a 3+ kill streak',
+  ace: 'All 5 enemy champions are dead',
+  execute: 'Killed by a non-player source with no assisters',
+};
+
 function RoleIcon({ position }: { position: PlayerPosition }) {
   const src = ROLE_ICON_URL[position];
   const label = ROLE_LABELS[position] ?? '';
@@ -350,7 +357,7 @@ function findBestIdleAnimName(names: string[]): string | undefined {
 }
 
 /** The 3D champion model with auto-sizing, optional chroma texture. preferIdle=true uses idle pose (hero formation). */
-function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url: string; chromaTextureUrl?: string | null; preferIdle?: boolean }) {
+function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false, modelRotationY = 0 }: { url: string; chromaTextureUrl?: string | null; preferIdle?: boolean; modelRotationY?: number }) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
@@ -521,7 +528,7 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
     // Reset transforms
     scene.scale.set(1, 1, 1);
     scene.position.set(0, 0, 0);
-    scene.rotation.set(0, 0, 0);
+    scene.rotation.set(0, modelRotationY, 0);
     scene.traverse((child) => {
       if (child.scale.x < 0) child.scale.x = Math.abs(child.scale.x);
       if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
@@ -603,7 +610,7 @@ function LiveChampionModel({ url, chromaTextureUrl, preferIdle = false }: { url:
     // Reveal
     scene.visible = true;
     setReady(true);
-  }, [scene, actions, names, animName, url, isFrightNight]);
+  }, [scene, actions, names, animName, url, isFrightNight, modelRotationY]);
 
 
   return (
@@ -717,7 +724,7 @@ export function PregameHeroFormation({
 }
 
 /** Reusable 3D canvas that renders a champion model with lighting + shadows */
-function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string }) {
+function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl, modelRotationY = 0 }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string; modelRotationY?: number }) {
   const [useFallback, setUseFallback] = useState(false);
   const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
 
@@ -767,7 +774,7 @@ function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: stri
           <shadowMaterial opacity={0.3} />
         </mesh>
         <Suspense fallback={<ModelLoadingIndicator />}>
-          <LiveChampionModel key={activeUrl} url={activeUrl} chromaTextureUrl={chromaTextureUrl} />
+          <LiveChampionModel key={activeUrl} url={activeUrl} chromaTextureUrl={chromaTextureUrl} modelRotationY={modelRotationY} />
         </Suspense>
         <OrbitControls
           enableRotate
@@ -980,6 +987,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 url={activeModelInfo.modelUrl}
                 fallbackUrl={activeModelInfo.fallbackUrl}
                 chromaTextureUrl={activeModelInfo.chromaTextureUrl}
+                modelRotationY={Math.PI / 4}
               />
             </div>
           )}
@@ -989,6 +997,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 url={enemyModelInfo.modelUrl}
                 fallbackUrl={enemyModelInfo.fallbackUrl}
                 chromaTextureUrl={enemyModelInfo.chromaTextureUrl}
+                modelRotationY={-Math.PI / 4}
               />
             </div>
           )}
@@ -1001,6 +1010,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 url={enemyModelInfo.modelUrl}
                 fallbackUrl={enemyModelInfo.fallbackUrl}
                 chromaTextureUrl={enemyModelInfo.chromaTextureUrl}
+                modelRotationY={Math.PI / 4}
               />
             </div>
           )}
@@ -1010,6 +1020,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 url={activeModelInfo.modelUrl}
                 fallbackUrl={activeModelInfo.fallbackUrl}
                 chromaTextureUrl={activeModelInfo.chromaTextureUrl}
+                modelRotationY={-Math.PI / 4}
               />
             </div>
           )}
@@ -1201,7 +1212,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
         {/* Kill Feed */}
         {data.killFeed && data.killFeed.length > 0 && (
           <KillFeed
-            kills={enrichKillFeed(data.killFeed)}
+            kills={enrichKillFeed(data.killFeed, data.players, data.killFeedSnapshots)}
             players={data.players}
             killFeedSnapshots={data.killFeedSnapshots}
             champions={champions}
@@ -1426,24 +1437,23 @@ function KillFeed({
                   level={killerPlayer?.level}
                 />
                 {/* Assister icons inline next to the killer */}
-                {liveAssisterPlayers.length > 0 && (
-                  <span className="lg-kill-assist-icons">
-                    <span className="lg-kill-assist-plus">+</span>
-                    {liveAssisterPlayers.map((ap) => {
-                      const apTeam = nameToTeam[ap.summonerName];
-                      const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
-                      return (
-                        <img
-                          key={ap.summonerName}
-                          className={`lg-kill-assist-mini-icon lg-kill-icon--${apSide}`}
-                          src={getChampionIconUrl(version, ap.championName, champions)}
-                          alt={ap.championName}
-                          title={ap.championName}
-                        />
-                      );
-                    })}
-                  </span>
-                )}
+                <span className={`lg-kill-assist-icons${liveAssisterPlayers.length === 0 ? ' lg-kill-assist-icons--empty' : ''}`}>
+                  {liveAssisterPlayers.length > 0 && <span className="lg-kill-assist-plus">+</span>}
+                  {liveAssisterPlayers.map((ap) => {
+                    const apTeam = nameToTeam[ap.summonerName];
+                    const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
+                    return (
+                      <img
+                        key={ap.summonerName}
+                        className={`lg-kill-assist-mini-icon lg-kill-icon--${apSide}`}
+                        src={getChampionIconUrl(version, ap.championName, champions)}
+                        alt={ap.championName}
+                        title={ap.championName}
+                      />
+                    );
+                  })}
+                </span>
+                <span className="lg-kill-tab-spacer" aria-hidden />
                 <svg className="lg-kill-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 12h14M13 5l6 7-6 7" />
                 </svg>
@@ -1457,8 +1467,44 @@ function KillFeed({
                   level={victimPlayer?.level}
                 />
                 <span className="lg-kill-right">
-                  {(kill.multiKill || kill.killStreak) && (
+                  {(kill.multiKill || kill.killStreak || kill.firstBlood || kill.shutdown || kill.ace || kill.execute) && (
                     <span className="lg-kill-badges">
+                      {kill.firstBlood && (
+                        <TextTooltip
+                          text={SPECIAL_KILL_TOOLTIPS.first_blood}
+                          variant="first_blood"
+                          className="lg-kill-badge lg-kill-badge--special lg-kill-badge--first_blood"
+                        >
+                          First Blood
+                        </TextTooltip>
+                      )}
+                      {kill.shutdown && (
+                        <TextTooltip
+                          text={SPECIAL_KILL_TOOLTIPS.shutdown}
+                          variant="shutdown"
+                          className="lg-kill-badge lg-kill-badge--special lg-kill-badge--shutdown"
+                        >
+                          Shutdown
+                        </TextTooltip>
+                      )}
+                      {kill.ace && (
+                        <TextTooltip
+                          text={SPECIAL_KILL_TOOLTIPS.ace}
+                          variant="ace"
+                          className="lg-kill-badge lg-kill-badge--special lg-kill-badge--ace"
+                        >
+                          Ace
+                        </TextTooltip>
+                      )}
+                      {kill.execute && (
+                        <TextTooltip
+                          text={SPECIAL_KILL_TOOLTIPS.execute}
+                          variant="execute"
+                          className="lg-kill-badge lg-kill-badge--special lg-kill-badge--execute"
+                        >
+                          Executed
+                        </TextTooltip>
+                      )}
                       {kill.multiKill && (
                         <TextTooltip
                           text={MULTI_KILL_TOOLTIPS[kill.multiKill]}
@@ -1470,7 +1516,7 @@ function KillFeed({
                           {kill.multiKill === 'quadra' && 'Quadra Kill'}
                           {kill.multiKill === 'penta' && 'Penta Kill'}
                           {kill.multiKillCount != null && kill.multiKillCount > 1 && (
-                            <span className="lg-kill-badge-multiplier">×{kill.multiKillCount}</span>
+                            <span className="lg-kill-badge-multiplier">x{kill.multiKillCount}</span>
                           )}
                         </TextTooltip>
                       )}
@@ -1486,7 +1532,7 @@ function KillFeed({
                           {kill.killStreak === 'godlike' && 'Godlike'}
                           {kill.killStreak === 'legendary' && 'Legendary'}
                           {kill.killStreakCount != null && kill.killStreakCount > 1 && (
-                            <span className="lg-kill-badge-multiplier">×{kill.killStreakCount}</span>
+                            <span className="lg-kill-badge-multiplier">x{kill.killStreakCount}</span>
                           )}
                         </TextTooltip>
                       )}

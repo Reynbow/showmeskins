@@ -967,6 +967,9 @@
   scrollbar-color: rgba(200, 170, 110, 0.2) transparent;
   margin-left: -28px;
   padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .lg-kill-entry {
@@ -1175,6 +1178,35 @@
   box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
 }
 
+.lg-kill-badge--special {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #e2e8f0;
+}
+
+.lg-kill-badge--first_blood {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.35), rgba(245, 158, 11, 0.22));
+  border-color: rgba(251, 191, 36, 0.65);
+  color: #fde68a;
+}
+
+.lg-kill-badge--shutdown {
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.35), rgba(194, 65, 12, 0.2));
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.lg-kill-badge--ace {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(56, 189, 248, 0.2));
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #bfdbfe;
+}
+
+.lg-kill-badge--execute {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.35), rgba(51, 65, 85, 0.25));
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #cbd5e1;
+}
+
 .lg-kill-badge-multiplier {
   margin-left: 4px;
   font-size: 9px;
@@ -1194,8 +1226,15 @@
 .lg-kill-assist-icons {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 3px;
   flex-shrink: 0;
+  width: 112px;
+  overflow: hidden;
+}
+
+.lg-kill-assist-icons--empty {
+  opacity: 0;
 }
 
 .lg-kill-assist-plus {
@@ -1217,6 +1256,11 @@
 
 .lg-kill-entry:hover .lg-kill-assist-mini-icon {
   opacity: 1;
+}
+
+.lg-kill-tab-spacer {
+  width: 28px;
+  flex-shrink: 0;
 }
 
 /* ── Kill entry expand affordance ────────────────────────────────────── */

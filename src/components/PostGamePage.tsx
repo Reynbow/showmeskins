@@ -946,7 +946,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
       {data.killFeed && data.killFeed.length > 0 && (
         <div className="pg-killfeed-section">
           <PostGameKillFeed
-            kills={enrichKillFeed(data.killFeed)}
+            kills={enrichKillFeed(data.killFeed, data.players, data.killFeedSnapshots)}
             players={data.players}
             killFeedSnapshots={data.killFeedSnapshots}
             champions={champions}
@@ -1240,6 +1240,13 @@ const KILL_STREAK_TOOLTIPS: Record<string, string> = {
   legendary: '7+ kills without dying',
 };
 
+const SPECIAL_KILL_TOOLTIPS: Record<string, string> = {
+  first_blood: 'First champion-vs-champion kill of the match',
+  shutdown: 'Ended a 3+ kill streak',
+  ace: 'All 5 enemy champions are dead',
+  execute: 'Killed by a non-player source with no assisters',
+};
+
 function PgKillFeedEntity({
   isEntity, champ, displayName, side, version: ver, champions: champs, level,
 }: {
@@ -1421,31 +1428,50 @@ function PostGameKillFeed({
               >
                 <span className="pg-kf-time">{formatTime(kill.eventTime)}</span>
                 <PgKillFeedEntity isEntity={killerIsEntity} champ={kill.killerChamp} displayName={kill.killerName} side={killerSide} version={ver} champions={champs} level={killerPlayer?.level} />
-                {liveAssisterPlayers.length > 0 && (
-                  <span className="pg-kf-assist-icons">
-                    <span className="pg-kf-assist-plus">+</span>
-                    {liveAssisterPlayers.map((ap) => {
-                      const apSide = nameToTeam[ap.summonerName] === 'ORDER' ? 'blue' : nameToTeam[ap.summonerName] === 'CHAOS' ? 'red' : 'neutral';
-                      return (
-                        <img key={ap.summonerName} className={`pg-kf-assist-mini-icon pg-kf-icon--${apSide}`} src={getChampionIconUrl(ver, ap.championName, champs)} alt={ap.championName} title={ap.championName} />
-                      );
-                    })}
-                  </span>
-                )}
+                <span className={`pg-kf-assist-icons${liveAssisterPlayers.length === 0 ? ' pg-kf-assist-icons--empty' : ''}`}>
+                  {liveAssisterPlayers.length > 0 && <span className="pg-kf-assist-plus">+</span>}
+                  {liveAssisterPlayers.map((ap) => {
+                    const apSide = nameToTeam[ap.summonerName] === 'ORDER' ? 'blue' : nameToTeam[ap.summonerName] === 'CHAOS' ? 'red' : 'neutral';
+                    return (
+                      <img key={ap.summonerName} className={`pg-kf-assist-mini-icon pg-kf-icon--${apSide}`} src={getChampionIconUrl(ver, ap.championName, champs)} alt={ap.championName} title={ap.championName} />
+                    );
+                  })}
+                </span>
+                <span className="pg-kf-tab-spacer" aria-hidden />
                 <svg className="pg-kf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 12h14M13 5l6 7-6 7" />
                 </svg>
                 <PgKillFeedEntity isEntity={victimIsEntity} champ={kill.victimChamp} displayName={kill.victimName} side={victimSide} version={ver} champions={champs} level={victimPlayer?.level} />
                 <span className="pg-kf-right">
-                  {(kill.multiKill || kill.killStreak) && (
+                  {(kill.multiKill || kill.killStreak || kill.firstBlood || kill.shutdown || kill.ace || kill.execute) && (
                     <span className="pg-kf-badges">
+                      {kill.firstBlood && (
+                        <TextTooltip text={SPECIAL_KILL_TOOLTIPS.first_blood} variant="first_blood" className="pg-kf-badge pg-kf-badge--special pg-kf-badge--first_blood">
+                          First Blood
+                        </TextTooltip>
+                      )}
+                      {kill.shutdown && (
+                        <TextTooltip text={SPECIAL_KILL_TOOLTIPS.shutdown} variant="shutdown" className="pg-kf-badge pg-kf-badge--special pg-kf-badge--shutdown">
+                          Shutdown
+                        </TextTooltip>
+                      )}
+                      {kill.ace && (
+                        <TextTooltip text={SPECIAL_KILL_TOOLTIPS.ace} variant="ace" className="pg-kf-badge pg-kf-badge--special pg-kf-badge--ace">
+                          Ace
+                        </TextTooltip>
+                      )}
+                      {kill.execute && (
+                        <TextTooltip text={SPECIAL_KILL_TOOLTIPS.execute} variant="execute" className="pg-kf-badge pg-kf-badge--special pg-kf-badge--execute">
+                          Executed
+                        </TextTooltip>
+                      )}
                       {kill.multiKill && (
                         <TextTooltip text={MULTI_KILL_TOOLTIPS[kill.multiKill]} variant={kill.multiKill} className={`pg-kf-badge pg-kf-badge--multikill pg-kf-badge--${kill.multiKill}`}>
                           {kill.multiKill === 'double' && 'Double Kill'}
                           {kill.multiKill === 'triple' && 'Triple Kill'}
                           {kill.multiKill === 'quadra' && 'Quadra Kill'}
                           {kill.multiKill === 'penta' && 'Penta Kill'}
-                          {kill.multiKillCount != null && kill.multiKillCount > 1 && <span className="pg-kf-badge-multiplier">\u00d7{kill.multiKillCount}</span>}
+                          {kill.multiKillCount != null && kill.multiKillCount > 1 && <span className="pg-kf-badge-multiplier">x{kill.multiKillCount}</span>}
                         </TextTooltip>
                       )}
                       {kill.killStreak && (
@@ -1455,7 +1481,7 @@ function PostGameKillFeed({
                           {kill.killStreak === 'unstoppable' && 'Unstoppable'}
                           {kill.killStreak === 'godlike' && 'Godlike'}
                           {kill.killStreak === 'legendary' && 'Legendary'}
-                          {kill.killStreakCount != null && kill.killStreakCount > 1 && <span className="pg-kf-badge-multiplier">\u00d7{kill.killStreakCount}</span>}
+                          {kill.killStreakCount != null && kill.killStreakCount > 1 && <span className="pg-kf-badge-multiplier">x{kill.killStreakCount}</span>}
                         </TextTooltip>
                       )}
                     </span>

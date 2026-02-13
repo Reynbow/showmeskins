@@ -389,7 +389,7 @@
   display: block;
   width: 100% !important;
   height: 100% !important;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .pg-model-bg--left {
@@ -1341,6 +1341,21 @@
   opacity: 0.4;
 }
 
+.pg-kf-tab-spacer {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.pg-kf-assist-icons {
+  width: 112px;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+.pg-kf-assist-icons--empty {
+  opacity: 0;
+}
+
 /* ── Right side (badges) ─────────────────────────────────────────────── */
 
 .pg-kf-right {
@@ -1410,6 +1425,35 @@
   color: #a7f3d0;
   border-color: rgba(34, 197, 94, 0.7);
   box-shadow: 0 0 14px rgba(34, 197, 94, 0.6);
+}
+
+.pg-kf-badge--special {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #e2e8f0;
+}
+
+.pg-kf-badge--first_blood {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.35), rgba(245, 158, 11, 0.22));
+  border-color: rgba(251, 191, 36, 0.65);
+  color: #fde68a;
+}
+
+.pg-kf-badge--shutdown {
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.35), rgba(194, 65, 12, 0.2));
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+.pg-kf-badge--ace {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(56, 189, 248, 0.2));
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #bfdbfe;
+}
+
+.pg-kf-badge--execute {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.35), rgba(51, 65, 85, 0.25));
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #cbd5e1;
 }
 
 .pg-kf-badge-multiplier {
