@@ -352,6 +352,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
   }, [url]);
 
   const isFrightNight = skinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(skinId);
+  const isKayle = champAlias?.toLowerCase() === 'kayle';
 
   /* ── Idle animation name (stable for the model's lifetime) ──── */
   const idleName = useMemo(() => findIdleName(names, champAlias), [names, champAlias]);
@@ -461,13 +462,16 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     scene.position.set(0, 0, 0);
     scene.rotation.set(0, 0, 0);
 
-    /* 2b. Fix negative scales on nodes (some models use negative X scale for mirroring).
-           Negative scale can cause degenerate bounding boxes and tiny rendering. */
-    scene.traverse((child) => {
-      if (child.scale.x < 0) child.scale.x = Math.abs(child.scale.x);
-      if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
-      if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
-    });
+    /* 2b. Fix negative scales on nodes (some models use negative scale for mirroring).
+           Negative scale can cause degenerate bounding boxes and tiny rendering.
+           Kayle needs authored mirror transforms intact for correct sword hand. */
+    if (!isKayle) {
+      scene.traverse((child) => {
+        if (child.scale.x < 0) child.scale.x = Math.abs(child.scale.x);
+        if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
+        if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
+      });
+    }
 
     /* 3. Start the idle animation and tick one frame so the skeleton
           is in its animated pose before we measure the bounding box */
@@ -633,7 +637,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       pendingRevealRef.current = false;
       Object.values(actions).forEach((a) => a?.stop());
     };
-  }, [scene, actions, names, idleName, isFrightNight, positionOffset]);
+  }, [scene, actions, names, idleName, isFrightNight, isKayle, positionOffset]);
 
   /* ── Level-form mesh visibility (Kayle ascension, etc.) ────────
        Toggles submesh visibility based on the active form definition.
@@ -687,6 +691,106 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       }
     });
   }, [scene, levelForm]);
+
+  /* Kayle level-16 dual-wield runtime sword clone.
+     The GLB ships one sword setup; the game spawns the second sword at runtime. */
+  const kayleSwordClonesRef = useRef<THREE.Object3D[]>([]);
+  useEffect(() => {
+    // Remove prior runtime clones on every form/model update.
+    for (const clone of kayleSwordClonesRef.current) {
+      clone.removeFromParent();
+    }
+    kayleSwordClonesRef.current = [];
+
+    if (!isKayle || !levelForm || !/\b16\b/.test(levelForm.label)) return;
+
+    const swordMeshes: THREE.Mesh[] = [];
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.visible) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const isSword = mesh.name.toLowerCase().includes('sword')
+        || mats.some((m) => m.name.toLowerCase().includes('sword'));
+      if (isSword) swordMeshes.push(mesh);
+    });
+    if (swordMeshes.length === 0) return;
+
+    const findParentBone = (node: THREE.Object3D): THREE.Bone | null => {
+      let p: THREE.Object3D | null = node.parent;
+      while (p) {
+        if ((p as THREE.Bone).isBone) return p as THREE.Bone;
+        p = p.parent;
+      }
+      return null;
+    };
+
+    const sideOf = (name: string): 'left' | 'right' | null => {
+      const n = name.toLowerCase();
+      if (/(^|[^a-z0-9])(?:l|left)(?:[^a-z0-9]|$)/.test(n)) return 'left';
+      if (/(^|[^a-z0-9])(?:r|right)(?:[^a-z0-9]|$)/.test(n)) return 'right';
+      return null;
+    };
+
+    const sourceBone = swordMeshes
+      .map((mesh) => findParentBone(mesh))
+      .find((bone): bone is THREE.Bone => bone !== null);
+
+    const bones: THREE.Bone[] = [];
+    scene.traverse((child) => {
+      if ((child as THREE.Bone).isBone) bones.push(child as THREE.Bone);
+    });
+
+    const handLikeBones = bones.filter((bone) => /(hand|weapon|wrist)/i.test(bone.name));
+    let sourceSide = sourceBone ? sideOf(sourceBone.name) : null;
+    if (!sourceSide && handLikeBones.length > 0 && swordMeshes[0]) {
+      const swordPos = new THREE.Vector3();
+      swordMeshes[0].getWorldPosition(swordPos);
+      let bestBone: THREE.Bone | null = null;
+      let bestDistSq = Infinity;
+      for (const bone of handLikeBones) {
+        const side = sideOf(bone.name);
+        if (!side) continue;
+        const bonePos = new THREE.Vector3();
+        bone.getWorldPosition(bonePos);
+        const d2 = bonePos.distanceToSquared(swordPos);
+        if (d2 < bestDistSq) {
+          bestDistSq = d2;
+          bestBone = bone;
+        }
+      }
+      if (bestBone) sourceSide = sideOf(bestBone.name);
+    }
+    const targetSide = sourceSide === 'left' ? 'right' : sourceSide === 'right' ? 'left' : null;
+    if (!targetSide) return;
+
+    const targetHand = handLikeBones.find((bone) => {
+      const n = bone.name.toLowerCase();
+      return sideOf(n) === targetSide && /(hand|weapon|wrist)/.test(n);
+    }) ?? bones.find((bone) => sideOf(bone.name) === targetSide);
+    if (!targetHand) return;
+
+    for (const sword of swordMeshes) {
+      const swordParentBone = findParentBone(sword);
+      if (!swordParentBone || swordParentBone === targetHand) continue;
+
+      const clone = sword.clone(true);
+      clone.name = `${sword.name || 'sword'}_runtime_clone`;
+      clone.matrixAutoUpdate = true;
+      (clone as THREE.Mesh).frustumCulled = false;
+      clone.position.copy(sword.position);
+      clone.quaternion.copy(sword.quaternion);
+      clone.scale.copy(sword.scale);
+      targetHand.add(clone);
+      kayleSwordClonesRef.current.push(clone);
+    }
+
+    return () => {
+      for (const clone of kayleSwordClonesRef.current) {
+        clone.removeFromParent();
+      }
+      kayleSwordClonesRef.current = [];
+    };
+  }, [scene, levelForm, isKayle]);
 
   /* ── Reveal-after-settle: keep the model invisible while the animation
        mixer ticks naturally for several real-time frames.  This guarantees
