@@ -30,17 +30,30 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "tag=companion-v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            VERSION="${{ github.event.inputs.version }}"
           else
-            TAG="${GITHUB_REF#refs/tags/companion-v}"
-            echo "version=$TAG" >> "$GITHUB_OUTPUT"
-            echo "tag=companion-v$TAG" >> "$GITHUB_OUTPUT"
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#companion-v}"
           fi
+          VERSION=$(echo "$VERSION" | tr -d '[:space:]')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=companion-v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
 
       - name: Build Go binary
         working-directory: companion
         run: go build -ldflags="-s -w -H windowsgui -X main.Version=${{ steps.version.outputs.version }}" -o "dist\Companion-Build.exe" .
+
+      - name: Verify embedded version
+        working-directory: companion/dist
+        run: |
+          $expected = "${{ steps.version.outputs.version }}"
+          $content = [System.IO.File]::ReadAllBytes("Companion-Build.exe")
+          $text = [System.Text.Encoding]::ASCII.GetString($content)
+          if ($text -notmatch [regex]::Escape($expected)) {
+            Write-Error "Built exe does not contain version $expected - check ldflags"
+          }
+          Write-Host "Verified version $expected in binary"
 
       - name: Copy portable exe
         working-directory: companion/dist

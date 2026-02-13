@@ -4,7 +4,7 @@ REM Builds the Go binary and (optionally) the NSIS installer.
 REM Version is used for the installer; bump when releasing.
 
 setlocal
-set VERSION=0.3.3
+set VERSION=0.3.4
 
 echo [1/2] Building Go binary...
 REM Build to temp name first (in case exe is locked by running instance)
