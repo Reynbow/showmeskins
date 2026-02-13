@@ -21,23 +21,24 @@ const (
 
 // LiveGameUpdate is broadcast to the website with full scoreboard data.
 type LiveGameUpdate struct {
-	Type       string           `json:"type"`
-	GameTime   float64          `json:"gameTime"`
-	GameMode   string           `json:"gameMode"`
-	GameResult string           `json:"gameResult,omitempty"` // "Win" or "Lose" (from active player perspective)
-	Active     ActivePlayerInfo `json:"activePlayer"`
-	Players    []PlayerInfo     `json:"players"`
-	KillFeed   []KillEvent      `json:"killFeed,omitempty"`
+	Type         string           `json:"type"`
+	GameTime     float64          `json:"gameTime"`
+	GameMode     string           `json:"gameMode"`
+	GameResult   string           `json:"gameResult,omitempty"` // "Win" or "Lose" (from active player perspective)
+	Active       ActivePlayerInfo `json:"activePlayer"`
+	Players      []PlayerInfo     `json:"players"`
+	PartyMembers []string         `json:"partyMembers,omitempty"`
+	KillFeed     []KillEvent      `json:"killFeed,omitempty"`
 }
 
 // KillEvent represents a champion kill for the kill feed.
 type KillEvent struct {
-	EventTime    float64  `json:"eventTime"`
-	KillerName   string   `json:"killerName"`   // champion display name
-	VictimName   string   `json:"victimName"`   // champion display name
-	Assisters    []string `json:"assisters"`     // champion display names
-	KillerChamp  string   `json:"killerChamp"`  // champion id name (for icon)
-	VictimChamp  string   `json:"victimChamp"`  // champion id name (for icon)
+	EventTime   float64  `json:"eventTime"`
+	KillerName  string   `json:"killerName"`  // champion display name
+	VictimName  string   `json:"victimName"`  // champion display name
+	Assisters   []string `json:"assisters"`   // champion display names
+	KillerChamp string   `json:"killerChamp"` // champion id name (for icon)
+	VictimChamp string   `json:"victimChamp"` // champion id name (for icon)
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -52,7 +53,7 @@ type ActivePlayerInfo struct {
 type PlayerInfo struct {
 	SummonerName   string         `json:"summonerName"`
 	ChampionName   string         `json:"championName"`
-	Team           string         `json:"team"` // "ORDER" (blue) or "CHAOS" (red)
+	Team           string         `json:"team"`     // "ORDER" (blue) or "CHAOS" (red)
 	Position       string         `json:"position"` // "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", or ""
 	Level          int            `json:"level"`
 	Kills          int            `json:"kills"`
@@ -275,7 +276,7 @@ type gameEvent struct {
 	Result     string   `json:"Result,omitempty"`     // "Win" or "Lose" on GameEnd events
 	KillerName string   `json:"KillerName,omitempty"` // ChampionKill
 	VictimName string   `json:"VictimName,omitempty"` // ChampionKill
-	Assisters  []string `json:"Assisters,omitempty"`   // ChampionKill
+	Assisters  []string `json:"Assisters,omitempty"`  // ChampionKill
 }
 
 type activePlayerData struct {

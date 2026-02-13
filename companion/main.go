@@ -24,22 +24,22 @@ const (
 var Version = "0.0.0"
 
 var (
-	lcu            *LCUConnector
-	liveGame       *LiveGameTracker
-	bridgeSrv      *BridgeServer
-	statusItem     *systray.MenuItem
-	updateItem     *systray.MenuItem
+	lcu             *LCUConnector
+	liveGame        *LiveGameTracker
+	bridgeSrv       *BridgeServer
+	statusItem      *systray.MenuItem
+	updateItem      *systray.MenuItem
 	updateReadyItem *systray.MenuItem
 )
 
 // ── Single instance lock ────────────────────────────────────────────────
 
 var (
-	kernel32       = syscall.NewLazyDLL("kernel32.dll")
-	createMutexW   = kernel32.NewProc("CreateMutexW")
-	getLastError   = kernel32.NewProc("GetLastError")
-	allocConsole   = kernel32.NewProc("AllocConsole")
-	freeConsole    = kernel32.NewProc("FreeConsole")
+	kernel32     = syscall.NewLazyDLL("kernel32.dll")
+	createMutexW = kernel32.NewProc("CreateMutexW")
+	getLastError = kernel32.NewProc("GetLastError")
+	allocConsole = kernel32.NewProc("AllocConsole")
+	freeConsole  = kernel32.NewProc("FreeConsole")
 )
 
 const errorAlreadyExists = 183
@@ -190,12 +190,12 @@ func onReady() {
 		},
 		func(info AccountInfo) {
 			bridgeSrv.Broadcast(map[string]interface{}{
-				"type":         "accountInfo",
-				"puuid":        info.PUUID,
-				"displayName":  info.DisplayName,
-				"summonerId":   info.SummonerID,
-				"accountId":    info.AccountID,
-				"platformId":   info.PlatformID,
+				"type":        "accountInfo",
+				"puuid":       info.PUUID,
+				"displayName": info.DisplayName,
+				"summonerId":  info.SummonerID,
+				"accountId":   info.AccountID,
+				"platformId":  info.PlatformID,
 			})
 		},
 	)
@@ -205,6 +205,9 @@ func onReady() {
 	liveGame = NewLiveGameTracker(
 		liveGameSetStatus,
 		func(update LiveGameUpdate) {
+			if lcu != nil {
+				update.PartyMembers = lcu.PartyMembers()
+			}
 			bridgeSrv.Broadcast(update)
 		},
 		func(result string) {

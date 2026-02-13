@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -62,26 +63,30 @@ type LCUConnector struct {
 
 	championMap map[string]ChampInfo // numeric key → ChampInfo
 	lastUpdate  string               // dedup key
+	authHeader  string
 
-	onStatus       StatusCallback
-	onChampSelect  ChampSelectCallback
-	onAccountInfo  AccountInfoCallback
+	onStatus      StatusCallback
+	onChampSelect ChampSelectCallback
+	onAccountInfo AccountInfoCallback
 
 	ws        *websocket.Conn
 	stopCh    chan struct{}
 	stopped   bool
 	stoppedMu sync.Mutex
+
+	partyMu      sync.RWMutex
+	partyMembers []string
 }
 
 // NewLCUConnector creates a new connector with the given callbacks.
 // onAccountInfo may be nil (account fetch skipped).
 func NewLCUConnector(onStatus StatusCallback, onChampSelect ChampSelectCallback, onAccountInfo AccountInfoCallback) *LCUConnector {
 	return &LCUConnector{
-		championMap:    make(map[string]ChampInfo),
-		onStatus:       onStatus,
-		onChampSelect:  onChampSelect,
-		onAccountInfo:  onAccountInfo,
-		stopCh:         make(chan struct{}),
+		championMap:   make(map[string]ChampInfo),
+		onStatus:      onStatus,
+		onChampSelect: onChampSelect,
+		onAccountInfo: onAccountInfo,
+		stopCh:        make(chan struct{}),
 	}
 }
 
@@ -243,6 +248,7 @@ func (l *LCUConnector) connectToLCU() {
 	}
 
 	l.ws = conn
+	l.authHeader = "Basic " + auth
 	log.Println("[lcu] Connected to League Client WebSocket")
 	l.onStatus("Connected – Waiting for Champion Select…")
 
@@ -250,6 +256,7 @@ func (l *LCUConnector) connectToLCU() {
 	if l.onAccountInfo != nil {
 		go l.fetchAndEmitAccountInfo(auth)
 	}
+	go l.refreshPartyMembers()
 
 	// Subscribe to champion-select session events (WAMP opcode 5 = subscribe)
 	subscribe := `[5, "OnJsonApiEvent_lol-champ-select_v1_session"]`
@@ -264,6 +271,7 @@ func (l *LCUConnector) connectToLCU() {
 			log.Printf("[lcu] WebSocket closed: %v", err)
 			l.ws = nil
 			l.lastUpdate = ""
+			l.setPartyMembers(nil)
 			if !l.isStopped() {
 				l.onStatus("Disconnected – Reconnecting…")
 				time.Sleep(3 * time.Second)
@@ -301,9 +309,9 @@ type champSelectSession struct {
 }
 
 type teamMember struct {
-	CellId            int `json:"cellId"`
-	ChampionId        int `json:"championId"`
-	SelectedSkinId    int `json:"selectedSkinId"`
+	CellId             int `json:"cellId"`
+	ChampionId         int `json:"championId"`
+	SelectedSkinId     int `json:"selectedSkinId"`
 	ChampionPickIntent int `json:"championPickIntent"`
 }
 
@@ -341,7 +349,14 @@ func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 		return
 	}
 
+	if event.EventType == "Create" {
+		go l.refreshPartyMembers()
+	}
+
 	if event.EventType == "Update" || event.EventType == "Create" {
+		if len(l.PartyMembers()) == 0 {
+			go l.refreshPartyMembers()
+		}
 		l.onStatus("In Champion Select")
 		l.processSession(event.Data)
 	}
@@ -524,6 +539,84 @@ func (l *LCUConnector) fetchAndEmitAccountInfo(auth string) {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+func (l *LCUConnector) setPartyMembers(names []string) {
+	l.partyMu.Lock()
+	defer l.partyMu.Unlock()
+	l.partyMembers = append([]string(nil), names...)
+}
+
+func (l *LCUConnector) PartyMembers() []string {
+	l.partyMu.RLock()
+	defer l.partyMu.RUnlock()
+	return append([]string(nil), l.partyMembers...)
+}
+
+func (l *LCUConnector) refreshPartyMembers() {
+	if l.isStopped() || l.port == "" || l.authHeader == "" {
+		return
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Timeout: 5 * time.Second,
+	}
+	url := fmt.Sprintf("https://127.0.0.1:%s/lol-lobby/v2/lobby/members", l.port)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Authorization", l.authHeader)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// Not in a lobby yet (or endpoint unavailable).
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	var members []struct {
+		SummonerName string `json:"summonerName"`
+		GameName     string `json:"gameName"`
+	}
+	if err := json.Unmarshal(body, &members); err != nil {
+		return
+	}
+
+	seen := make(map[string]struct{}, len(members)*2)
+	names := make([]string, 0, len(members)*2)
+	for _, member := range members {
+		candidates := []string{
+			strings.TrimSpace(member.GameName),
+			strings.TrimSpace(member.SummonerName),
+		}
+		for _, name := range candidates {
+			if name == "" {
+				continue
+			}
+			key := strings.ToLower(name)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			names = append(names, name)
+		}
+	}
+
+	l.setPartyMembers(names)
+	log.Printf("[lcu] Party members detected: %d", len(names))
+}
 
 func httpGet(url string) ([]byte, error) {
 	resp, err := http.Get(url)

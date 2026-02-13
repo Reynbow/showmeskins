@@ -169,6 +169,7 @@ export interface LiveGameData {
   gameResult?: string; // "Win" or "Lose" (from active player perspective)
   activePlayer: LiveGameActivePlayer;
   players: LiveGamePlayer[];
+  partyMembers?: string[];
   killFeed?: KillEvent[];
   /** Frozen player state at the moment each kill happened, keyed by eventTime */
   killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;

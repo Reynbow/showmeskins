@@ -75,6 +75,10 @@ function formatGold(gold: number): string {
   return Math.floor(gold).toString();
 }
 
+function normalizePlayerName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 /** Get Data Dragon champion icon URL from display name */
 function getChampionIconUrl(
   version: string,
@@ -806,6 +810,31 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     return match;
   }, [data.players, activePlayer]);
 
+  const partyNameSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const rawName of data.partyMembers ?? []) {
+      const normalized = normalizePlayerName(rawName);
+      if (!normalized) continue;
+      set.add(normalized);
+      const hashIdx = normalized.indexOf('#');
+      if (hashIdx > 0) {
+        set.add(normalized.slice(0, hashIdx));
+      }
+    }
+    return set;
+  }, [data.partyMembers]);
+
+  const isPartyMember = useCallback((player: LiveGamePlayer): boolean => {
+    if (!activePlayer || player.isActivePlayer || player.team !== activePlayer.team) {
+      return false;
+    }
+    const normalized = normalizePlayerName(player.summonerName);
+    if (partyNameSet.has(normalized)) return true;
+    const hashIdx = normalized.indexOf('#');
+    if (hashIdx > 0 && partyNameSet.has(normalized.slice(0, hashIdx))) return true;
+    return false;
+  }, [activePlayer, partyNameSet]);
+
   // Resolve model URL + chroma texture for each player (uses resolveLcuSkinNum for chroma detection)
   const activeModelInfo = usePlayerModelInfo(activePlayer, champions);
   const enemyModelInfo = usePlayerModelInfo(laneOpponent, champions);
@@ -1076,7 +1105,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
               }}
             >
               {blueTeam[i] ? (
-                <LgPlayerSide player={blueTeam[i]} side="blue" isMvp={gameMvp?.summonerName === blueTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
+                <LgPlayerSide player={blueTeam[i]} side="blue" isMvp={gameMvp?.summonerName === blueTeam[i].summonerName} isPartyMember={isPartyMember(blueTeam[i])} champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--blue" />
               )}
@@ -1084,7 +1113,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                 {rolePos && <RoleIcon position={rolePos as PlayerPosition} />}
               </div>
               {redTeam[i] ? (
-                <LgPlayerSide player={redTeam[i]} side="red" isMvp={gameMvp?.summonerName === redTeam[i].summonerName} champions={champions} version={version} itemData={itemData} />
+                <LgPlayerSide player={redTeam[i]} side="red" isMvp={gameMvp?.summonerName === redTeam[i].summonerName} isPartyMember={isPartyMember(redTeam[i])} champions={champions} version={version} itemData={itemData} />
               ) : (
                 <div className="lg-sb-side lg-sb-side--red" />
               )}
@@ -1661,6 +1690,7 @@ function LgPlayerSide({
   player,
   side,
   isMvp,
+  isPartyMember,
   champions,
   version,
   itemData,
@@ -1668,6 +1698,7 @@ function LgPlayerSide({
   player: LiveGamePlayer;
   side: 'blue' | 'red';
   isMvp?: boolean;
+  isPartyMember?: boolean;
   champions: ChampionBasic[];
   version: string;
   itemData: Record<number, ItemInfo>;
@@ -1719,9 +1750,11 @@ function LgPlayerSide({
 
   const info = (
     <div className="lg-sb-player-info">
+      {isPartyMember && side === 'blue' && <span className="lg-sb-party-chevron lg-sb-party-chevron--blue" aria-hidden />}
       <span className={`lg-sb-player-name ${isActive ? 'lg-sb-player-name--active' : ''}`}>
         {player.summonerName}
       </span>
+      {isPartyMember && side === 'red' && <span className="lg-sb-party-chevron lg-sb-party-chevron--red" aria-hidden />}
     </div>
   );
 

@@ -63,6 +63,10 @@ function formatGold(gold: number): string {
   return Math.floor(gold).toString();
 }
 
+function normalizePlayerName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 /** Readable game mode names (Riot uses fruit codenames for rotating modes) */
 function formatGameMode(mode: string): string {
   const map: Record<string, string> = {
@@ -561,6 +565,31 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     [data.players],
   );
 
+  const partyNameSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const rawName of data.partyMembers ?? []) {
+      const normalized = normalizePlayerName(rawName);
+      if (!normalized) continue;
+      set.add(normalized);
+      const hashIdx = normalized.indexOf('#');
+      if (hashIdx > 0) {
+        set.add(normalized.slice(0, hashIdx));
+      }
+    }
+    return set;
+  }, [data.partyMembers]);
+
+  const isPartyMember = useCallback((player: LiveGamePlayer): boolean => {
+    if (!activePlayer || player.isActivePlayer || player.team !== activePlayer.team) {
+      return false;
+    }
+    const normalized = normalizePlayerName(player.summonerName);
+    if (partyNameSet.has(normalized)) return true;
+    const hashIdx = normalized.indexOf('#');
+    if (hashIdx > 0 && partyNameSet.has(normalized.slice(0, hashIdx))) return true;
+    return false;
+  }, [activePlayer, partyNameSet]);
+
   // Find the overall game MVP (highest mvpScore across ALL players)
   const gameMvp = useMemo(() => {
     if (data.players.length === 0) return undefined;
@@ -878,6 +907,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
                   player={blueTeam[i]}
                   side="blue"
                   isMvp={gameMvp?.summonerName === blueTeam[i].summonerName}
+                  isPartyMember={isPartyMember(blueTeam[i])}
                   champions={champions}
                   version={version}
                   itemData={itemData}
@@ -895,6 +925,7 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
                   player={redTeam[i]}
                   side="red"
                   isMvp={gameMvp?.summonerName === redTeam[i].summonerName}
+                  isPartyMember={isPartyMember(redTeam[i])}
                   champions={champions}
                   version={version}
                   itemData={itemData}
@@ -936,6 +967,7 @@ function PgPlayerSide({
   player,
   side,
   isMvp,
+  isPartyMember,
   champions,
   version,
   itemData,
@@ -945,6 +977,7 @@ function PgPlayerSide({
   player: LiveGamePlayer;
   side: 'blue' | 'red';
   isMvp?: boolean;
+  isPartyMember?: boolean;
   champions: ChampionBasic[];
   version: string;
   itemData: Record<number, ItemInfo>;
@@ -991,9 +1024,11 @@ function PgPlayerSide({
 
   const info = (
     <div className="pg-sb-player-info">
+      {isPartyMember && side === 'blue' && <span className="pg-sb-party-chevron pg-sb-party-chevron--blue" aria-hidden />}
       <span className={`pg-sb-player-name ${isActive ? 'pg-sb-player-name--active' : ''}`}>
         {player.summonerName}
       </span>
+      {isPartyMember && side === 'red' && <span className="pg-sb-party-chevron pg-sb-party-chevron--red" aria-hidden />}
     </div>
   );
 

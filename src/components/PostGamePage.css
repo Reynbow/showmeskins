@@ -1031,6 +1031,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .pg-sb-side--blue .pg-sb-player-info {
@@ -1055,6 +1056,25 @@
 
 .pg-sb-player-name--active {
   color: var(--lol-gold-light);
+}
+
+.pg-sb-party-chevron {
+  width: 0;
+  height: 0;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 4px rgba(143, 183, 212, 0.25));
+}
+
+.pg-sb-party-chevron--blue {
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid rgba(143, 183, 212, 0.72);
+}
+
+.pg-sb-party-chevron--red {
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 7px solid rgba(143, 183, 212, 0.72);
 }
 
 /* ── KDA ─────────────────────────────────────────────────────────────── */

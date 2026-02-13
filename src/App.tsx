@@ -490,6 +490,7 @@ function App() {
                   gameResult: data.gameResult || undefined,
                   activePlayer: data.activePlayer ?? {},
                   players,
+                  partyMembers: data.partyMembers ?? prev?.partyMembers ?? [],
                   killFeed,
                   killFeedSnapshots: snapshots,
                 };
