@@ -65,7 +65,7 @@ func (b *BridgeServer) handleWS(w http.ResponseWriter, r *http.Request) {
 	// Send welcome message so the website knows the connection is live
 	welcome, _ := json.Marshal(map[string]string{
 		"type":    "connected",
-		"version": "0.3.4",
+		"version": "0.3.5",
 	})
 	conn.WriteMessage(websocket.TextMessage, welcome)
 

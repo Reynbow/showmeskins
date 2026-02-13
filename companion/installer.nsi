@@ -4,18 +4,23 @@
 ; ═══════════════════════════════════════════════════════════════════════════════
 
 !include "MUI2.nsh"
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
 
 ; ── App metadata ──────────────────────────────────────────────────────────────
 ; PRODUCT_VERSION can be overridden: makensis /DPRODUCT_VERSION=0.3.0 installer.nsi
 
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "0.3.4"
+!define PRODUCT_VERSION "0.3.5"
 !endif
 
 !define PRODUCT_NAME "Show Me Skins Companion"
 !define PRODUCT_EXE  "Show Me Skins Companion.exe"
 !define PRODUCT_PUBLISHER "Show Me Skins"
 !define PRODUCT_URL "https://www.showmeskins.com"
+
+Var CreateDesktopShortcut
+Var CreateStartMenuShortcut
 
 Name "${PRODUCT_NAME}"
 ; Use dotted filename to match GitHub release asset URL pattern
@@ -32,6 +37,7 @@ SetCompressor /SOLID lzma
 ; ── Pages ─────────────────────────────────────────────────────────────────────
 
 !insertmacro MUI_PAGE_DIRECTORY
+Page custom ShortcutsPageCreate ShortcutsPageLeave "Shortcuts"
 !insertmacro MUI_PAGE_INSTFILES
 
 ; Custom finish page
@@ -54,6 +60,36 @@ SetCompressor /SOLID lzma
 
 !insertmacro MUI_LANGUAGE "English"
 
+; ── Shortcuts options page ───────────────────────────────────────────────────
+
+Var Dialog
+Var DesktopCheckbox
+Var StartMenuCheckbox
+
+Function ShortcutsPageCreate
+  nsDialogs::Create 1018
+  pop $Dialog
+
+  ${If} $Dialog == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateCheckbox} 0 0 100% 12u "Create a desktop shortcut"
+  Pop $DesktopCheckbox
+  ${NSD_Check} $DesktopCheckbox
+
+  ${NSD_CreateCheckbox} 0 18u 100% 12u "Create a Start Menu shortcut"
+  Pop $StartMenuCheckbox
+  ${NSD_Check} $StartMenuCheckbox
+
+  nsDialogs::Show
+FunctionEnd
+
+Function ShortcutsPageLeave
+  ${NSD_GetState} $DesktopCheckbox $CreateDesktopShortcut
+  ${NSD_GetState} $StartMenuCheckbox $CreateStartMenuShortcut
+FunctionEnd
+
 ; ── Installer section ─────────────────────────────────────────────────────────
 
 Section "Install"
@@ -61,16 +97,29 @@ Section "Install"
 
   ; Kill any running instance before overwriting
   nsExec::ExecToLog 'taskkill /F /IM "${PRODUCT_EXE}"'
+  nsExec::ExecToLog 'taskkill /F /IM "Companion-Build.exe"'
 
-  ; Install the single executable (build outputs to Companion-Build.exe to avoid locked exe)
-  File "dist\Companion-Build.exe"
-  Rename "$INSTDIR\Companion-Build.exe" "$INSTDIR\${PRODUCT_EXE}"
+  ; Remove old exe and any leftover Companion-Build.exe from failed updates
+  Delete "$INSTDIR\${PRODUCT_EXE}"
+  Delete "$INSTDIR\Companion-Build.exe"
+
+  ; Extract directly as final exe name (avoids rename leaving old file on upgrade)
+  File "/oname=${PRODUCT_EXE}" "dist\Companion-Build.exe"
 
   ; Remove any stale auto-start entry (re-added by finish page if checked)
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
 
   ; Save install dir to registry
   WriteRegStr HKCU "Software\${PRODUCT_NAME}" "InstallDir" "$INSTDIR"
+
+  ; Create shortcuts based on user selection
+  ${If} $CreateDesktopShortcut == 1
+    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}" "" "$INSTDIR\${PRODUCT_EXE}" 0
+  ${EndIf}
+  ${If} $CreateStartMenuShortcut == 1
+    CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${PRODUCT_EXE}" "" "$INSTDIR\${PRODUCT_EXE}" 0
+  ${EndIf}
 
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -119,8 +168,14 @@ Section "Uninstall"
   ; Remove auto-start entry
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
 
-  ; Remove files
+  ; Remove shortcuts (created by us in current or previous installs)
+  Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+  RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
+
+  ; Remove files (including Companion-Build.exe from any failed upgrade)
   Delete "$INSTDIR\${PRODUCT_EXE}"
+  Delete "$INSTDIR\Companion-Build.exe"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
 
