@@ -583,12 +583,11 @@
 .lg-sb-side--blue .lg-sb-respawn { right: 14px; }
 .lg-sb-side--red  .lg-sb-respawn { left: 14px; }
 
-/* ── Pregame hero formation (all 10 champs, Marvel/Overwatch style) ──── */
+/* ── Pregame hero formation (loading art row) ──────────────────────── */
 
 .lg-hero-formation {
   width: 100%;
   max-width: 1200px;
-  height: 280px;
   margin-top: 24px;
   margin-bottom: 24px;
   border-radius: 8px;
@@ -596,25 +595,161 @@
   border: 1px solid rgba(30, 40, 45, 0.6);
   background: linear-gradient(180deg, rgba(8, 12, 20, 0.85), rgba(5, 8, 12, 0.9));
   backdrop-filter: blur(8px);
+  padding: 16px 12px;
 }
 
-.lg-hero-formation canvas {
+.lg-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+}
+
+.lg-hero-team {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.lg-hero-team--blue {
+  justify-content: flex-end;
+}
+
+.lg-hero-team--red {
+  justify-content: flex-start;
+}
+
+.lg-hero-vs {
+  font-family: 'Beaufort for LOL', serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: rgba(200, 170, 110, 0.7);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 12px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.lg-hero-card {
+  position: relative;
+  width: 88px;
+  aspect-ratio: 308 / 560;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  cursor: default;
+}
+
+.lg-hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  z-index: 2;
+  pointer-events: none;
+  transition: border-color 0.22s ease;
+}
+
+.lg-hero-card--blue::before {
+  border-color: rgba(0, 150, 200, 0.45);
+}
+
+.lg-hero-card--red::before {
+  border-color: rgba(200, 50, 50, 0.45);
+}
+
+.lg-hero-card:hover {
+  transform: translateY(-4px) scale(1.04);
+  z-index: 3;
+}
+
+.lg-hero-card--blue:hover::before {
+  border-color: rgba(10, 200, 185, 0.8);
+  box-shadow: 0 0 12px rgba(10, 200, 185, 0.3);
+}
+
+.lg-hero-card--red:hover::before {
+  border-color: rgba(240, 80, 80, 0.8);
+  box-shadow: 0 0 12px rgba(240, 80, 80, 0.3);
+}
+
+.lg-hero-card-img {
   display: block;
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.lg-hero-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.15) 40%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.lg-hero-card-name {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(240, 230, 210, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  z-index: 2;
+  padding: 0 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 900px) {
   .lg-hero-formation {
-    height: 220px;
     margin-top: 14px;
+    padding: 12px 8px;
+  }
+  .lg-hero-card {
+    width: 68px;
+  }
+  .lg-hero-team {
+    gap: 4px;
+  }
+  .lg-hero-vs {
+    font-size: 0.9rem;
+    padding: 0 8px;
+  }
+  .lg-hero-card-name {
+    font-size: 0.5rem;
   }
 }
 
 @media (max-width: 640px) {
   .lg-hero-formation {
-    height: 180px;
     margin-top: 12px;
+    padding: 10px 6px;
+  }
+  .lg-hero-card {
+    width: 52px;
+  }
+  .lg-hero-team {
+    gap: 3px;
+  }
+  .lg-hero-vs {
+    font-size: 0.75rem;
+    padding: 0 6px;
+  }
+  .lg-hero-card-name {
+    font-size: 0.45rem;
+    bottom: 2px;
   }
 }
 
@@ -799,6 +934,8 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(200, 170, 110, 0.2) transparent;
+  margin-left: -28px;
+  padding-left: 28px;
 }
 
 .lg-kill-entry {
@@ -820,8 +957,23 @@
 
 .lg-kill-entry--your-kill {
   background: rgba(200, 170, 110, 0.08);
-  border-left: 3px solid var(--lol-gold);
-  padding-left: 15px; /* 18 - 3 to keep content aligned */
+  position: relative;
+}
+
+.lg-kill-entry--your-kill::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid var(--lol-gold);
+  filter: drop-shadow(0 0 6px rgba(200, 170, 110, 0.5));
+  pointer-events: none;
+  z-index: 20;
 }
 
 .lg-kill-entry--your-kill:hover {

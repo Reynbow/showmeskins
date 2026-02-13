@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component, type ReactNode } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import type { LiveGameData, LiveGamePlayer, KillEvent, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
-import { getChampionDetail, getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
+import { getChampionDetail, getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS, getLoadingArt, getLoadingArtFallback } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
 import { ItemTooltip } from './ItemTooltip';
@@ -583,66 +583,37 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
   render() { return this.state.hasError ? this.props.fallback : this.props.children; }
 }
 
-/* ── Pregame hero formation (all 10 champs, Overwatch/Marvel style) ─────── */
+/* ── Pregame hero formation (all 10 champs, loading art row) ─────── */
 
-/** Formation positions by role: [0]=Top, [1]=Jungle, [2]=Mid, [3]=Bot, [4]=Support. Same order for both teams. */
-export const BLUE_FORMATION_POSITIONS: [number, number, number][] = [
-  [-1.9, 0, -3.0],   /* Top */
-  [-2.8, 0, -2.0],   /* Jungle */
-  [-3.5, 0, -1.5],   /* Mid */
-  [-3.3, 0, -0.4],   /* Bot */
-  [-5.5, 0, -3.0],   /* Support */
-];
-export const RED_FORMATION_POSITIONS: [number, number, number][] = [
-  [2.2, 0, -3.0],   /* Top */
-  [2.8, 0, -2.0],   /* Jungle */
-  [3.5, 0, -1.5],   /* Mid */
-  [3.3, 0, -0.4],   /* Bot */
-  [6.6, 0, -3.0],   /* Support */
-];
-/** Camera at (0,1.5,3). Models default facing center; rotate 90° so both face +Z (camera) */
-const BLUE_FACE_CAMERA_Y = Math.PI / 2;
-const RED_FACE_CAMERA_Y = -Math.PI / 2;
+/** Single champion loading-art card for the pregame hero row */
+function HeroArtCard({ player, champions, side }: { player: LiveGamePlayer; champions: ChampionBasic[]; side: 'blue' | 'red' }) {
+  const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
+  const championId = match?.id ?? player.championName;
+  const championKey = match?.key ?? '0';
+  const skinNum = player.skinID;
+  const artUrl = getLoadingArt(championId, skinNum);
+  const fallbackUrl = getLoadingArtFallback(championKey, skinNum);
+  const baseFallbackUrl = getLoadingArt(championId, 0);
 
-export const DEFAULT_CAMERA_POSITION: [number, number, number] = [0, 1.5, 5];
-export const DEFAULT_CAMERA_FOV = 20;
-export const DEFAULT_LOOK_AT_Y = 1.204;
-
-/** Updates hero formation camera position, FOV, and look-at (Canvas camera prop is only used on mount) */
-function HeroFormationCameraController({ position, fov, lookAtY }: { position: [number, number, number]; fov: number; lookAtY: number }) {
-  const { camera } = useThree();
-  useEffect(() => {
-    camera.position.set(position[0], position[1], position[2]);
-    (camera as THREE.PerspectiveCamera).fov = fov;
-    (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
-  }, [camera, position, fov]);
-  useEffect(() => {
-    camera.lookAt(0, lookAtY, 0);
-  }, [camera, lookAtY]);
-  return null;
-}
-
-function PregameChampionSlot({
-  player,
-  champions,
-  position,
-  rotationY,
-}: {
-  player: LiveGamePlayer;
-  champions: ChampionBasic[];
-  position: [number, number, number];
-  rotationY: number;
-}) {
-  const modelInfo = usePlayerModelInfo(player, champions);
-  if (!modelInfo?.modelUrl) return null;
   return (
-    <ModelErrorBoundary fallback={null} resetKey={`${player.championName}-${player.skinID}`}>
-      <group position={position} rotation={[0, rotationY, 0]} scale={[0.26, 0.26, 0.26]}>
-        <Suspense fallback={null}>
-          <LiveChampionModel url={modelInfo.modelUrl} chromaTextureUrl={modelInfo.chromaTextureUrl} preferIdle />
-        </Suspense>
-      </group>
-    </ModelErrorBoundary>
+    <div className={`lg-hero-card lg-hero-card--${side}`}>
+      <img
+        className="lg-hero-card-img"
+        src={artUrl}
+        alt={player.championName}
+        loading="eager"
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (img.src !== fallbackUrl && img.src !== baseFallbackUrl) {
+            img.src = fallbackUrl;
+          } else if (img.src === fallbackUrl) {
+            img.src = baseFallbackUrl;
+          }
+        }}
+      />
+      <div className="lg-hero-card-overlay" />
+      <span className="lg-hero-card-name">{player.championName}</span>
+    </div>
   );
 }
 
@@ -650,87 +621,39 @@ export function PregameHeroFormation({
   blueTeam,
   redTeam,
   champions,
-  bluePositions,
-  redPositions,
-  cameraPosition,
-  cameraFov,
-  lookAtY,
 }: {
   blueTeam: LiveGamePlayer[];
   redTeam: LiveGamePlayer[];
   champions: ChampionBasic[];
-  bluePositions?: [number, number, number][];
-  redPositions?: [number, number, number][];
-  cameraPosition?: [number, number, number];
-  cameraFov?: number;
-  lookAtY?: number;
 }) {
   const blueByRole = useMemo(() => sortByRole(blueTeam), [blueTeam]);
   const redByRole = useMemo(() => sortByRole(redTeam), [redTeam]);
-  const bluePos = bluePositions ?? BLUE_FORMATION_POSITIONS;
-  const redPos = redPositions ?? RED_FORMATION_POSITIONS;
-  const camPos = cameraPosition ?? DEFAULT_CAMERA_POSITION;
-  const camFov = cameraFov ?? DEFAULT_CAMERA_FOV;
-  const lookY = lookAtY ?? DEFAULT_LOOK_AT_Y;
 
   return (
     <div className="lg-hero-formation">
-      <Canvas
-        shadows
-        camera={{ position: camPos, fov: camFov }}
-        gl={{
-          antialias: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
-          alpha: true,
-        }}
-        style={{ background: 'transparent' }}
-      >
-        <HeroFormationCameraController position={camPos} fov={camFov} lookAtY={lookY} />
-        <fog attach="fog" args={['#010a13', 12, 28]} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[8, 8, -2]} intensity={1.2} color="#f0e6d2" />
-        <directionalLight position={[0, 4, -6]} intensity={0.4} color="#0ac8b9" />
-        <pointLight position={[1, 3, -5]} intensity={0.6} color="#0ac8b9" />
-        <pointLight position={[5, 3, 2]} intensity={0.6} color="#c8aa6e" />
-        <pointLight position={[-5, 4, 4]} intensity={0.5} color="#ff69b4" />
-        <spotLight position={[0, 8, 0]} intensity={0.8} color="#f0e6d2" angle={0.5} penumbra={0.8} />
-        <directionalLight
-          position={[-5, 10, 5]}
-          intensity={0.25}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-          shadow-camera-left={-8}
-          shadow-camera-right={8}
-          shadow-camera-top={8}
-          shadow-camera-bottom={-8}
-          shadow-bias={-0.002}
-          shadow-radius={50}
-        />
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.69, 0]} receiveShadow>
-          <planeGeometry args={[24, 24]} />
-          <shadowMaterial opacity={0.3} />
-        </mesh>
-        {blueByRole.slice(0, 5).map((player, i) => (
-          <PregameChampionSlot
-            key={`blue-${player.summonerName}-${player.championName}-${player.skinID}`}
-            player={player}
-            champions={champions}
-            position={bluePos[i] ?? BLUE_FORMATION_POSITIONS[i]}
-            rotationY={BLUE_FACE_CAMERA_Y}
-          />
-        ))}
-        {redByRole.slice(0, 5).map((player, i) => (
-          <PregameChampionSlot
-            key={`red-${player.summonerName}-${player.championName}-${player.skinID}`}
-            player={player}
-            champions={champions}
-            position={redPos[i] ?? RED_FORMATION_POSITIONS[i]}
-            rotationY={RED_FACE_CAMERA_Y}
-          />
-        ))}
-      </Canvas>
+      <div className="lg-hero-row">
+        <div className="lg-hero-team lg-hero-team--blue">
+          {blueByRole.slice(0, 5).map((player) => (
+            <HeroArtCard
+              key={`blue-${player.summonerName}-${player.championName}`}
+              player={player}
+              champions={champions}
+              side="blue"
+            />
+          ))}
+        </div>
+        <div className="lg-hero-vs">VS</div>
+        <div className="lg-hero-team lg-hero-team--red">
+          {redByRole.slice(0, 5).map((player) => (
+            <HeroArtCard
+              key={`red-${player.summonerName}-${player.championName}`}
+              player={player}
+              champions={champions}
+              side="red"
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
