@@ -200,9 +200,9 @@ const STAT_GROUPS: { groupLabel: string; stats: StatEntry[] }[] = [
     stats: [
       { label: 'Phys. Lethality', key: 'physicalLethality', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
       { label: 'Armor Pen (Flat)', key: 'armorPenetrationFlat', color: 'lg-stat-lethality', showIf: (v) => v > 0 },
-      { label: 'Armor Pen (%)', key: 'armorPenetrationPercent', color: 'lg-stat-lethality', format: (v) => `${Math.round(v < 1 ? v * 100 : v)}%`, showIf: (v) => v > 0 },
+      { label: 'Armor Pen (%)', key: 'armorPenetrationPercent', color: 'lg-stat-lethality', format: (v) => `${Math.round(v < 1 ? (1 - v) * 100 : v)}%`, showIf: (v) => v > 0 && v < 1 },
       { label: 'Magic Pen (Flat)', key: 'magicPenetrationFlat', color: 'lg-stat-ap', showIf: (v) => v > 0 },
-      { label: 'Magic Pen (%)', key: 'magicPenetrationPercent', color: 'lg-stat-ap', format: (v) => `${Math.round(v < 1 ? v * 100 : v)}%`, showIf: (v) => v > 0 },
+      { label: 'Magic Pen (%)', key: 'magicPenetrationPercent', color: 'lg-stat-ap', format: (v) => `${Math.round(v < 1 ? (1 - v) * 100 : v)}%`, showIf: (v) => v > 0 && v < 1 },
     ],
   },
 ];
