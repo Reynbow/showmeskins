@@ -610,15 +610,15 @@
   display: flex;
   gap: 6px;
   flex: 1;
-  justify-content: center;
+  min-width: 0;
 }
 
 .lg-hero-team--blue {
-  justify-content: flex-end;
+  justify-content: stretch;
 }
 
 .lg-hero-team--red {
-  justify-content: flex-start;
+  justify-content: stretch;
 }
 
 .lg-hero-vs {
@@ -635,11 +635,11 @@
 
 .lg-hero-card {
   position: relative;
-  width: 88px;
+  flex: 1 1 0;
+  min-width: 0;
   aspect-ratio: 308 / 560;
   border-radius: 6px;
   overflow: hidden;
-  flex-shrink: 0;
   transition: transform 0.22s ease, box-shadow 0.22s ease;
   cursor: default;
 }
@@ -696,16 +696,16 @@
 
 .lg-hero-card-name {
   position: absolute;
-  bottom: 4px;
+  bottom: 6px;
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: rgba(240, 230, 210, 0.92);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
   z-index: 2;
-  padding: 0 2px;
+  padding: 0 4px;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -716,9 +716,6 @@
   .lg-hero-formation {
     margin-top: 14px;
     padding: 12px 8px;
-  }
-  .lg-hero-card {
-    width: 68px;
   }
   .lg-hero-team {
     gap: 4px;
@@ -736,9 +733,6 @@
   .lg-hero-formation {
     margin-top: 12px;
     padding: 10px 6px;
-  }
-  .lg-hero-card {
-    width: 52px;
   }
   .lg-hero-team {
     gap: 3px;
@@ -943,12 +937,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 18px;
-  border-bottom: 1px solid rgba(200, 170, 110, 0.06);
   transition: background 0.15s;
-}
-
-.lg-kill-entry:last-child {
-  border-bottom: none;
 }
 
 .lg-kill-entry:hover {
@@ -1131,6 +1120,322 @@
   color: var(--lol-text-dim);
   white-space: nowrap;
   opacity: 0.7;
+}
+
+/* ── Inline assist icons (next to killer) ────────────────────────────── */
+
+.lg-kill-assist-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.lg-kill-assist-plus {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  opacity: 0.5;
+  margin-right: 1px;
+}
+
+.lg-kill-assist-mini-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--lol-border);
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.lg-kill-entry:hover .lg-kill-assist-mini-icon {
+  opacity: 1;
+}
+
+/* ── Kill entry expand affordance ────────────────────────────────────── */
+
+.lg-kill-entry {
+  cursor: pointer;
+  user-select: none;
+}
+
+.lg-kill-entry--expanded {
+  background: rgba(200, 170, 110, 0.06);
+  border-bottom-color: transparent;
+}
+
+.lg-kill-entry--expanded.lg-kill-entry--your-kill {
+  background: rgba(200, 170, 110, 0.13);
+}
+
+.lg-kill-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--lol-text-dim);
+  opacity: 0.35;
+  margin-left: 6px;
+  transition: transform 0.2s ease, opacity 0.2s;
+}
+
+.lg-kill-entry:hover .lg-kill-chevron {
+  opacity: 0.65;
+}
+
+.lg-kill-chevron--open {
+  transform: rotate(180deg);
+  opacity: 0.8;
+}
+
+/* ── Kill detail expanded panel ──────────────────────────────────────── */
+
+.lg-kill-wrapper {
+  border-bottom: 1px solid rgba(200, 170, 110, 0.06);
+}
+
+.lg-kill-wrapper:last-child {
+  border-bottom: none;
+}
+
+.lg-kill-wrapper .lg-kill-entry {
+  border-bottom: none;
+}
+
+.lg-kill-detail {
+  padding: 14px 18px 16px;
+  background: rgba(10, 15, 28, 0.7);
+  border-top: 1px solid rgba(200, 170, 110, 0.15);
+  animation: lg-kill-detail-in 0.2s ease-out;
+}
+
+@keyframes lg-kill-detail-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 400px;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+}
+
+.lg-kill-detail-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.lg-kill-detail-col {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lg-kill-detail-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  opacity: 0.85;
+}
+
+.lg-kill-detail-vs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 20px;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.lg-kill-detail-vs-text {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--lol-gold);
+  opacity: 0.8;
+}
+
+.lg-kill-detail-vs-time {
+  font-size: 12px;
+  color: var(--lol-text);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.lg-kill-detail-entity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lg-kill-detail-unknown {
+  font-size: 13px;
+  color: var(--lol-text);
+  opacity: 0.7;
+}
+
+.lg-kill-detail-champ {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lg-kill-detail-champ-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--lol-border);
+}
+
+.lg-kill-detail-champ-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.lg-kill-detail-champ-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-kill-detail-summoner {
+  font-size: 12px;
+  color: var(--lol-text);
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-kill-detail-stats {
+  display: flex;
+  gap: 14px;
+}
+
+.lg-kill-detail-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lg-kill-detail-stat-label {
+  font-size: 11px;
+  color: var(--lol-text);
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.lg-kill-detail-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lol-text);
+}
+
+.lg-kill-detail-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.lg-kill-detail-item-slot {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(200, 170, 110, 0.15);
+  background: rgba(20, 25, 35, 0.6);
+  cursor: pointer;
+}
+
+.lg-kill-detail-item-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Assists column (inside detail-columns, hugs the killer) ─────────── */
+
+.lg-kill-detail-col--assists {
+  flex: 0 0 auto;
+  min-width: 0;
+  gap: 6px;
+  margin-left: -8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(200, 170, 110, 0.2);
+}
+
+.lg-kill-detail-assist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lg-kill-detail-assist-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lg-kill-detail-assist-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--lol-border);
+  flex-shrink: 0;
+}
+
+.lg-kill-detail-assist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.lg-kill-detail-assist-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-kill-detail-assist-kda {
+  font-size: 12px;
+  color: var(--lol-text);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Badges row in detail ────────────────────────────────────────────── */
+
+.lg-kill-detail-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(200, 170, 110, 0.08);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────── */

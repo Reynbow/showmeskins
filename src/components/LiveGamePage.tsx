@@ -1081,6 +1081,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
             players={data.players}
             champions={champions}
             version={version}
+            itemData={itemData}
           />
         )}
 
@@ -1160,17 +1161,37 @@ function KillFeed({
   players,
   champions,
   version,
+  itemData,
 }: {
   kills: KillEvent[];
   players: LiveGamePlayer[];
   champions: ChampionBasic[];
   version: string;
+  itemData: Record<number, ItemInfo>;
 }) {
   // Build a map from summoner name → team
   const nameToTeam = useMemo(() => {
     const map: Record<string, 'ORDER' | 'CHAOS'> = {};
     for (const p of players) {
       map[p.summonerName] = p.team;
+    }
+    return map;
+  }, [players]);
+
+  // Build a map from summoner name → player (live, for inline icons)
+  const nameToPlayer = useMemo(() => {
+    const map: Record<string, LiveGamePlayer> = {};
+    for (const p of players) {
+      map[p.summonerName] = p;
+    }
+    return map;
+  }, [players]);
+
+  // Build a map from champion name → player (live, for inline assister icons)
+  const champToPlayer = useMemo(() => {
+    const map: Record<string, LiveGamePlayer> = {};
+    for (const p of players) {
+      map[p.championName] = p;
     }
     return map;
   }, [players]);
@@ -1183,13 +1204,63 @@ function KillFeed({
   // All kills, most recent first
   const allKills = useMemo(() => [...kills].reverse(), [kills]);
 
+  // ── Snapshot player data at time of each kill ─────────────────────────
+  // Maps eventTime → { byName: Record<summonerName, player>, byChamp: Record<champName, player> }
+  type PlayerSnapshot = {
+    byName: Record<string, LiveGamePlayer>;
+    byChamp: Record<string, LiveGamePlayer>;
+  };
+  const snapshotsRef = useRef<Record<number, PlayerSnapshot>>({});
+
+  // On each render, snapshot player state for any new kills we haven't seen yet
+  for (const kill of kills) {
+    if (!(kill.eventTime in snapshotsRef.current)) {
+      const byName: Record<string, LiveGamePlayer> = {};
+      const byChamp: Record<string, LiveGamePlayer> = {};
+      for (const p of players) {
+        // Deep-clone the player so the snapshot is frozen
+        const frozen = { ...p, items: p.items.map((it) => ({ ...it })) };
+        byName[p.summonerName] = frozen;
+        byChamp[p.championName] = frozen;
+      }
+      snapshotsRef.current[kill.eventTime] = { byName, byChamp };
+    }
+  }
+
+  // Track which kill is expanded using eventTime (stable across re-renders when new kills arrive)
+  const [expandedTime, setExpandedTime] = useState<number | null>(null);
+
+  // Ref for the scrollable list container
+  const listRef = useRef<HTMLDivElement>(null);
+  // Refs for each kill wrapper element, keyed by eventTime
+  const wrapperRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  // Scroll expanded entry to top of the killfeed viewport
+  const handleExpand = useCallback((eventTime: number) => {
+    const isAlreadyExpanded = expandedTime === eventTime;
+    const newTime = isAlreadyExpanded ? null : eventTime;
+    setExpandedTime(newTime);
+
+    if (!isAlreadyExpanded && listRef.current) {
+      // Use requestAnimationFrame so the DOM has updated
+      requestAnimationFrame(() => {
+        const wrapper = wrapperRefs.current[eventTime];
+        if (wrapper && listRef.current) {
+          const listTop = listRef.current.getBoundingClientRect().top;
+          const wrapperTop = wrapper.getBoundingClientRect().top;
+          listRef.current.scrollTop += wrapperTop - listTop;
+        }
+      });
+    }
+  }, [expandedTime]);
+
   return (
     <div className="lg-killfeed">
       <div className="lg-killfeed-header">
         <span className="lg-killfeed-title">Kill Feed</span>
         <span className="lg-killfeed-count">{kills.length} kills</span>
       </div>
-      <div className="lg-killfeed-list">
+      <div className="lg-killfeed-list" ref={listRef}>
         {allKills.map((kill, i) => {
           const killerIsEntity = kill.killerChamp.startsWith('_');
           const victimIsEntity = kill.victimChamp.startsWith('_');
@@ -1207,78 +1278,297 @@ function KillFeed({
             : 'neutral';
 
           const isYourKill = activePlayerName != null && kill.killerName === activePlayerName;
+          const isExpanded = expandedTime === kill.eventTime;
+
+          // Live player data (for inline assister icons in the row)
+          const liveAssisterPlayers = kill.assisters
+            .map((champName) => champToPlayer[champName])
+            .filter(Boolean) as LiveGamePlayer[];
+
+          // Snapshot data (frozen at time of kill) for the expanded detail panel
+          const snapshot = snapshotsRef.current[kill.eventTime];
+          const killerPlayer = snapshot?.byName[kill.killerName];
+          const victimPlayer = snapshot?.byName[kill.victimName];
+          const assisterPlayers = kill.assisters
+            .map((champName) => snapshot?.byChamp[champName])
+            .filter(Boolean) as LiveGamePlayer[];
 
           return (
             <div
               key={`${kill.eventTime}-${i}`}
-              className={`lg-kill-entry${isYourKill ? ' lg-kill-entry--your-kill' : ''}`}
+              className="lg-kill-wrapper"
+              ref={(el) => { wrapperRefs.current[kill.eventTime] = el; }}
             >
-              <span className="lg-kill-time">{formatTime(kill.eventTime)}</span>
-              <KillFeedEntity
-                isEntity={killerIsEntity}
-                champ={kill.killerChamp}
-                displayName={kill.killerName}
-                side={killerSide}
-                version={version}
-                champions={champions}
-              />
-              <svg className="lg-kill-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M13 5l6 7-6 7" />
-              </svg>
-              <KillFeedEntity
-                isEntity={victimIsEntity}
-                champ={kill.victimChamp}
-                displayName={kill.victimName}
-                side={victimSide}
-                version={version}
-                champions={champions}
-              />
-              <span className="lg-kill-right">
-                {(kill.multiKill || kill.killStreak) && (
-                  <span className="lg-kill-badges">
-                    {kill.multiKill && (
-                      <TextTooltip
-                        text={MULTI_KILL_TOOLTIPS[kill.multiKill]}
-                        variant={kill.multiKill}
-                        className={`lg-kill-badge lg-kill-badge--multikill lg-kill-badge--${kill.multiKill}`}
-                      >
-                        {kill.multiKill === 'double' && 'Double Kill'}
-                        {kill.multiKill === 'triple' && 'Triple Kill'}
-                        {kill.multiKill === 'quadra' && 'Quadra Kill'}
-                        {kill.multiKill === 'penta' && 'Penta Kill'}
-                        {kill.multiKillCount != null && kill.multiKillCount > 1 && (
-                          <span className="lg-kill-badge-multiplier">×{kill.multiKillCount}</span>
-                        )}
-                      </TextTooltip>
-                    )}
-                    {kill.killStreak && (
-                      <TextTooltip
-                        text={KILL_STREAK_TOOLTIPS[kill.killStreak]}
-                        variant={kill.killStreak}
-                        className={`lg-kill-badge lg-kill-badge--streak lg-kill-badge--${kill.killStreak}`}
-                      >
-                        {kill.killStreak === 'killing_spree' && 'Killing Spree'}
-                        {kill.killStreak === 'rampage' && 'Rampage'}
-                        {kill.killStreak === 'unstoppable' && 'Unstoppable'}
-                        {kill.killStreak === 'godlike' && 'Godlike'}
-                        {kill.killStreak === 'legendary' && 'Legendary'}
-                        {kill.killStreakCount != null && kill.killStreakCount > 1 && (
-                          <span className="lg-kill-badge-multiplier">×{kill.killStreakCount}</span>
-                        )}
-                      </TextTooltip>
-                    )}
+              <div
+                className={`lg-kill-entry${isYourKill ? ' lg-kill-entry--your-kill' : ''}${isExpanded ? ' lg-kill-entry--expanded' : ''}`}
+                onClick={() => handleExpand(kill.eventTime)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExpand(kill.eventTime); } }}
+              >
+                <span className="lg-kill-time">{formatTime(kill.eventTime)}</span>
+                <KillFeedEntity
+                  isEntity={killerIsEntity}
+                  champ={kill.killerChamp}
+                  displayName={kill.killerName}
+                  side={killerSide}
+                  version={version}
+                  champions={champions}
+                />
+                {/* Assister icons inline next to the killer */}
+                {liveAssisterPlayers.length > 0 && (
+                  <span className="lg-kill-assist-icons">
+                    <span className="lg-kill-assist-plus">+</span>
+                    {liveAssisterPlayers.map((ap) => {
+                      const apTeam = nameToTeam[ap.summonerName];
+                      const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
+                      return (
+                        <img
+                          key={ap.summonerName}
+                          className={`lg-kill-assist-mini-icon lg-kill-icon--${apSide}`}
+                          src={getChampionIconUrl(version, ap.championName, champions)}
+                          alt={ap.championName}
+                          title={ap.championName}
+                        />
+                      );
+                    })}
                   </span>
                 )}
-                {kill.assisters.length > 0 && (
-                  <span className="lg-kill-assists">
-                    + {kill.assisters.join(', ')}
-                  </span>
-                )}
-              </span>
+                <svg className="lg-kill-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M13 5l6 7-6 7" />
+                </svg>
+                <KillFeedEntity
+                  isEntity={victimIsEntity}
+                  champ={kill.victimChamp}
+                  displayName={kill.victimName}
+                  side={victimSide}
+                  version={version}
+                  champions={champions}
+                />
+                <span className="lg-kill-right">
+                  {(kill.multiKill || kill.killStreak) && (
+                    <span className="lg-kill-badges">
+                      {kill.multiKill && (
+                        <TextTooltip
+                          text={MULTI_KILL_TOOLTIPS[kill.multiKill]}
+                          variant={kill.multiKill}
+                          className={`lg-kill-badge lg-kill-badge--multikill lg-kill-badge--${kill.multiKill}`}
+                        >
+                          {kill.multiKill === 'double' && 'Double Kill'}
+                          {kill.multiKill === 'triple' && 'Triple Kill'}
+                          {kill.multiKill === 'quadra' && 'Quadra Kill'}
+                          {kill.multiKill === 'penta' && 'Penta Kill'}
+                          {kill.multiKillCount != null && kill.multiKillCount > 1 && (
+                            <span className="lg-kill-badge-multiplier">×{kill.multiKillCount}</span>
+                          )}
+                        </TextTooltip>
+                      )}
+                      {kill.killStreak && (
+                        <TextTooltip
+                          text={KILL_STREAK_TOOLTIPS[kill.killStreak]}
+                          variant={kill.killStreak}
+                          className={`lg-kill-badge lg-kill-badge--streak lg-kill-badge--${kill.killStreak}`}
+                        >
+                          {kill.killStreak === 'killing_spree' && 'Killing Spree'}
+                          {kill.killStreak === 'rampage' && 'Rampage'}
+                          {kill.killStreak === 'unstoppable' && 'Unstoppable'}
+                          {kill.killStreak === 'godlike' && 'Godlike'}
+                          {kill.killStreak === 'legendary' && 'Legendary'}
+                          {kill.killStreakCount != null && kill.killStreakCount > 1 && (
+                            <span className="lg-kill-badge-multiplier">×{kill.killStreakCount}</span>
+                          )}
+                        </TextTooltip>
+                      )}
+                    </span>
+                  )}
+                </span>
+                <svg className={`lg-kill-chevron${isExpanded ? ' lg-kill-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+
+              {/* Expanded detail breakdown */}
+              {isExpanded && (
+                <div className="lg-kill-detail">
+                  <div className="lg-kill-detail-columns">
+                    {/* Killer column */}
+                    <KillDetailColumn
+                      label="Killer"
+                      player={killerPlayer}
+                      champ={kill.killerChamp}
+                      isEntity={killerIsEntity}
+                      side={killerSide}
+                      version={version}
+                      champions={champions}
+                      itemData={itemData}
+                    />
+
+                    {/* Assists column (between killer and VS) */}
+                    {assisterPlayers.length > 0 && (
+                      <div className="lg-kill-detail-col lg-kill-detail-col--assists">
+                        <span className="lg-kill-detail-label">Assists</span>
+                        <div className="lg-kill-detail-assist-list">
+                          {assisterPlayers.map((ap) => {
+                            const apTeam = nameToTeam[ap.summonerName];
+                            const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
+                            return (
+                              <div key={ap.summonerName} className="lg-kill-detail-assist-player">
+                                <img
+                                  className={`lg-kill-detail-assist-icon lg-kill-icon--${apSide}`}
+                                  src={getChampionIconUrl(version, ap.championName, champions)}
+                                  alt={ap.championName}
+                                />
+                                <div className="lg-kill-detail-assist-info">
+                                  <span className={`lg-kill-detail-assist-name lg-kill-name--${apSide}`}>
+                                    {ap.championName}
+                                  </span>
+                                  <span className="lg-kill-detail-assist-kda">
+                                    {ap.kills}/{ap.deaths}/{ap.assists}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* VS divider */}
+                    <div className="lg-kill-detail-vs">
+                      <span className="lg-kill-detail-vs-text">VS</span>
+                      <span className="lg-kill-detail-vs-time">{formatTime(kill.eventTime)}</span>
+                    </div>
+
+                    {/* Victim column */}
+                    <KillDetailColumn
+                      label="Killed"
+                      player={victimPlayer}
+                      champ={kill.victimChamp}
+                      isEntity={victimIsEntity}
+                      side={victimSide}
+                      version={version}
+                      champions={champions}
+                      itemData={itemData}
+                    />
+                  </div>
+
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Detail column for killer or victim in the expanded kill detail */
+function KillDetailColumn({
+  label,
+  player,
+  champ,
+  isEntity,
+  side,
+  version,
+  champions,
+  itemData,
+}: {
+  label: string;
+  player?: LiveGamePlayer;
+  champ: string;
+  isEntity: boolean;
+  side: string;
+  version: string;
+  champions: ChampionBasic[];
+  itemData: Record<number, ItemInfo>;
+}) {
+  if (isEntity) {
+    return (
+      <div className="lg-kill-detail-col">
+        <span className="lg-kill-detail-label">{label}</span>
+        <div className="lg-kill-detail-entity">
+          <span className={`lg-kill-entity-icon lg-kill-icon--${side}`}>
+            {ENTITY_ICONS[champ] ?? '❓'}
+          </span>
+          <span className={`lg-kill-name lg-kill-name--${side}`}>{champ.replace(/^_/, '')}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!player) {
+    return (
+      <div className="lg-kill-detail-col">
+        <span className="lg-kill-detail-label">{label}</span>
+        <span className="lg-kill-detail-unknown">Unknown</span>
+      </div>
+    );
+  }
+
+  const playerItems = player.items.filter((it) => it.itemID > 0);
+
+  return (
+    <div className="lg-kill-detail-col">
+      <span className="lg-kill-detail-label">{label}</span>
+      <div className="lg-kill-detail-champ">
+        <img
+          className={`lg-kill-detail-champ-icon lg-kill-icon--${side}`}
+          src={getChampionIconUrl(version, player.championName, champions)}
+          alt={player.championName}
+        />
+        <div className="lg-kill-detail-champ-info">
+          <span className={`lg-kill-detail-champ-name lg-kill-name--${side}`}>
+            {player.championName}
+          </span>
+          <span className="lg-kill-detail-summoner">{player.summonerName}</span>
+        </div>
+      </div>
+      <div className="lg-kill-detail-stats">
+        <div className="lg-kill-detail-stat">
+          <span className="lg-kill-detail-stat-label">Level</span>
+          <span className="lg-kill-detail-stat-value">{player.level}</span>
+        </div>
+        <div className="lg-kill-detail-stat">
+          <span className="lg-kill-detail-stat-label">KDA</span>
+          <span className="lg-kill-detail-stat-value">
+            <span className="lg-kda-k">{player.kills}</span>
+            <span className="lg-kda-slash">/</span>
+            <span className="lg-kda-d">{player.deaths}</span>
+            <span className="lg-kda-slash">/</span>
+            <span className="lg-kda-a">{player.assists}</span>
+          </span>
+        </div>
+        <div className="lg-kill-detail-stat">
+          <span className="lg-kill-detail-stat-label">CS</span>
+          <span className="lg-kill-detail-stat-value">{player.creepScore}</span>
+        </div>
+      </div>
+      {playerItems.length > 0 && (
+        <div className="lg-kill-detail-items">
+          {playerItems.map((item, idx) => {
+            const info = itemData[item.itemID];
+            return (
+              <ItemTooltip
+                key={idx}
+                itemId={item.itemID}
+                itemDisplayName={item.displayName}
+                itemPrice={item.price}
+                itemCount={item.count}
+                info={info}
+                version={version}
+                getItemIconUrl={getItemIconUrl}
+                className="lg-kill-detail-item-slot"
+              >
+                <img
+                  className="lg-kill-detail-item-img"
+                  src={getItemIconUrl(version, item.itemID)}
+                  alt={item.displayName}
+                />
+              </ItemTooltip>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -70,6 +70,8 @@ interface Props {
   selectedChromaId: number | null;
   chromaResolving: boolean;
   onChromaSelect: (chromaId: number | null) => void;
+  /** Active level-form (Kayle ascension, etc.). null = default visibility. */
+  levelForm?: import('../api').LevelForm | null;
 }
 
 /* ================================================================
@@ -322,6 +324,8 @@ interface ChampionModelProps {
   positionOffset?: [number, number, number];
   /** When true, skips reporting emotes/height to parent (for companion models) */
   isCompanion?: boolean;
+  /** Active level-form definition (Kayle ascension, etc.). null = default visibility. */
+  levelForm?: import('../api').LevelForm | null;
   onChromaLoading: (loading: boolean) => void;
   onEmotesAvailable: (emotes: EmoteType[]) => void;
   onEmoteFinished: () => void;
@@ -333,7 +337,7 @@ interface ChampionModelProps {
 /** Stable reference for models that don't need a position offset (avoids effect re-runs) */
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -630,6 +634,59 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       Object.values(actions).forEach((a) => a?.stop());
     };
   }, [scene, actions, names, idleName, isFrightNight, positionOffset]);
+
+  /* ── Level-form mesh visibility (Kayle ascension, etc.) ────────
+       Toggles submesh visibility based on the active form definition.
+       The CDN uses generic mesh node names (mesh_0, mesh_0_1, …) but the
+       MATERIAL names carry the original submesh identifiers (level1, wings_mid, …).
+       We match form patterns against material names, using word-boundary logic
+       so "level1" doesn't accidentally match "level11".
+       First resets all meshes to their default (material userData) visibility,
+       then applies the form's show/hide overrides. */
+  useEffect(() => {
+    if (!levelForm) return;                       // no form system → setup effect's defaults win
+
+    /** Match pattern as a "whole token" inside a material name.
+     *  Treats underscores as word characters so "sword_hilt" does NOT match
+     *  "sword_hilt_combined", and "level1" does NOT match "level11". */
+    const segmentMatch = (name: string, pattern: string): boolean => {
+      const a = name.toLowerCase();
+      const b = pattern.toLowerCase();
+      if (a === b) return true;
+      const escaped = b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:[^a-z0-9_]|$)`, 'i').test(name);
+    };
+
+    /** Check if ANY material name on this mesh matches a pattern list. */
+    const matsMatchAny = (mats: THREE.Material[], patterns: string[]): boolean =>
+      patterns.some((p) => mats.some((m) => segmentMatch(m.name, p)));
+
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+      // 1) Reset to default visibility (same logic as the setup effect)
+      const defaultHidden = mats.some(
+        (m) => (m as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> }).userData?.visible === false,
+      );
+      mesh.visible = !defaultHidden;
+      mesh.castShadow = !defaultHidden;
+
+      // 2) Apply form overrides — match against MATERIAL names
+      const shouldShow = matsMatchAny(mats, levelForm.show);
+      const shouldHide = matsMatchAny(mats, levelForm.hide);
+
+      if (shouldShow) {
+        mesh.visible = true;
+        mesh.castShadow = true;
+      } else if (shouldHide) {
+        mesh.visible = false;
+        mesh.castShadow = false;
+      }
+    });
+  }, [scene, levelForm]);
 
   /* ── Reveal-after-settle: keep the model invisible while the animation
        mixer ticks naturally for several real-time frames.  This guarantees
@@ -1714,7 +1771,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, companionChromaTextureUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect }: Props) {
+export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, companionChromaTextureUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -1833,6 +1890,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
                     chromaTextureUrl={chromaTextureUrl}
                     facingRotationY={facingRotationY}
                     positionOffset={[0.4, 0, 0.4]}
+                    levelForm={levelForm}
                     onChromaLoading={handleChromaLoading}
                     onEmotesAvailable={handleEmotesAvailable}
                     onEmoteFinished={handleEmoteFinished}
@@ -1867,6 +1925,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
                   chromaTextureUrl={chromaTextureUrl}
                   facingRotationY={facingRotationY}
                   positionOffset={ZERO_OFFSET}
+                  levelForm={levelForm}
                   onChromaLoading={handleChromaLoading}
                   onEmotesAvailable={handleEmotesAvailable}
                   onEmoteFinished={handleEmoteFinished}

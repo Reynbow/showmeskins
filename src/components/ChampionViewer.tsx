@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, getChampionChromas, resolveChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, getChampionChromas, resolveChromaTextureUrl } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -99,6 +99,18 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   useEffect(() => {
     setUseAltForm(false);
   }, [champion.id]);
+
+  /* ── Level-form selector (Kayle ascension levels, etc.) ──── */
+  const levelFormChamp = LEVEL_FORM_CHAMPIONS[champion.id] ?? null;
+  const [levelFormIndex, setLevelFormIndex] = useState(0);
+
+  // Reset form index when switching champions
+  useEffect(() => {
+    setLevelFormIndex(0);
+  }, [champion.id]);
+
+  // The active form definition (null when champion has no level forms)
+  const activeLevelForm = levelFormChamp ? levelFormChamp.forms[levelFormIndex] ?? null : null;
 
   const ddSplashUrl = getSplashArt(champion.id, selectedSkin.num);
   const [splashUrl, setSplashUrl] = useState(ddSplashUrl);
@@ -269,6 +281,24 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </button>
         )}
 
+        {levelFormChamp && (
+          <div className="level-form-selector">
+            <span className="level-form-label">{levelFormChamp.label}</span>
+            <div className="level-form-buttons">
+              {levelFormChamp.forms.map((form, idx) => (
+                <button
+                  key={idx}
+                  className={`level-form-btn${levelFormIndex === idx ? ' active' : ''}`}
+                  onClick={() => setLevelFormIndex(idx)}
+                  title={form.label}
+                >
+                  {form.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="viewer-skin-badge">
           <span className="viewer-skin-name">{skinName}</span>
           <span className="viewer-skin-sep">|</span>
@@ -312,6 +342,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             selectedChromaId={selectedChromaId}
             chromaResolving={chromaResolving}
             onChromaSelect={handleChromaSelect}
+            levelForm={activeLevelForm}
           />
         </div>
       </div>

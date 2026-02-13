@@ -181,6 +181,62 @@
     inset 0 0 6px rgba(255, 255, 255, 0.1);
 }
 
+/* ── Level-form selector (Kayle ascension, etc.) ── */
+.level-form-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  background: rgba(1, 10, 19, 0.82);
+  border: 1px solid var(--lol-border-gold);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.level-form-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(200, 170, 110, 0.5);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.level-form-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.level-form-btn {
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(200, 170, 110, 0.55);
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.level-form-btn:hover {
+  color: var(--lol-gold);
+  border-color: rgba(200, 170, 110, 0.3);
+  background: rgba(200, 170, 110, 0.08);
+}
+
+.level-form-btn.active {
+  color: #1a1a1a;
+  background: var(--lol-gold);
+  border-color: var(--lol-gold);
+  box-shadow:
+    0 0 6px rgba(200, 170, 110, 0.25),
+    inset 0 0 4px rgba(255, 255, 255, 0.1);
+}
+
 .viewer-skin-badge {
   margin-left: auto;
   display: flex;

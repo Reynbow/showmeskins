@@ -180,6 +180,60 @@ export const ALTERNATE_FORMS: Record<string, { alias: string; label: string }> =
 };
 
 /**
+ * Champions whose models contain submeshes for multiple "level-up" forms.
+ * The GLB includes all meshes, with later-form meshes initially hidden
+ * (material userData.visible === false).  Each form defines which mesh names
+ * to force-show and which to force-hide relative to the default state.
+ *
+ * `meshNameMatch` uses case-insensitive substring matching against THREE.Mesh.name.
+ */
+export interface LevelForm {
+  label: string;
+  /** Mesh names (substrings) to force visible */
+  show: string[];
+  /** Mesh names (substrings) to force hidden */
+  hide: string[];
+}
+
+export interface LevelFormChampion {
+  /** UI group label, e.g. "Ascension" */
+  label: string;
+  forms: LevelForm[];
+}
+
+export const LEVEL_FORM_CHAMPIONS: Record<string, LevelFormChampion> = {
+  Kayle: {
+    label: 'Ascension',
+    forms: [
+      {
+        // Default: top wings + sword, basic armor
+        label: 'Level 1',
+        show: [],
+        hide: ['level11', 'wings_mid', 'wings_bot'],
+      },
+      {
+        // Bottom wings appear
+        label: 'Level 6',
+        show: ['wings_bot'],
+        hide: ['level11', 'wings_mid'],
+      },
+      {
+        // Middle wings + helmet/armor upgrade (level11 replaces level1)
+        label: 'Level 11',
+        show: ['wings_bot', 'wings_mid', 'level11'],
+        hide: ['level1'],
+      },
+      {
+        // Full ascension (dual-wield sword + fire VFX are runtime-spawned, not in model)
+        label: 'Level 16',
+        show: ['wings_bot', 'wings_mid', 'level11'],
+        hide: ['level1'],
+      },
+    ],
+  },
+};
+
+/**
  * Get the URL for a champion skin's 3D model (.glb)
  * Models are hosted on cdn.modelviewer.lol and proxied through Vite.
  *
