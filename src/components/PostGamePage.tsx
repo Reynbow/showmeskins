@@ -1,12 +1,8 @@
-import { useMemo, useRef, useState, useEffect, useCallback, Suspense, Component, type ReactNode } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
-import * as THREE from 'three';
+import { useMemo, useRef, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition } from '../types';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
-import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
-import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
+import { getLoadingArt, getLoadingArtFallback } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { buildKillEventKeys } from '../utils/killFeedKey';
 import './PostGamePage.css';
@@ -164,377 +160,6 @@ function kdaRatio(p: LiveGamePlayer): string {
 
 const MAX_ITEMS = 7;
 
-/* ── 3D Model — Taunt animation (fallback to idle), auto-sizing ───── */
-
-/** Check if an animation name is an attack animation */
-function isAttackAnim(name: string): boolean {
-  const n = name.replace(/\.anm$/i, '');
-  if (/_to_/i.test(n) || /to_attack/i.test(n)) return false;
-  return /attack/i.test(n);
-}
-
-const ATTACK_PATTERNS: RegExp[] = [
-  /^attack1(\.anm)?$/i,
-  /^attack_?1(\.anm)?$/i,
-  /^attack(\.anm)?$/i,
-  /^attack\d?(\.anm)?$/i,
-  /(?:^|_)attack(?:\d{0,2})?(\.anm)?$/i,
-  /attack/i,
-];
-
-function isIdleAnim(name: string): boolean {
-  const n = name.replace(/\.anm$/i, '');
-  if (!/idle/i.test(n)) return false;
-  if (/idle_?in(?:_|$)/i.test(n)) return false;
-  if (/_to_/i.test(n)) return false;
-  if (/to_idle/i.test(n)) return false;
-  return true;
-}
-
-const IDLE_PATTERNS: RegExp[] = [
-  /^idle_?base(\.anm)?$/i,
-  /^idle\d?_base(\.anm)?$/i,
-  /^idle_?1(\.anm)?$/i,
-  /^idle_?01(\.anm)?$/i,
-  /idle_loop(\.anm)?$/i,
-  /(?:^|_)idle(?:\d{0,2})?(\.anm)?$/i,
-  /idle/i,
-];
-
-/** Find the best attack animation, falling back to idle */
-function findBestAnimName(names: string[]): string | undefined {
-  // Try attack first
-  const attacks = names.filter(isAttackAnim);
-  if (attacks.length > 0) {
-    for (const pattern of ATTACK_PATTERNS) {
-      const match = attacks.find((n) => pattern.test(n));
-      if (match) return match;
-    }
-    return attacks[0];
-  }
-  // Fallback to idle
-  const idles = names.filter(isIdleAnim);
-  if (idles.length > 0) {
-    for (const pattern of IDLE_PATTERNS) {
-      const match = idles.find((n) => pattern.test(n));
-      if (match) return match;
-    }
-    return idles[0];
-  }
-  for (const pattern of IDLE_PATTERNS) {
-    const match = names.find((n) => pattern.test(n));
-    if (match) return match;
-  }
-  return names[0];
-}
-
-function PostGameChampionModel({ url, chromaTextureUrl }: { url: string; chromaTextureUrl?: string | null }) {
-  const { scene, animations } = useGLTF(url);
-  const groupRef = useRef<THREE.Group>(null);
-  const { actions, names } = useAnimations(animations, groupRef);
-  const originalTexturesRef = useRef<Map<THREE.MeshStandardMaterial, THREE.Texture | null>>(new Map());
-  const loadedChromaTexRef = useRef<THREE.Texture | null>(null);
-
-  const isFrightNight = useMemo(() => {
-    const m = url.match(/\/models\/([^/]+)\/([^/]+)\//);
-    return m != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(m[2]);
-  }, [url]);
-
-  const animName = useMemo(() => findBestAnimName(names), [names]);
-
-  /* ── Chroma texture overlay (same logic as LiveGamePage's LiveChampionModel) ── */
-  useEffect(() => {
-    const originals = originalTexturesRef.current;
-    let cancelled = false;
-
-    async function loadTextureWithRetry(url: string, retries = 3, timeoutMs = 15_000): Promise<THREE.Texture> {
-      for (let attempt = 0; attempt < retries; attempt++) {
-        if (cancelled) throw new Error('cancelled');
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-          const res = await fetch(url, { signal: controller.signal });
-          clearTimeout(timer);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          if (cancelled) throw new Error('cancelled');
-          const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' });
-          if (cancelled) { bitmap.close(); throw new Error('cancelled'); }
-          const texture = new THREE.CanvasTexture(bitmap as unknown as HTMLCanvasElement);
-          texture.flipY = false;
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.minFilter = THREE.LinearMipmapLinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          texture.needsUpdate = true;
-          return texture;
-        } catch (err) {
-          clearTimeout(timer);
-          if ((err as Error).message === 'cancelled') throw err;
-          if (attempt < retries - 1) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
-          throw err;
-        }
-      }
-      throw new Error('failed');
-    }
-
-    if (!chromaTextureUrl) {
-      for (const [mat, origTex] of originals) {
-        mat.map = origTex;
-        mat.needsUpdate = true;
-      }
-      if (loadedChromaTexRef.current) {
-        loadedChromaTexRef.current.dispose();
-        loadedChromaTexRef.current = null;
-      }
-      return;
-    }
-
-    loadTextureWithRetry(chromaTextureUrl, 3, 15_000)
-      .then((texture) => {
-        if (cancelled) { texture.dispose(); return; }
-        if (loadedChromaTexRef.current) loadedChromaTexRef.current.dispose();
-        loadedChromaTexRef.current = texture;
-        let maxSize = 0;
-        let maxTexRef: THREE.Texture | null = null;
-        const primaryMats: THREE.MeshStandardMaterial[] = [];
-        scene.traverse((child) => {
-          const mesh = child as THREE.Mesh;
-          if (!mesh.isMesh || !mesh.visible) return;
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          for (const mat of mats) {
-            const m = mat as THREE.MeshStandardMaterial;
-            const tex = originals.has(m) ? originals.get(m) : m.map;
-            if (tex?.image) {
-              const img = tex.image as { width?: number; height?: number };
-              const size = (img.width ?? 0) * (img.height ?? 0);
-              if (size > maxSize) { maxSize = size; maxTexRef = tex; primaryMats.length = 0; primaryMats.push(m); }
-              else if (size === maxSize && size > 0 && (isFrightNight || tex === maxTexRef)) primaryMats.push(m);
-            }
-          }
-        });
-        if (primaryMats.length > 0) {
-          const firstOrig = originals.get(primaryMats[0]) ?? primaryMats[0].map;
-          if (firstOrig) {
-            texture.offset.copy(firstOrig.offset);
-            texture.repeat.copy(firstOrig.repeat);
-            texture.wrapS = firstOrig.wrapS;
-            texture.wrapT = firstOrig.wrapT;
-          }
-          for (const m of primaryMats) {
-            if (!originals.has(m)) originals.set(m, m.map);
-            m.map = texture;
-            m.needsUpdate = true;
-          }
-        } else {
-          texture.dispose();
-          loadedChromaTexRef.current = null;
-        }
-      })
-      .catch(() => {
-        for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
-      });
-
-    return () => {
-      cancelled = true;
-      for (const [mat, origTex] of originals) { mat.map = origTex; mat.needsUpdate = true; }
-      originals.clear();
-      if (loadedChromaTexRef.current) {
-        loadedChromaTexRef.current.dispose();
-        loadedChromaTexRef.current = null;
-      }
-    };
-  }, [scene, chromaTextureUrl, isFrightNight]);
-
-  useEffect(() => {
-    return () => {
-      const originals = originalTexturesRef.current;
-      for (const [mat, origTex] of originals) {
-        mat.map = origTex;
-        mat.needsUpdate = true;
-      }
-      originals.clear();
-      if (loadedChromaTexRef.current) {
-        loadedChromaTexRef.current.dispose();
-        loadedChromaTexRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    scene.visible = false;
-    if (!groupRef.current) return;
-
-    scene.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      mesh.castShadow = true;
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const mat of mats) {
-        const m = mat as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> };
-        if (m.userData?.visible === false) { mesh.visible = false; mesh.castShadow = false; }
-        if (m.transparent) { m.alphaTest = m.alphaTest || 0.1; m.depthWrite = true; m.needsUpdate = true; }
-        if (isFrightNight && m.map) {
-          m.map.wrapS = THREE.ClampToEdgeWrapping;
-          m.map.wrapT = THREE.ClampToEdgeWrapping;
-          m.map.needsUpdate = true;
-        }
-      }
-    });
-
-    scene.scale.set(1, 1, 1);
-    scene.position.set(0, 0, 0);
-    scene.rotation.set(0, 0, 0);
-    scene.traverse((child) => {
-      if (child.scale.x < 0) child.scale.x = Math.abs(child.scale.x);
-      if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
-      if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
-    });
-
-    if (animName && actions[animName]) {
-      const anim = actions[animName]!;
-      anim.reset().play();
-      anim.getMixer().update(0);
-      anim.paused = true;
-    }
-    scene.updateMatrixWorld(true);
-
-    const _pos = new THREE.Vector3();
-    let groundY: number | null = null;
-    let overheadY: number | null = null;
-    scene.traverse((child) => {
-      if (!(child as THREE.Bone).isBone) return;
-      const name = child.name.toLowerCase();
-      if (name === 'buffbone_glb_ground_loc') { child.getWorldPosition(_pos); groundY = _pos.y; }
-      else if (name === 'c_buffbone_glb_overhead_loc') { child.getWorldPosition(_pos); overheadY = _pos.y; }
-    });
-
-    let modelHeight: number;
-    if (groundY !== null && overheadY !== null) {
-      modelHeight = Math.abs(overheadY! - groundY!);
-    } else {
-      const box = new THREE.Box3();
-      scene.traverse((child) => { if ((child as THREE.Mesh).isMesh && child.visible) box.expandByObject(child); });
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      modelHeight = size.y || 3;
-    }
-
-    const targetHeight = 3.4;
-    const urlMatch = url.match(/\/models\/([^/]+)\//);
-    const alias = urlMatch?.[1] ?? '';
-    const scaleMult = getChampionScale(alias);
-    const scale = (targetHeight / Math.max(modelHeight, 0.01)) * scaleMult;
-    scene.scale.setScalar(scale);
-    scene.updateMatrixWorld(true);
-
-    let footY = 0, centerX = 0, centerZ = 0;
-    const _gp: { v: THREE.Vector3 | null } = { v: null };
-    scene.traverse((child) => {
-      if (_gp.v === null && (child as THREE.Bone).isBone && /^buffbone_glb_ground_loc$/i.test(child.name)) {
-        _gp.v = new THREE.Vector3();
-        child.getWorldPosition(_gp.v);
-      }
-    });
-    if (_gp.v) { centerX = _gp.v.x; footY = _gp.v.y; centerZ = _gp.v.z; }
-    else {
-      const box = new THREE.Box3();
-      scene.traverse((child) => { if ((child as THREE.Mesh).isMesh && child.visible) box.expandByObject(child); });
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      centerX = center.x; centerZ = center.z; footY = box.min.y;
-    }
-
-    scene.position.set(-centerX, -footY - 1.7, -centerZ);
-    scene.visible = true;
-  }, [scene, actions, names, animName, url, isFrightNight]);
-
-
-  return (
-    <group ref={groupRef}>
-      <primitive object={scene} />
-    </group>
-  );
-}
-
-function ModelLoadingIndicator() {
-  const meshRef = useRef<THREE.Mesh>(null);
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.elapsedTime * 1.5;
-      meshRef.current.rotation.x = state.clock.elapsedTime * 0.7;
-      meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 2) * 0.15;
-    }
-  });
-  return (
-    <mesh ref={meshRef}>
-      <octahedronGeometry args={[0.6, 0]} />
-      <meshStandardMaterial color="#c8aa6e" wireframe emissive="#c8aa6e" emissiveIntensity={0.8} toneMapped={false} />
-    </mesh>
-  );
-}
-
-class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode; resetKey?: string; onError?: () => void }, { hasError: boolean }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch() { this.props.onError?.(); }
-  componentDidUpdate(prev: { resetKey?: string }) {
-    if (prev.resetKey !== this.props.resetKey) this.setState({ hasError: false });
-  }
-  render() { return this.state.hasError ? this.props.fallback : this.props.children; }
-}
-
-function ChampionModelCanvas({ url, fallbackUrl, chromaTextureUrl }: { url: string; fallbackUrl?: string; chromaTextureUrl?: string | null }) {
-  const [useFallback, setUseFallback] = useState(false);
-  const activeUrl = useFallback && fallbackUrl ? fallbackUrl : url;
-
-  useEffect(() => { setUseFallback(false); }, [url]);
-
-  return (
-    <ModelErrorBoundary
-      resetKey={`${activeUrl}:${chromaTextureUrl ?? ''}`}
-      fallback={null}
-      onError={() => { if (fallbackUrl && !useFallback) setUseFallback(true); }}
-    >
-      <Canvas
-        shadows
-        camera={{ position: [0, 0.5, 5.5], fov: 45 }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, alpha: true }}
-        style={{ background: 'transparent' }}
-      >
-        <fog attach="fog" args={['#010a13', 14, 30]} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[8, 8, -2]} intensity={1.2} color="#f0e6d2" />
-        <directionalLight position={[0, 4, -6]} intensity={0.4} color="#0ac8b9" />
-        <pointLight position={[1, 3, -5]} intensity={0.6} color="#0ac8b9" />
-        <pointLight position={[5, 3, 2]} intensity={0.6} color="#c8aa6e" />
-        <pointLight position={[-5, 4, 4]} intensity={0.5} color="#ff69b4" />
-        <spotLight position={[0, 8, 0]} intensity={0.8} color="#f0e6d2" angle={0.5} penumbra={0.8} />
-        <directionalLight
-          position={[-5, 10, 5]}
-          intensity={0.25}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-          shadow-camera-left={-6}
-          shadow-camera-right={6}
-          shadow-camera-top={6}
-          shadow-camera-bottom={-6}
-          shadow-bias={-0.002}
-          shadow-radius={50}
-        />
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.69, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <shadowMaterial opacity={0.3} />
-        </mesh>
-        <Suspense fallback={<ModelLoadingIndicator />}>
-          <PostGameChampionModel key={activeUrl} url={activeUrl} chromaTextureUrl={chromaTextureUrl} />
-        </Suspense>
-        <OrbitControls enableRotate enablePan={false} enableZoom={false} enableDamping dampingFactor={0.05} target={[0, -0.3, 0]} />
-      </Canvas>
-    </ModelErrorBoundary>
-  );
-}
-
 /* ================================================================
    Main PostGamePage component
    ================================================================ */
@@ -618,9 +243,21 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     }
   }
 
-  // Resolve model URLs + chroma textures (uses resolveLcuSkinNum for chroma detection)
-  const leftModelInfo = usePlayerModelInfo(leftPlayer, champions);
-  const rightModelInfo = usePlayerModelInfo(rightPlayer, champions);
+  // Resolve champion art URLs for the flanking artwork
+  const resolveArtUrls = (player: LiveGamePlayer | undefined) => {
+    if (!player) return null;
+    const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
+    const championId = match?.id ?? player.championName;
+    const championKey = match?.key ?? '0';
+    const skinNum = player.skinID;
+    return {
+      artUrl: getLoadingArt(championId, skinNum),
+      fallbackUrl: getLoadingArtFallback(championKey, skinNum),
+      baseFallbackUrl: getLoadingArt(championId, 0),
+    };
+  };
+  const leftArt = resolveArtUrls(leftPlayer);
+  const rightArt = resolveArtUrls(rightPlayer);
 
   // Team results
   const blueTeam = useMemo(() => sortByRole(data.players.filter((p) => p.team === 'ORDER')), [data.players]);
@@ -728,22 +365,40 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
         </div>
       </div>
 
-      {/* 3D models flanking the showcase — left and right */}
-      {leftModelInfo?.modelUrl && (
-        <div className="pg-model-bg pg-model-bg--left">
-          <ChampionModelCanvas
-            url={leftModelInfo.modelUrl}
-            fallbackUrl={leftModelInfo.fallbackUrl}
-            chromaTextureUrl={leftModelInfo.chromaTextureUrl}
+      {/* Champion artwork flanking the showcase — left and right */}
+      {leftArt && (
+        <div className="pg-art-bg pg-art-bg--left">
+          <img
+            className="pg-art-bg-img"
+            src={leftArt.artUrl}
+            alt=""
+            loading="eager"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src !== leftArt.fallbackUrl && img.src !== leftArt.baseFallbackUrl) {
+                img.src = leftArt.fallbackUrl;
+              } else if (img.src === leftArt.fallbackUrl) {
+                img.src = leftArt.baseFallbackUrl;
+              }
+            }}
           />
         </div>
       )}
-      {rightModelInfo?.modelUrl && (
-        <div className="pg-model-bg pg-model-bg--right">
-          <ChampionModelCanvas
-            url={rightModelInfo.modelUrl}
-            fallbackUrl={rightModelInfo.fallbackUrl}
-            chromaTextureUrl={rightModelInfo.chromaTextureUrl}
+      {rightArt && (
+        <div className="pg-art-bg pg-art-bg--right">
+          <img
+            className="pg-art-bg-img"
+            src={rightArt.artUrl}
+            alt=""
+            loading="eager"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src !== rightArt.fallbackUrl && img.src !== rightArt.baseFallbackUrl) {
+                img.src = rightArt.fallbackUrl;
+              } else if (img.src === rightArt.fallbackUrl) {
+                img.src = rightArt.baseFallbackUrl;
+              }
+            }}
           />
         </div>
       )}
