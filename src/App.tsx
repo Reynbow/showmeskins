@@ -471,12 +471,14 @@ function App() {
               setLiveGameData((prev) => {
                 const players = data.players ?? [];
                 const killFeed = data.killFeed ?? [];
+                const liveEvents = data.liveEvents ?? [];
                 const gameTime = data.gameTime ?? 0;
 
                 const isNewTimeline =
                   !prev ||
                   gameTime < prev.gameTime ||
-                  killFeed.length < (prev.killFeed?.length ?? 0);
+                  killFeed.length < (prev.killFeed?.length ?? 0) ||
+                  liveEvents.length < (prev.liveEvents?.length ?? 0);
                 const snapshots: Record<number, KillEventPlayerSnapshot> =
                   isNewTimeline ? {} : { ...(prev.killFeedSnapshots ?? {}) };
 
@@ -494,6 +496,7 @@ function App() {
                   players,
                   partyMembers: data.partyMembers ?? prev?.partyMembers ?? [],
                   killFeed,
+                  liveEvents,
                   killFeedSnapshots: snapshots,
                 };
               });

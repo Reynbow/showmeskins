@@ -29,6 +29,7 @@ type LiveGameUpdate struct {
 	Players      []PlayerInfo     `json:"players"`
 	PartyMembers []string         `json:"partyMembers,omitempty"`
 	KillFeed     []KillEvent      `json:"killFeed,omitempty"`
+	LiveEvents   []LiveGameEvent  `json:"liveEvents,omitempty"`
 }
 
 // KillEvent represents a champion kill for the kill feed.
@@ -39,6 +40,20 @@ type KillEvent struct {
 	Assisters   []string `json:"assisters"`   // champion display names
 	KillerChamp string   `json:"killerChamp"` // champion id name (for icon)
 	VictimChamp string   `json:"victimChamp"` // champion id name (for icon)
+}
+
+// LiveGameEvent carries objective and timeline signals from the Riot live API.
+type LiveGameEvent struct {
+	EventName    string   `json:"eventName"`
+	EventTime    float64  `json:"eventTime"`
+	KillerName   string   `json:"killerName,omitempty"`
+	VictimName   string   `json:"victimName,omitempty"`
+	Assisters    []string `json:"assisters,omitempty"`
+	TurretKilled string   `json:"turretKilled,omitempty"`
+	InhibKilled  string   `json:"inhibKilled,omitempty"`
+	MonsterType  string   `json:"monsterType,omitempty"`
+	DragonType   string   `json:"dragonType,omitempty"`
+	Stolen       bool     `json:"stolen,omitempty"`
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -241,11 +256,12 @@ func (t *LiveGameTracker) poll() {
 }
 
 func (t *LiveGameTracker) computeHash(u *LiveGameUpdate) string {
-	h := fmt.Sprintf("%.0f:%d:%.0f:k%d",
+	h := fmt.Sprintf("%.0f:%d:%.0f:k%d:e%d",
 		u.GameTime,
 		u.Active.Level,
 		u.Active.CurrentGold,
 		len(u.KillFeed),
+		len(u.LiveEvents),
 	)
 	for _, p := range u.Players {
 		h += fmt.Sprintf("|%s:%d:%d:%d:%d:%d:%d",
@@ -271,12 +287,17 @@ type gameEvents struct {
 }
 
 type gameEvent struct {
-	EventName  string   `json:"EventName"`
-	EventTime  float64  `json:"EventTime"`
-	Result     string   `json:"Result,omitempty"`     // "Win" or "Lose" on GameEnd events
-	KillerName string   `json:"KillerName,omitempty"` // ChampionKill
-	VictimName string   `json:"VictimName,omitempty"` // ChampionKill
-	Assisters  []string `json:"Assisters,omitempty"`  // ChampionKill
+	EventName    string   `json:"EventName"`
+	EventTime    float64  `json:"EventTime"`
+	Result       string   `json:"Result,omitempty"`       // "Win" or "Lose" on GameEnd events
+	KillerName   string   `json:"KillerName,omitempty"`   // multiple events
+	VictimName   string   `json:"VictimName,omitempty"`   // ChampionKill
+	Assisters    []string `json:"Assisters,omitempty"`    // kill/objective events
+	TurretKilled string   `json:"TurretKilled,omitempty"` // TurretKilled
+	InhibKilled  string   `json:"InhibKilled,omitempty"`  // InhibKilled
+	MonsterType  string   `json:"MonsterType,omitempty"`  // DragonKill/BaronKill/HeraldKill/etc
+	DragonType   string   `json:"DragonType,omitempty"`   // DragonKill
+	Stolen       bool     `json:"Stolen,omitempty"`       // epic objective stolen
 }
 
 type activePlayerData struct {
@@ -464,9 +485,24 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		nameToChamp[name] = p.ChampionName
 	}
 
-	// Extract kill events from game events
+	// Extract kill feed + live events from game events
 	var killFeed []KillEvent
+	var liveEvents []LiveGameEvent
 	for _, ev := range data.Events.Events {
+		// Pass through objective/timeline event metadata for richer front-end estimation.
+		liveEvents = append(liveEvents, LiveGameEvent{
+			EventName:    ev.EventName,
+			EventTime:    ev.EventTime,
+			KillerName:   ev.KillerName,
+			VictimName:   ev.VictimName,
+			Assisters:    ev.Assisters,
+			TurretKilled: ev.TurretKilled,
+			InhibKilled:  ev.InhibKilled,
+			MonsterType:  ev.MonsterType,
+			DragonType:   ev.DragonType,
+			Stolen:       ev.Stolen,
+		})
+
 		if ev.EventName != "ChampionKill" {
 			continue
 		}
@@ -513,5 +549,6 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		},
 		Players:  players,
 		KillFeed: killFeed,
+		LiveEvents: liveEvents,
 	}
 }

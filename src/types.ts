@@ -171,6 +171,19 @@ export interface KillEventPlayerSnapshot {
   byChamp: Record<string, LiveGamePlayer>;
 }
 
+export interface LiveGameEvent {
+  eventName: string;
+  eventTime: number;
+  killerName?: string;
+  victimName?: string;
+  assisters?: string[];
+  turretKilled?: string;
+  inhibKilled?: string;
+  monsterType?: string;
+  dragonType?: string;
+  stolen?: boolean;
+}
+
 export interface LiveGameData {
   gameTime: number;
   gameMode: string;
@@ -179,6 +192,7 @@ export interface LiveGameData {
   players: LiveGamePlayer[];
   partyMembers?: string[];
   killFeed?: KillEvent[];
+  liveEvents?: LiveGameEvent[];
   /** Frozen player state at the moment each kill happened, keyed by eventTime */
   killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;
 }

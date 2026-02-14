@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, Suspense, Component,
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats } from '../types';
+import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition, ChampionStats, LiveGameEvent } from '../types';
 import { getChampionDetail, getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS, getLoadingArt, getLoadingArtFallback } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { usePlayerModelInfo } from '../hooks/usePlayerModelInfo';
@@ -80,6 +80,121 @@ function formatTime(seconds: number): string {
 function formatGold(gold: number): string {
   if (gold >= 1000) return `${(gold / 1000).toFixed(1)}k`;
   return Math.floor(gold).toString();
+}
+
+function getItemValue(item: LiveGamePlayer['items'][number]): number {
+  const count = item.count > 0 ? item.count : 1;
+  return item.price * count;
+}
+
+const STARTING_GOLD = 500;
+const PASSIVE_GOLD_PER_MINUTE = 122;
+const AVG_GOLD_PER_CS = 28;
+const KILL_GOLD = 300;
+const ASSIST_GOLD = 150;
+const FIRST_BLOOD_BONUS = 100;
+const SHUTDOWN_BONUS = 250;
+const TURRET_GOLD = 400;
+const FIRST_TURRET_BONUS = 150;
+const INHIBITOR_GOLD = 50;
+const DRAGON_GOLD = 125;
+const HERALD_GOLD = 100;
+const BARON_GOLD = 1500;
+const ATAKHAN_GOLD = 300;
+const VOIDGRUB_GOLD = 75;
+
+function estimatePlayerGoldEarned(player: LiveGamePlayer, gameTimeSeconds: number): number {
+  const itemGold = player.items.reduce((sum, item) => sum + getItemValue(item), 0);
+  const gameMinutes = Math.max(0, gameTimeSeconds) / 60;
+  const estimatedFromStats =
+    STARTING_GOLD
+    + (gameMinutes * PASSIVE_GOLD_PER_MINUTE)
+    + (player.creepScore * AVG_GOLD_PER_CS)
+    + (player.kills * KILL_GOLD)
+    + (player.assists * ASSIST_GOLD);
+  return Math.max(itemGold, estimatedFromStats);
+}
+
+function estimateTeamGoldEarned(
+  players: LiveGamePlayer[],
+  kills: KillEvent[],
+  events: LiveGameEvent[] | undefined,
+  gameTimeSeconds: number,
+): { order: number; chaos: number } {
+  let order = 0;
+  let chaos = 0;
+
+  const nameToTeam: Record<string, 'ORDER' | 'CHAOS'> = {};
+  for (const p of players) {
+    nameToTeam[p.summonerName] = p.team;
+    if (p.team === 'ORDER') order += estimatePlayerGoldEarned(p, gameTimeSeconds);
+    else chaos += estimatePlayerGoldEarned(p, gameTimeSeconds);
+  }
+
+  for (const kill of kills) {
+    const killerTeam = nameToTeam[kill.killerName];
+    if (!killerTeam) continue;
+    if (kill.firstBlood) {
+      if (killerTeam === 'ORDER') order += FIRST_BLOOD_BONUS;
+      else chaos += FIRST_BLOOD_BONUS;
+    }
+    if (kill.shutdown) {
+      if (killerTeam === 'ORDER') order += SHUTDOWN_BONUS;
+      else chaos += SHUTDOWN_BONUS;
+    }
+  }
+
+  let firstTurretGiven = false;
+  for (const ev of events ?? []) {
+    const killerTeam = ev.killerName ? nameToTeam[ev.killerName] : undefined;
+    if (!killerTeam) continue;
+
+    const addGold = (amount: number) => {
+      if (killerTeam === 'ORDER') order += amount;
+      else chaos += amount;
+    };
+
+    switch (ev.eventName) {
+      case 'TurretKilled':
+        addGold(TURRET_GOLD);
+        if (!firstTurretGiven) {
+          addGold(FIRST_TURRET_BONUS);
+          firstTurretGiven = true;
+        }
+        break;
+      case 'InhibKilled':
+        addGold(INHIBITOR_GOLD);
+        break;
+      case 'DragonKill':
+        addGold(DRAGON_GOLD);
+        break;
+      case 'HeraldKill':
+        addGold(HERALD_GOLD);
+        break;
+      case 'HordeKill':
+        addGold(VOIDGRUB_GOLD);
+        break;
+      case 'BaronKill':
+        addGold(BARON_GOLD);
+        break;
+      case 'FirstBrick':
+        if (!firstTurretGiven) {
+          addGold(FIRST_TURRET_BONUS);
+          firstTurretGiven = true;
+        }
+        break;
+      case 'AtakhanKill':
+        addGold(ATAKHAN_GOLD);
+        break;
+      default:
+        if (ev.monsterType?.toLowerCase().includes('atakhan')) {
+          addGold(ATAKHAN_GOLD);
+        }
+        break;
+    }
+  }
+
+  return { order, chaos };
 }
 
 function normalizePlayerName(name: string): string {
@@ -880,6 +995,10 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
 
   const blueKills = blueTeam.reduce((sum, p) => sum + p.kills, 0);
   const redKills = redTeam.reduce((sum, p) => sum + p.kills, 0);
+  const enrichedKillFeed = useMemo(
+    () => enrichKillFeed(data.killFeed ?? [], data.players, data.killFeedSnapshots),
+    [data.killFeed, data.players, data.killFeedSnapshots],
+  );
 
   // Active player row index and side (for floating "you" chevron)
   const activePlayerRow = useMemo(() => {
@@ -944,11 +1063,13 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     return () => ro.disconnect();
   }, [activePlayerRow, mvpRow]);
 
-  // Estimate team gold from item prices (API doesn't expose per-player gold)
-  const teamItemGold = (players: typeof blueTeam) =>
-    players.reduce((total, p) => total + p.items.reduce((s, item) => s + item.price * item.count, 0), 0);
-  const blueGold = teamItemGold(blueTeam);
-  const redGold = teamItemGold(redTeam);
+  // Estimate team gold from player incomes + kill-event bonuses.
+  const teamGold = useMemo(
+    () => estimateTeamGoldEarned(data.players, enrichedKillFeed, data.liveEvents, data.gameTime),
+    [data.players, enrichedKillFeed, data.liveEvents, data.gameTime],
+  );
+  const blueGold = teamGold.order;
+  const redGold = teamGold.chaos;
 
   // Show hero formation during pre-game (loading / fountain before minions); clear once match starts
   // Use both gameTime and items: Riot's gameTime format can vary; "no items" = true fountain phase
@@ -1212,7 +1333,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
         {/* Kill Feed */}
         {data.killFeed && data.killFeed.length > 0 && (
           <KillFeed
-            kills={enrichKillFeed(data.killFeed, data.players, data.killFeedSnapshots)}
+            kills={enrichedKillFeed}
             players={data.players}
             killFeedSnapshots={data.killFeedSnapshots}
             champions={champions}
