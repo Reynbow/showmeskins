@@ -27,6 +27,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
   const [companionChromaTextureUrl, setCompanionChromaTextureUrl] = useState<string | null>(null);
   const [azirSoldierModelUrl, setAzirSoldierModelUrl] = useState<string | null>(null);
+  const [azirTowerModelUrl, setAzirTowerModelUrl] = useState<string | null>(null);
 
   // Track which skin the current chroma state belongs to.
   // When the skin changes we clear chroma state synchronously during render
@@ -135,13 +136,13 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   useEffect(() => {
     if (champion.id !== 'Azir') {
       setAzirSoldierModelUrl(null);
+      setAzirTowerModelUrl(null);
       return;
     }
 
     let cancelled = false;
 
-    const resolveAzirSoldierModel = async (): Promise<string | null> => {
-      const aliases = ['azirsoldier', 'azir_soldier', 'azirsandwarrior'];
+    const resolveModelFromAliases = async (aliases: string[]): Promise<string | null> => {
       for (const alias of aliases) {
         const url = `/model-cdn/lol/models/${alias}/${selectedSkin.id}/model.glb`;
         try {
@@ -154,23 +155,32 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
       return null;
     };
 
-    resolveAzirSoldierModel().then((soldierUrl) => {
+    Promise.all([
+      resolveModelFromAliases(['azirsoldier', 'azir_soldier', 'azirsandwarrior']),
+      resolveModelFromAliases(['azirtower', 'azir_tower', 'azirsundisc', 'azir_sundisc', 'sundisc']),
+    ]).then(([soldierUrl, towerUrl]) => {
       if (cancelled) return;
       setAzirSoldierModelUrl(soldierUrl);
+      setAzirTowerModelUrl(towerUrl);
     });
 
     return () => { cancelled = true; };
   }, [champion.id, selectedSkin.id]);
 
-  const extraModels = useMemo(
-    () => (champion.id === 'Azir' && azirSoldierModelUrl
-      ? [{ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] as [number, number, number] }]
-      : []),
-    [champion.id, azirSoldierModelUrl],
-  );
+  const extraModels = useMemo(() => {
+    if (champion.id !== 'Azir') return [];
+    const models: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number }> = [];
+    if (azirSoldierModelUrl) {
+      models.push({ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] });
+    }
+    if (azirTowerModelUrl) {
+      models.push({ url: azirTowerModelUrl, positionOffset: [0.15, -0.1, -3.4], scaleMultiplier: 2.1 });
+    }
+    return models;
+  }, [champion.id, azirSoldierModelUrl, azirTowerModelUrl]);
 
   const mainModelOffset = useMemo<[number, number, number] | undefined>(
-    () => (champion.id === 'Azir' ? [-0.6, 0, -0.9] : undefined),
+    () => (champion.id === 'Azir' ? [-0.6, 0, -0.2] : undefined),
     [champion.id],
   );
 

@@ -66,7 +66,7 @@ interface EmoteRequest {
 interface Props {
   modelUrl: string;
   companionModelUrl?: string | null;
-  extraModels?: Array<{ url: string; positionOffset: [number, number, number] }>;
+  extraModels?: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number }>;
   mainModelOffset?: [number, number, number];
   chromaTextureUrl: string | null;
   companionChromaTextureUrl?: string | null;
@@ -374,6 +374,8 @@ interface ChampionModelProps {
   facingRotationY: number;
   /** World-space offset [x, y, z] applied to the model root (for dual-model layouts) */
   positionOffset?: [number, number, number];
+  /** Additional multiplicative scale for this model instance (default 1). */
+  scaleMultiplier?: number;
   /** When true, skips reporting emotes/height to parent (for companion models) */
   isCompanion?: boolean;
   /** Active level-form definition (Kayle ascension, etc.). null = default visibility. */
@@ -389,7 +391,7 @@ interface ChampionModelProps {
 /** Stable reference for models that don't need a position offset (avoids effect re-runs) */
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferredIdleAnimation = null, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferredIdleAnimation = null, facingRotationY, positionOffset = ZERO_OFFSET, scaleMultiplier = 1, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -664,7 +666,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
         ?? SKIN_OVERRIDES[urlMatch[1]])                    // alias (least specific)
       : undefined;
     const championScale = urlMatch ? getChampionScale(urlMatch[1]) : 1;
-    const scale = (targetHeight / height) * (overrides?.scale ?? championScale);
+    const scale = (targetHeight / height) * (overrides?.scale ?? championScale) * scaleMultiplier;
 
     scene.scale.set(
       (GLOBAL_MIRROR_X ? -1 : 1) * scale,
@@ -746,7 +748,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       pendingRevealRef.current = false;
       Object.values(actions).forEach((a) => a?.stop());
     };
-  }, [scene, actions, names, idleName, isFrightNight, isKayle, isAzirFamily, positionOffset]);
+  }, [scene, actions, names, idleName, isFrightNight, isKayle, isAzirFamily, positionOffset, scaleMultiplier]);
 
   /* ── Level-form mesh visibility (Kayle ascension, etc.) ────────
        Toggles submesh visibility based on the active form definition.
@@ -2399,6 +2401,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
                     chromaTextureUrl={null}
                     facingRotationY={facingRotationY}
                     positionOffset={extra.positionOffset}
+                    scaleMultiplier={extra.scaleMultiplier ?? 1}
                     isCompanion
                     onChromaLoading={() => {}}
                     onEmotesAvailable={() => {}}
