@@ -1,9 +1,16 @@
 import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo } from './types';
 
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
-const MODEL_CDN = '/model-cdn'; // proxied through Vite to cdn.modelviewer.lol
+const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? 'https://cdn.modelviewer.lol').replace(/\/+$/, '');
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
 const CDRAGON_RAW = 'https://raw.communitydragon.org';
+
+/**
+ * Build a model CDN asset URL for a champion alias + skin ID.
+ */
+export function getModelAssetUrl(alias: string, skinId: string, filename = 'model.glb'): string {
+  return `${MODEL_CDN}/lol/models/${alias}/${skinId}/${filename}`;
+}
 
 let cachedVersion: string | null = null;
 
@@ -183,6 +190,29 @@ export const ALTERNATE_FORMS: Record<string, { label: string; alias?: string; te
 };
 
 /**
+ * Optional historical/alternate full-model variants for champions.
+ * These are distinct from ALTERNATE_FORMS (spider/cougar/etc.) and are
+ * intended for legacy model versions (e.g. pre-rework visuals).
+ */
+export interface ChampionModelVersion {
+  /** Stable ID used in UI state */
+  id: string;
+  /** UI label (e.g. "2011") */
+  label: string;
+  /** Model alias in the model CDN path (required for dedicated model variants) */
+  alias?: string;
+  /** Optional texture file override for texture-only variants */
+  textureFile?: string;
+  /** Optional preferred idle animation name for this version */
+  idleAnimation?: string;
+}
+
+export const CHAMPION_MODEL_VERSIONS: Record<string, ChampionModelVersion[]> = {
+  // Example:
+  // Caitlyn: [{ id: 'legacy-2011', label: '2011', alias: 'caitlyn_2011' }],
+};
+
+/**
  * Champions whose models contain submeshes for multiple "level-up" forms.
  * The GLB includes all meshes, with later-form meshes initially hidden
  * (material userData.visible === false).  Each form defines which mesh names
@@ -282,7 +312,7 @@ export const LEVEL_FORM_SKINS: Record<string, LevelFormChampion> = {
  */
 export function getModelUrl(championId: string, skinId: string): string {
   const alias = championId.toLowerCase();
-  return `${MODEL_CDN}/lol/models/${alias}/${skinId}/model.glb`;
+  return getModelAssetUrl(alias, skinId);
 }
 
 /**
@@ -292,7 +322,7 @@ export function getModelUrl(championId: string, skinId: string): string {
 export function getAlternateModelUrl(championId: string, skinId: string): string | null {
   const form = ALTERNATE_FORMS[championId];
   if (!form?.alias) return null;
-  return `${MODEL_CDN}/lol/models/${form.alias}/${skinId}/model.glb`;
+  return getModelAssetUrl(form.alias, skinId);
 }
 
 /**
@@ -303,7 +333,26 @@ export function getAlternateFormTextureUrl(championId: string, skinId: string): 
   const form = ALTERNATE_FORMS[championId];
   if (!form?.textureFile) return null;
   const alias = form.alias ?? championId.toLowerCase();
-  return `${MODEL_CDN}/lol/models/${alias}/${skinId}/${form.textureFile}`;
+  return getModelAssetUrl(alias, skinId, form.textureFile);
+}
+
+/**
+ * Get the URL for a champion model-version variant (.glb).
+ * Returns null when the variant does not provide a dedicated model alias.
+ */
+export function getModelVersionUrl(version: ChampionModelVersion, championId: string, skinId: string): string | null {
+  if (!version.alias) return null;
+  return getModelAssetUrl(version.alias, skinId);
+}
+
+/**
+ * Get the URL for a champion model-version texture override.
+ * Returns null when the variant does not provide a texture override.
+ */
+export function getModelVersionTextureUrl(version: ChampionModelVersion, championId: string, skinId: string): string | null {
+  if (!version.textureFile) return null;
+  const alias = version.alias ?? championId.toLowerCase();
+  return getModelAssetUrl(alias, skinId, version.textureFile);
 }
 
 /**
@@ -313,7 +362,7 @@ export function getAlternateFormTextureUrl(championId: string, skinId: string): 
 export function getCompanionModelUrl(championId: string, skinId: string): string | null {
   const comp = COMPANION_MODELS[championId];
   if (!comp) return null;
-  return `${MODEL_CDN}/lol/models/${comp.alias}/${skinId}/model.glb`;
+  return getModelAssetUrl(comp.alias, skinId);
 }
 
 import { getChampionScaleFromHeight } from './data/championHeights';

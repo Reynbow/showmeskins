@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, getChampionChromas, resolveChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, CHAMPION_MODEL_VERSIONS, getModelVersionUrl, getModelVersionTextureUrl, getChampionChromas, resolveChromaTextureUrl, getModelAssetUrl, type ChampionModelVersion } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -17,6 +17,10 @@ interface Props {
   onLiveGame?: () => void;
 }
 
+type ExtraModel = { url: string; positionOffset: [number, number, number]; scaleMultiplier?: number };
+type ResolvedModelVersion = ChampionModelVersion & { modelUrl: string; resolvedSkinId: string };
+const EMPTY_MODEL_VERSIONS: ChampionModelVersion[] = [];
+
 export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, onSkinSelect, onPrevChampion, onNextChampion, hasLiveGame, onLiveGame }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('model');
 
@@ -26,8 +30,9 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [chromaResolving, setChromaResolving] = useState(false);
   const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
   const [companionChromaTextureUrl, setCompanionChromaTextureUrl] = useState<string | null>(null);
-  const [azirSoldierModelUrl, setAzirSoldierModelUrl] = useState<string | null>(null);
-  const [azirTowerModelUrl, setAzirTowerModelUrl] = useState<string | null>(null);
+  const [resolvedExtraModels, setResolvedExtraModels] = useState<ExtraModel[]>([]);
+  const [resolvedModelVersions, setResolvedModelVersions] = useState<ResolvedModelVersion[]>([]);
+  const [modelVersionIndex, setModelVersionIndex] = useState(0);
 
   // Track which skin the current chroma state belongs to.
   // When the skin changes we clear chroma state synchronously during render
@@ -102,6 +107,60 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     setUseAltForm(false);
   }, [champion.id]);
 
+  // Resolve historical/alternate model versions for this champion + selected skin.
+  // If the selected skin variant is unavailable, fall back to base skin.
+  const modelVersions = useMemo(
+    () => CHAMPION_MODEL_VERSIONS[champion.id] ?? EMPTY_MODEL_VERSIONS,
+    [champion.id],
+  );
+  useEffect(() => {
+    if (modelVersions.length === 0) {
+      setResolvedModelVersions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const baseSkinId = `${parseInt(champion.key, 10) * 1000}`;
+
+    const headExists = async (url: string): Promise<boolean> => {
+      try {
+        const res = await fetch(url, { method: 'HEAD' });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    Promise.all(modelVersions.map(async (version) => {
+      const selectedSkinUrl = getModelVersionUrl(version, champion.id, selectedSkin.id);
+      if (selectedSkinUrl && await headExists(selectedSkinUrl)) {
+        return { ...version, modelUrl: selectedSkinUrl, resolvedSkinId: selectedSkin.id } as ResolvedModelVersion;
+      }
+      if (baseSkinId !== selectedSkin.id) {
+        const baseSkinUrl = getModelVersionUrl(version, champion.id, baseSkinId);
+        if (baseSkinUrl && await headExists(baseSkinUrl)) {
+          return { ...version, modelUrl: baseSkinUrl, resolvedSkinId: baseSkinId } as ResolvedModelVersion;
+        }
+      }
+      return null;
+    })).then((versions) => {
+      if (cancelled) return;
+      setResolvedModelVersions(versions.filter((v): v is ResolvedModelVersion => v !== null));
+    });
+
+    return () => { cancelled = true; };
+  }, [champion.id, champion.key, modelVersions, selectedSkin.id]);
+
+  // Reset selected historical version when changing champion, or when variants
+  // shrink and the current index becomes invalid.
+  useEffect(() => {
+    setModelVersionIndex(0);
+  }, [champion.id]);
+
+  useEffect(() => {
+    if (modelVersionIndex > resolvedModelVersions.length) setModelVersionIndex(0);
+  }, [resolvedModelVersions.length, modelVersionIndex]);
+
   /* ── Level-form selector (Kayle ascension levels, Gun Goddess MF exosuits, etc.) ──── */
   // Skin-specific forms take precedence over champion-level forms
   const levelFormChamp = LEVEL_FORM_SKINS[selectedSkin.id] ?? LEVEL_FORM_CHAMPIONS[champion.id] ?? null;
@@ -134,9 +193,25 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
   // Champion-specific extra models (e.g. Azir soldiers).
   useEffect(() => {
-    if (champion.id !== 'Azir') {
-      setAzirSoldierModelUrl(null);
-      setAzirTowerModelUrl(null);
+    const getExtraModelSpecs = () => {
+      if (champion.id === 'Azir') {
+        return [
+          { aliases: ['azirsoldier', 'azir_soldier', 'azirsandwarrior'], positionOffset: [0.9, 0, 1.0] as [number, number, number] },
+          { aliases: ['azirtower', 'azir_tower', 'azirsundisc', 'azir_sundisc', 'sundisc'], positionOffset: [0.15, -0.1, -3.4] as [number, number, number], scaleMultiplier: 2.1 },
+        ];
+      }
+      if (champion.id === 'Bard') {
+        // Bard's meeps are exposed as the "bardfollower" model family.
+        return [
+          { aliases: ['bardfollower', 'bard_follower', 'bardmeep'], positionOffset: [0.95, 0, 1.2] as [number, number, number], scaleMultiplier: 0.18 },
+        ];
+      }
+      return [];
+    };
+
+    const specs = getExtraModelSpecs();
+    if (specs.length === 0) {
+      setResolvedExtraModels([]);
       return;
     }
 
@@ -144,7 +219,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
     const resolveModelFromAliases = async (aliases: string[]): Promise<string | null> => {
       for (const alias of aliases) {
-        const url = `/model-cdn/lol/models/${alias}/${selectedSkin.id}/model.glb`;
+        const url = getModelAssetUrl(alias, selectedSkin.id);
         try {
           const res = await fetch(url, { method: 'HEAD' });
           if (res.ok) return url;
@@ -155,29 +230,24 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
       return null;
     };
 
-    Promise.all([
-      resolveModelFromAliases(['azirsoldier', 'azir_soldier', 'azirsandwarrior']),
-      resolveModelFromAliases(['azirtower', 'azir_tower', 'azirsundisc', 'azir_sundisc', 'sundisc']),
-    ]).then(([soldierUrl, towerUrl]) => {
+    Promise.all(specs.map(async (spec) => {
+      const url = await resolveModelFromAliases(spec.aliases);
+      if (!url) return null;
+      const model: ExtraModel = {
+        url,
+        positionOffset: spec.positionOffset,
+      };
+      if (spec.scaleMultiplier != null) model.scaleMultiplier = spec.scaleMultiplier;
+      return model;
+    })).then((models) => {
       if (cancelled) return;
-      setAzirSoldierModelUrl(soldierUrl);
-      setAzirTowerModelUrl(towerUrl);
+      setResolvedExtraModels(models.filter((model): model is ExtraModel => model !== null));
     });
 
     return () => { cancelled = true; };
   }, [champion.id, selectedSkin.id]);
 
-  const extraModels = useMemo(() => {
-    if (champion.id !== 'Azir') return [];
-    const models: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number }> = [];
-    if (azirSoldierModelUrl) {
-      models.push({ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] });
-    }
-    if (azirTowerModelUrl) {
-      models.push({ url: azirTowerModelUrl, positionOffset: [0.15, -0.1, -3.4], scaleMultiplier: 2.1 });
-    }
-    return models;
-  }, [champion.id, azirSoldierModelUrl, azirTowerModelUrl]);
+  const extraModels = resolvedExtraModels;
 
   const mainModelOffset = useMemo<[number, number, number] | undefined>(
     () => (champion.id === 'Azir' ? [-0.6, 0, -0.2] : undefined),
@@ -194,8 +264,21 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     ? getAlternateFormTextureUrl(champion.id, selectedSkin.id)
     : null;
   const altIdleAnimation = useAltForm ? (altForm?.idleAnimation ?? null) : null;
-  const modelUrl = altModelUrl ?? getModelUrl(champion.id, selectedSkin.id);
-  const activeMainTextureUrl = altTextureUrl ?? chromaTextureUrl;
+  const activeModelVersion = !useAltForm && modelVersionIndex > 0
+    ? (resolvedModelVersions[modelVersionIndex - 1] ?? null)
+    : null;
+  const nextModelVersionLabel = useMemo(() => {
+    if (resolvedModelVersions.length === 0) return 'alternate';
+    const nextIdx = (modelVersionIndex + 1) % (resolvedModelVersions.length + 1);
+    return nextIdx === 0 ? 'current' : (resolvedModelVersions[nextIdx - 1]?.label ?? 'current');
+  }, [modelVersionIndex, resolvedModelVersions]);
+  const versionTextureUrl = activeModelVersion
+    ? getModelVersionTextureUrl(activeModelVersion, champion.id, activeModelVersion.resolvedSkinId)
+    : null;
+  const versionIdleAnimation = activeModelVersion?.idleAnimation ?? null;
+  const modelUrl = altModelUrl ?? activeModelVersion?.modelUrl ?? getModelUrl(champion.id, selectedSkin.id);
+  const activeMainTextureUrl = altTextureUrl ?? versionTextureUrl ?? chromaTextureUrl;
+  const preferredIdleAnimation = altIdleAnimation ?? versionIdleAnimation;
   const skinName = selectedSkin.num === 0 ? champion.name : selectedSkin.name;
 
   /* ── Draggable splash art ─────────────────────────────────── */
@@ -344,6 +427,21 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </button>
         )}
 
+        {resolvedModelVersions.length > 0 && !companionModelUrl && (
+          <button
+            className={`form-toggle-btn${activeModelVersion ? ' active' : ''}`}
+            onClick={() => setModelVersionIndex((idx) => (idx + 1) % (resolvedModelVersions.length + 1))}
+            title={activeModelVersion
+              ? `Switch to ${nextModelVersionLabel} model`
+              : `Switch to ${resolvedModelVersions[0]?.label ?? 'alternate'} model`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M4 7h16M4 17h16M7 4v16m10-16v16" />
+            </svg>
+            <span>{activeModelVersion ? activeModelVersion.label : 'Current'}</span>
+          </button>
+        )}
+
         {levelFormChamp && (
           <div className="level-form-selector">
             <span className="level-form-label">{levelFormChamp.label}</span>
@@ -401,7 +499,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             mainModelOffset={mainModelOffset}
             chromaTextureUrl={activeMainTextureUrl}
             companionChromaTextureUrl={companionModelUrl ? companionChromaTextureUrl : null}
-            preferredIdleAnimation={altIdleAnimation}
+            preferredIdleAnimation={preferredIdleAnimation}
             splashUrl={splashUrl}
             viewMode={viewMode}
             chromas={skinChromas}
