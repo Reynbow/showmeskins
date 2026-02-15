@@ -13,6 +13,7 @@ import { OrbitControls, useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ChromaInfo } from '../types';
 import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
+import { DEFAULT_IDLE_ANIMATIONS } from '../data/defaultIdleAnimations';
 import './ModelViewer.css';
 
 /* ================================================================
@@ -40,6 +41,9 @@ export type MapSide = 'blue' | 'red';
 const SKIN_OVERRIDES: Record<string, { scale?: number; xShift?: number; yShift?: number; zShift?: number }> = {
 };
 
+/** Flip all champion models horizontally. */
+const GLOBAL_MIRROR_X = true;
+
 /* ================================================================
    Types
    ================================================================ */
@@ -62,8 +66,12 @@ interface EmoteRequest {
 interface Props {
   modelUrl: string;
   companionModelUrl?: string | null;
+  extraModels?: Array<{ url: string; positionOffset: [number, number, number] }>;
+  mainModelOffset?: [number, number, number];
   chromaTextureUrl: string | null;
   companionChromaTextureUrl?: string | null;
+  /** Optional forced idle animation for alternate forms (e.g. Bel'Veth ult). */
+  preferredIdleAnimation?: string | null;
   splashUrl: string;
   viewMode: ViewMode;
   chromas: ChromaInfo[];
@@ -123,6 +131,17 @@ function buildBoneBox(positions: THREE.Vector3[]): THREE.Box3 {
   return box;
 }
 
+function clipHasVisibilityTrack(clip: THREE.AnimationClip | undefined): boolean {
+  if (!clip) return false;
+  return clip.tracks.some((t) => /\.visible$/i.test(t.name));
+}
+
+function stripBlinkTracksFromClip(clip: THREE.AnimationClip): void {
+  clip.tracks = clip.tracks.filter(
+    (t) => !/\.visible$/i.test(t.name) && !/\.material\.opacity$/i.test(t.name),
+  );
+}
+
 function isIdleAnimation(name: string): boolean {
   const n = name.replace(/\.anm$/i, '');
   // Must contain "idle" somewhere
@@ -137,14 +156,6 @@ function isIdleAnimation(name: string): boolean {
   return true;
 }
 
-/**
- * Per-champion preferred idle animation name.
- * Key = champion alias (lowercase), value = exact animation name to prefer.
- */
-const PREFERRED_IDLE: Record<string, string> = {
-  fiddlesticks: 'Fiddlesticks_Idle2_Loop',
-};
-
 /** Ordered patterns for finding the best idle animation (most preferred first) */
 const IDLE_PATTERNS: RegExp[] = [
   /^idle_?base(\.anm)?$/i,
@@ -157,13 +168,53 @@ const IDLE_PATTERNS: RegExp[] = [
   /idle/i,
 ];
 
-function findIdleName(names: string[], alias?: string): string | undefined {
-  // Check for a champion-specific preferred idle first
+function normalizeAnimName(name: string): string {
+  return name.trim().toLowerCase().replace(/\.anm$/i, '');
+}
+
+function resolveConfiguredAnimation(
+  names: string[],
+  configured: string,
+  alias?: string,
+): string | undefined {
+  if (!configured) return undefined;
+
+  // 1) Exact match first.
+  const exact = names.find((n) => n === configured);
+  if (exact) return exact;
+
+  // 2) Case-insensitive match.
+  const ci = names.find((n) => n.toLowerCase() === configured.toLowerCase());
+  if (ci) return ci;
+
+  // 3) Extension-insensitive match ("Idle1" == "Idle1.anm").
+  const target = normalizeAnimName(configured);
+  const normalized = names.find((n) => normalizeAnimName(n) === target);
+  if (normalized) return normalized;
+
+  // 4) Alias-prefix-insensitive match
+  //    ("Aatrox_Idle1" can match "Idle1" or "Aatrox_Idle1.anm").
   if (alias) {
-    const preferred = PREFERRED_IDLE[alias.toLowerCase()];
+    const prefix = `${alias.toLowerCase()}_`;
+    const targetNoPrefix = target.startsWith(prefix) ? target.slice(prefix.length) : target;
+    const prefixed = names.find((n) => {
+      const nn = normalizeAnimName(n);
+      const nnNoPrefix = nn.startsWith(prefix) ? nn.slice(prefix.length) : nn;
+      return nnNoPrefix === targetNoPrefix;
+    });
+    if (prefixed) return prefixed;
+  }
+
+  return undefined;
+}
+
+function findIdleName(names: string[], alias?: string): string | undefined {
+  // Check for a champion-specific configured idle first.
+  if (alias) {
+    const preferred = DEFAULT_IDLE_ANIMATIONS[alias.toLowerCase()];
     if (preferred) {
-      const exact = names.find((n) => n === preferred);
-      if (exact) return exact;
+      const matched = resolveConfiguredAnimation(names, preferred, alias);
+      if (matched) return matched;
     }
   }
   // First try matching from candidate idle animations only
@@ -319,6 +370,7 @@ interface ChampionModelProps {
   viewMode: ViewMode;
   emoteRequest: EmoteRequest | null;
   chromaTextureUrl: string | null;
+  preferredIdleAnimation?: string | null;
   facingRotationY: number;
   /** World-space offset [x, y, z] applied to the model root (for dual-model layouts) */
   positionOffset?: [number, number, number];
@@ -337,7 +389,7 @@ interface ChampionModelProps {
 /** Stable reference for models that don't need a position offset (avoids effect re-runs) */
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferredIdleAnimation = null, facingRotationY, positionOffset = ZERO_OFFSET, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -353,11 +405,34 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
 
   const isFrightNight = skinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(skinId);
   const isKayle = champAlias?.toLowerCase() === 'kayle';
+  const aliasLower = champAlias?.toLowerCase() ?? '';
+  const isAzirFamily =
+    aliasLower === 'azir' ||
+    aliasLower === 'azirsoldier' ||
+    aliasLower === 'azir_soldier' ||
+    aliasLower === 'azirsandwarrior';
 
   const isKayleLevel16 = isKayle && !!levelForm && /\b16\b/.test(levelForm.label);
 
   /* ── Idle animation name (stable for the current model/form) ─── */
   const idleName = useMemo(() => {
+    if (preferredIdleAnimation) {
+      const forcedIdle = resolveConfiguredAnimation(names, preferredIdleAnimation, champAlias);
+      if (forcedIdle) return forcedIdle;
+    }
+    if (champAlias?.toLowerCase() === 'azir') {
+      // Prefer idles without visibility tracks to avoid one-frame blink at loop end.
+      const clipByName = new Map(animations.map((clip) => [clip.name, clip]));
+      const azirIdles = names.filter(isIdleAnimation);
+      const stableLoopIdle = azirIdles.find(
+        (n) => /loop/i.test(n) && !clipHasVisibilityTrack(clipByName.get(n)),
+      );
+      if (stableLoopIdle) return stableLoopIdle;
+      const stableIdle = azirIdles.find((n) => !clipHasVisibilityTrack(clipByName.get(n)));
+      if (stableIdle) return stableIdle;
+      const azirLoopIdle = azirIdles.find((n) => /loop/i.test(n));
+      if (azirLoopIdle) return azirLoopIdle;
+    }
     if (isKayle) {
       if (isKayleLevel16) {
         const level16Idle =
@@ -373,7 +448,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       }
     }
     return findIdleName(names, champAlias);
-  }, [names, champAlias, isKayle, isKayleLevel16]);
+  }, [names, animations, champAlias, isKayle, isKayleLevel16, preferredIdleAnimation]);
 
   /* ── All idle animation names for cycling ────────────────────── */
   const allIdleNames = useMemo(() => findAllIdleNames(names), [names]);
@@ -448,6 +523,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
 
       // Enable shadow casting on all visible meshes
       mesh.castShadow = true;
+      if (isAzirFamily) {
+        mesh.frustumCulled = false;
+      }
 
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const mat of mats) {
@@ -476,7 +554,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     });
 
     /* 2. Reset transforms so bounding-box math starts clean */
-    scene.scale.set(1, 1, 1);
+    scene.scale.set(GLOBAL_MIRROR_X ? -1 : 1, 1, 1);
     scene.position.set(0, 0, 0);
     scene.rotation.set(0, 0, 0);
 
@@ -485,6 +563,12 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
            Kayle needs authored mirror transforms intact for correct sword hand. */
     if (!isKayle) {
       scene.traverse((child) => {
+        // Keep the intentional global mirror on the root scene node.
+        if (child === scene && GLOBAL_MIRROR_X) {
+          if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
+          if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
+          return;
+        }
         if (child.scale.x < 0) child.scale.x = Math.abs(child.scale.x);
         if (child.scale.y < 0) child.scale.y = Math.abs(child.scale.y);
         if (child.scale.z < 0) child.scale.z = Math.abs(child.scale.z);
@@ -496,6 +580,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     idleRef.current = null;
     if (idleName && actions[idleName]) {
       const idle = actions[idleName]!;
+      if (isAzirFamily) {
+        stripBlinkTracksFromClip(idle.getClip());
+      }
       idle.reset().play();
       idle.getMixer().update(0);
       idleRef.current = idle;
@@ -579,7 +666,11 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
     const championScale = urlMatch ? getChampionScale(urlMatch[1]) : 1;
     const scale = (targetHeight / height) * (overrides?.scale ?? championScale);
 
-    scene.scale.setScalar(scale);
+    scene.scale.set(
+      (GLOBAL_MIRROR_X ? -1 : 1) * scale,
+      scale,
+      scale,
+    );
 
     /* 7. Recompute positions after scaling to place model on platform.
           - Ground bone for Y positioning (Riot's authoritative floor marker)
@@ -655,7 +746,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
       pendingRevealRef.current = false;
       Object.values(actions).forEach((a) => a?.stop());
     };
-  }, [scene, actions, names, idleName, isFrightNight, isKayle, positionOffset]);
+  }, [scene, actions, names, idleName, isFrightNight, isKayle, isAzirFamily, positionOffset]);
 
   /* ── Level-form mesh visibility (Kayle ascension, etc.) ────────
        Toggles submesh visibility based on the active form definition.
@@ -919,6 +1010,22 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, facingRo
         setReady(true);
       }
     }
+  });
+
+  // Azir main model: force runtime visibility to prevent idle-loop one-frame
+  // disappearance caused by authored visibility tracks in some clips.
+  useFrame(() => {
+    if (!isAzirFamily || !ready) return;
+    if (!scene.visible) scene.visible = true;
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const defaultHidden = mats.some(
+        (m) => (m as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> }).userData?.visible === false,
+      );
+      if (!defaultHidden) mesh.visible = true;
+    });
   });
 
   /* ══════════════════════════════════════════════════════════════
@@ -2133,7 +2240,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
-export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, companionChromaTextureUrl, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
+export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
   const [modelError, setModelError] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
@@ -2160,7 +2267,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
     setChromaLoading(false);
     setCurrentAnimName('');
     setEmoteAnimNames({});
-  }, [modelUrl, companionModelUrl]);
+  }, [modelUrl, companionModelUrl, extraModels]);
 
   const handleChromaLoading = useCallback((loading: boolean) => {
     setChromaLoading(loading);
@@ -2241,26 +2348,27 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
 
             {/* Champion 3D model(s) with emote support */}
             <Suspense fallback={<LoadingIndicator />}>
-              {companionModelUrl ? (
-                <>
-                  {/* Main champion (e.g. Annie) — off-center front-left */}
-                  <ChampionModel
-                    key={modelUrl}
-                    url={modelUrl}
-                    viewMode={viewMode}
-                    emoteRequest={emoteRequest}
-                    chromaTextureUrl={chromaTextureUrl}
-                    facingRotationY={facingRotationY}
-                    positionOffset={[0.4, 0, 0.4]}
-                    levelForm={levelForm}
-                    onChromaLoading={handleChromaLoading}
-                    onEmotesAvailable={handleEmotesAvailable}
-                    onEmoteFinished={handleEmoteFinished}
-                    onAnimationName={handleAnimationName}
-                    onEmoteNames={handleEmoteNames}
-                    onModelHeight={handleModelHeight}
-                  />
-                  {/* Companion (e.g. Tibbers) — off-center back-right */}
+              <>
+                {/* Main champion (e.g. Annie) — off-center when companion is present */}
+                <ChampionModel
+                  key={modelUrl}
+                  url={modelUrl}
+                  viewMode={viewMode}
+                  emoteRequest={emoteRequest}
+                  chromaTextureUrl={chromaTextureUrl}
+                  preferredIdleAnimation={preferredIdleAnimation}
+                  facingRotationY={facingRotationY}
+                  positionOffset={companionModelUrl ? [0.4, 0, 1] : mainModelOffset}
+                  levelForm={levelForm}
+                  onChromaLoading={handleChromaLoading}
+                  onEmotesAvailable={handleEmotesAvailable}
+                  onEmoteFinished={handleEmoteFinished}
+                  onAnimationName={handleAnimationName}
+                  onEmoteNames={handleEmoteNames}
+                  onModelHeight={handleModelHeight}
+                />
+                {/* Companion (e.g. Tibbers) — off-center back-right */}
+                {companionModelUrl && (
                   <ChampionModel
                     key={companionModelUrl}
                     url={companionModelUrl}
@@ -2277,25 +2385,26 @@ export function ModelViewer({ modelUrl, companionModelUrl, chromaTextureUrl, com
                     onEmoteNames={() => {}}
                     onModelHeight={() => {}}
                   />
-                </>
-              ) : (
-                <ChampionModel
-                  key={modelUrl}
-                  url={modelUrl}
-                  viewMode={viewMode}
-                  emoteRequest={emoteRequest}
-                  chromaTextureUrl={chromaTextureUrl}
-                  facingRotationY={facingRotationY}
-                  positionOffset={ZERO_OFFSET}
-                  levelForm={levelForm}
-                  onChromaLoading={handleChromaLoading}
-                  onEmotesAvailable={handleEmotesAvailable}
-                  onEmoteFinished={handleEmoteFinished}
-                  onAnimationName={handleAnimationName}
-                  onEmoteNames={handleEmoteNames}
-                  onModelHeight={handleModelHeight}
-                />
-              )}
+                )}
+                {extraModels.map((extra, idx) => (
+                  <ChampionModel
+                    key={`${extra.url}#${idx}`}
+                    url={extra.url}
+                    viewMode={viewMode}
+                    emoteRequest={emoteRequest}
+                    chromaTextureUrl={null}
+                    facingRotationY={facingRotationY}
+                    positionOffset={extra.positionOffset}
+                    isCompanion
+                    onChromaLoading={() => {}}
+                    onEmotesAvailable={() => {}}
+                    onEmoteFinished={() => {}}
+                    onAnimationName={() => {}}
+                    onEmoteNames={() => {}}
+                    onModelHeight={() => {}}
+                  />
+                ))}
+              </>
             </Suspense>
 
             {/* Shadow-casting light from the south-west — shadow falls to upper-right */}

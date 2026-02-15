@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, getChampionChromas, resolveChromaTextureUrl } from '../api';
+import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, getChampionChromas, resolveChromaTextureUrl } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -26,6 +26,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [chromaResolving, setChromaResolving] = useState(false);
   const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
   const [companionChromaTextureUrl, setCompanionChromaTextureUrl] = useState<string | null>(null);
+  const [azirSoldierModelUrl, setAzirSoldierModelUrl] = useState<string | null>(null);
 
   // Track which skin the current chroma state belongs to.
   // When the skin changes we clear chroma state synchronously during render
@@ -130,10 +131,53 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   // Companion model (e.g. Annie + Tibbers) — shown alongside main, no toggle
   const companionModelUrl = getCompanionModelUrl(champion.id, selectedSkin.id);
 
-  // Model URL — use alternate form URL if toggled, otherwise default
-  const modelUrl = useAltForm && altForm
-    ? getAlternateModelUrl(champion.id, selectedSkin.id)!
-    : getModelUrl(champion.id, selectedSkin.id);
+  // Champion-specific extra models (e.g. Azir soldiers).
+  useEffect(() => {
+    if (champion.id !== 'Azir') {
+      setAzirSoldierModelUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveAzirSoldierModel = async (): Promise<string | null> => {
+      const aliases = ['azirsoldier', 'azir_soldier', 'azirsandwarrior'];
+      for (const alias of aliases) {
+        const url = `/model-cdn/lol/models/${alias}/${selectedSkin.id}/model.glb`;
+        try {
+          const res = await fetch(url, { method: 'HEAD' });
+          if (res.ok) return url;
+        } catch {
+          // Ignore and try the next alias candidate.
+        }
+      }
+      return null;
+    };
+
+    resolveAzirSoldierModel().then((soldierUrl) => {
+      if (cancelled) return;
+      setAzirSoldierModelUrl(soldierUrl);
+    });
+
+    return () => { cancelled = true; };
+  }, [champion.id, selectedSkin.id]);
+
+  const extraModels = champion.id === 'Azir' && azirSoldierModelUrl
+    ? [{ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] as [number, number, number] }]
+    : [];
+
+  // Alternate form can be either:
+  // - a dedicated model alias (Elise/Nidalee/etc.), or
+  // - a texture swap on the base model (Bel'Veth ult form).
+  const altModelUrl = useAltForm && altForm
+    ? getAlternateModelUrl(champion.id, selectedSkin.id)
+    : null;
+  const altTextureUrl = useAltForm && altForm
+    ? getAlternateFormTextureUrl(champion.id, selectedSkin.id)
+    : null;
+  const altIdleAnimation = useAltForm ? (altForm?.idleAnimation ?? null) : null;
+  const modelUrl = altModelUrl ?? getModelUrl(champion.id, selectedSkin.id);
+  const activeMainTextureUrl = altTextureUrl ?? chromaTextureUrl;
   const skinName = selectedSkin.num === 0 ? champion.name : selectedSkin.name;
 
   /* ── Draggable splash art ─────────────────────────────────── */
@@ -335,8 +379,11 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           <ModelViewer
             modelUrl={modelUrl}
             companionModelUrl={companionModelUrl}
-            chromaTextureUrl={chromaTextureUrl}
+            extraModels={extraModels}
+            mainModelOffset={champion.id === 'Azir' ? [-0.6, 0, -0.9] : undefined}
+            chromaTextureUrl={activeMainTextureUrl}
             companionChromaTextureUrl={companionModelUrl ? companionChromaTextureUrl : null}
+            preferredIdleAnimation={altIdleAnimation}
             splashUrl={splashUrl}
             viewMode={viewMode}
             chromas={skinChromas}

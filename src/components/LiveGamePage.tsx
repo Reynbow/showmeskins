@@ -960,6 +960,24 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   // Resolve model URL + chroma texture for each player (uses resolveLcuSkinNum for chroma detection)
   const activeModelInfo = usePlayerModelInfo(activePlayer, champions);
   const enemyModelInfo = usePlayerModelInfo(laneOpponent, champions);
+  const leftFlankPlayer = activePlayer?.team === 'ORDER' ? activePlayer : laneOpponent;
+  const rightFlankPlayer = activePlayer?.team === 'ORDER' ? laneOpponent : activePlayer;
+
+  const resolveArtUrls = useCallback((player: LiveGamePlayer | undefined) => {
+    if (!player) return null;
+    const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
+    const championId = match?.id ?? player.championName;
+    const championKey = match?.key ?? '0';
+    const skinNum = player.skinID;
+    return {
+      artUrl: getLoadingArt(championId, skinNum),
+      fallbackUrl: getLoadingArtFallback(championKey, skinNum),
+      baseFallbackUrl: getLoadingArt(championId, 0),
+    };
+  }, [champions]);
+
+  const leftArt = useMemo(() => resolveArtUrls(leftFlankPlayer), [resolveArtUrls, leftFlankPlayer]);
+  const rightArt = useMemo(() => resolveArtUrls(rightFlankPlayer), [resolveArtUrls, rightFlankPlayer]);
 
   // Fetch champion base stats for the active player
   useEffect(() => {
@@ -1098,6 +1116,43 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     <div className="live-game-page">
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
+
+      {!isPregame && leftArt && (
+        <div className="lg-art-bg lg-art-bg--left">
+          <img
+            className="lg-art-bg-img"
+            src={leftArt.artUrl}
+            alt=""
+            loading="eager"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src !== leftArt.fallbackUrl && img.src !== leftArt.baseFallbackUrl) {
+                img.src = leftArt.fallbackUrl;
+              } else if (img.src === leftArt.fallbackUrl) {
+                img.src = leftArt.baseFallbackUrl;
+              }
+            }}
+          />
+        </div>
+      )}
+      {!isPregame && rightArt && (
+        <div className="lg-art-bg lg-art-bg--right">
+          <img
+            className="lg-art-bg-img"
+            src={rightArt.artUrl}
+            alt=""
+            loading="eager"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src !== rightArt.fallbackUrl && img.src !== rightArt.baseFallbackUrl) {
+                img.src = rightArt.fallbackUrl;
+              } else if (img.src === rightArt.fallbackUrl) {
+                img.src = rightArt.baseFallbackUrl;
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* Champion models positioned by team: Blue (ORDER) left, Red (CHAOS) right — hidden during pregame, hidden when kill feed has 5+ kills */}
       {!isPregame && showHeroModels && activePlayer?.team === 'ORDER' ? (

@@ -168,15 +168,18 @@ export const COMPANION_MODELS: Record<string, { alias: string; label: string }> 
 };
 
 /**
- * Champions with alternate form models on the CDN (toggle between forms).
- * Key = Data Dragon champion ID, value = alternate alias + display label.
+ * Champions with alternate forms (toggle between forms).
+ * - `alias`: alternate model alias when the form has a dedicated model.
+ * - `textureFile`: alternate texture file when the form uses the base model.
+ * - `idleAnimation`: optional preferred idle animation for that form.
  */
-export const ALTERNATE_FORMS: Record<string, { alias: string; label: string }> = {
+export const ALTERNATE_FORMS: Record<string, { label: string; alias?: string; textureFile?: string; idleAnimation?: string }> = {
   Elise:   { alias: 'elisespider',   label: 'Spider Form' },
   Nidalee: { alias: 'nidaleecougar', label: 'Cougar Form' },
   Shyvana: { alias: 'shyvanadragon', label: 'Dragon Form' },
   Gnar:    { alias: 'gnarbig',       label: 'Mega Gnar' },
   Quinn:   { alias: 'quinnvalor',    label: 'Valor' },
+  Belveth: { label: 'Ult Form', textureFile: 'belveth_ult.png', idleAnimation: 'Idle_Ult.anm' },
 };
 
 /**
@@ -288,8 +291,19 @@ export function getModelUrl(championId: string, skinId: string): string {
  */
 export function getAlternateModelUrl(championId: string, skinId: string): string | null {
   const form = ALTERNATE_FORMS[championId];
-  if (!form) return null;
+  if (!form?.alias) return null;
   return `${MODEL_CDN}/lol/models/${form.alias}/${skinId}/model.glb`;
+}
+
+/**
+ * Get the URL for a champion's alternate form texture.
+ * Returns null if the champion's alternate form does not use texture swapping.
+ */
+export function getAlternateFormTextureUrl(championId: string, skinId: string): string | null {
+  const form = ALTERNATE_FORMS[championId];
+  if (!form?.textureFile) return null;
+  const alias = form.alias ?? championId.toLowerCase();
+  return `${MODEL_CDN}/lol/models/${alias}/${skinId}/${form.textureFile}`;
 }
 
 /**
