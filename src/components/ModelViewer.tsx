@@ -386,12 +386,13 @@ interface ChampionModelProps {
   onAnimationName: (name: string) => void;
   onEmoteNames: (names: Record<string, string[]>) => void;
   onModelHeight: (height: number) => void;
+  onModelReady: () => void;
 }
 
 /** Stable reference for models that don't need a position offset (avoids effect re-runs) */
 const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
 
-function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferredIdleAnimation = null, facingRotationY, positionOffset = ZERO_OFFSET, scaleMultiplier = 1, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight }: ChampionModelProps) {
+function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferredIdleAnimation = null, facingRotationY, positionOffset = ZERO_OFFSET, scaleMultiplier = 1, isCompanion = false, levelForm, onChromaLoading, onEmotesAvailable, onEmoteFinished, onAnimationName, onEmoteNames, onModelHeight, onModelReady }: ChampionModelProps) {
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names, mixer } = useAnimations(animations, groupRef);
@@ -466,6 +467,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
 
   /* ── Hide the model until the setup effect has positioned it ──── */
   const [ready, setReady] = useState(false);
+  const reportedReadyRef = useRef(false);
 
   /* ── Frame-delay reveal: wait for the animation to settle before
        showing the model, so the bind-pose → idle transition (weapons
@@ -512,6 +514,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
   /* ── Setup effect: mesh fixes, scaling, idle animation ──────── */
   useEffect(() => {
     setReady(false);
+    reportedReadyRef.current = false;
     // Immediately hide the scene at the Three.js object level.
     // This is independent of React's render cycle, so there is zero chance
     // of a frame leaking through before React processes the state update.
@@ -1010,6 +1013,10 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
         pendingRevealRef.current = false;
         scene.visible = true;
         setReady(true);
+        if (!reportedReadyRef.current) {
+          reportedReadyRef.current = true;
+          onModelReady();
+        }
       }
     }
   });
@@ -2242,8 +2249,43 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
    ================================================================ */
 const bgColor = '#010a13';
 
+function getAlternateModelSourceUrl(url: string): string | null {
+  const directBase = 'https://cdn.modelviewer.lol';
+  const proxyPrefix = '/model-cdn';
+
+  // Direct CDN -> proxy route
+  if (url.startsWith(directBase)) {
+    try {
+      const u = new URL(url);
+      return `${proxyPrefix}${u.pathname}${u.search}`;
+    } catch {
+      const suffix = url.slice(directBase.length);
+      return `${proxyPrefix}${suffix}`;
+    }
+  }
+
+  // Proxy route -> direct CDN
+  if (url.startsWith(proxyPrefix)) {
+    return `${directBase}${url.replace(/^\/model-cdn/, '')}`;
+  }
+
+  // Absolute site URL with /model-cdn path -> direct CDN
+  try {
+    const u = new URL(url);
+    if (u.pathname.startsWith('/model-cdn/')) {
+      return `${directBase}${u.pathname.replace(/^\/model-cdn/, '')}${u.search}`;
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  return null;
+}
+
 export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
   const [modelError, setModelError] = useState(false);
+  const [mainModelReady, setMainModelReady] = useState(false);
+  const [useAlternateSource, setUseAlternateSource] = useState(false);
   const [emoteRequest, setEmoteRequest] = useState<EmoteRequest | null>(null);
   const [availableEmotes, setAvailableEmotes] = useState<EmoteType[]>([]);
   const [activeEmote, setActiveEmote] = useState<EmoteType | null>(null);
@@ -2258,6 +2300,12 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
     () => extraModels.map((m) => `${m.url}:${m.positionOffset.join(',')}`).join('|'),
     [extraModels],
   );
+  const alternateModelUrl = useMemo(() => getAlternateModelSourceUrl(modelUrl), [modelUrl]);
+  const activeModelUrl = useMemo(
+    () => (useAlternateSource && alternateModelUrl ? alternateModelUrl : modelUrl),
+    [modelUrl, alternateModelUrl, useAlternateSource],
+  );
+  const MODEL_LOAD_TIMEOUT_MS = 8_000;
 
   /* Facing rotation: SW for blue side, NE for red side (only in ingame mode) */
   const facingRotationY = viewMode === 'ingame'
@@ -2266,6 +2314,8 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
 
   /* Reset state on model change */
   useEffect(() => {
+    setUseAlternateSource(false);
+    setMainModelReady(false);
     setModelError(false);
     setEmoteRequest(null);
     setActiveEmote(null);
@@ -2274,6 +2324,30 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
     setCurrentAnimName('');
     setEmoteAnimNames({});
   }, [modelUrl, companionModelUrl, extraModelsKey]);
+
+  // If the main model stalls for too long, switch once to the alternate source
+  // for the SAME selected model (direct CDN <-> proxy). Then fail to splash.
+  useEffect(() => {
+    if (modelError || mainModelReady) return;
+    const timer = window.setTimeout(() => {
+      if (!useAlternateSource && alternateModelUrl && alternateModelUrl !== activeModelUrl) {
+        console.warn('[model] load timeout, switching source for same model', {
+          from: activeModelUrl,
+          to: alternateModelUrl,
+          timeoutMs: MODEL_LOAD_TIMEOUT_MS,
+        });
+        setUseAlternateSource(true);
+        setMainModelReady(false);
+        return;
+      }
+      console.warn('[model] load timeout, showing splash fallback', {
+        activeModelUrl,
+        timeoutMs: MODEL_LOAD_TIMEOUT_MS,
+      });
+      setModelError(true);
+    }, MODEL_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeModelUrl, alternateModelUrl, mainModelReady, modelError, useAlternateSource]);
 
   const handleChromaLoading = useCallback((loading: boolean) => {
     setChromaLoading(loading);
@@ -2293,6 +2367,9 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
 
   const handleModelHeight = useCallback((h: number) => {
     setRawModelHeight(h);
+  }, []);
+  const handleMainModelReady = useCallback(() => {
+    setMainModelReady(true);
   }, []);
 
   /** Called when a non-looping emote finishes playing → reset button state */
@@ -2325,7 +2402,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
       {modelError ? (
         <SplashFallback url={splashUrl} />
       ) : (
-        <ModelErrorBoundary resetKey={modelUrl} fallback={<SplashFallback url={splashUrl} />}>
+        <ModelErrorBoundary resetKey={activeModelUrl} fallback={<SplashFallback url={splashUrl} />}>
           {/* Flat ground texture behind the 3D canvas (ingame mode only) */}
           {viewMode === 'ingame' && (
             <div
@@ -2353,66 +2430,73 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
             {viewMode === 'model' ? <ModelViewerLighting /> : <IngameLighting />}
 
             {/* Champion 3D model(s) with emote support */}
+            {/* Main champion (e.g. Annie) — off-center when companion is present */}
             <Suspense fallback={<LoadingIndicator />}>
-              <>
-                {/* Main champion (e.g. Annie) — off-center when companion is present */}
+              <ChampionModel
+                key={activeModelUrl}
+                url={activeModelUrl}
+                viewMode={viewMode}
+                emoteRequest={emoteRequest}
+                chromaTextureUrl={chromaTextureUrl}
+                preferredIdleAnimation={preferredIdleAnimation}
+                facingRotationY={facingRotationY}
+                positionOffset={companionModelUrl ? [0.4, 0, 1] : mainModelOffset}
+                levelForm={levelForm}
+                onChromaLoading={handleChromaLoading}
+                onEmotesAvailable={handleEmotesAvailable}
+                onEmoteFinished={handleEmoteFinished}
+                onAnimationName={handleAnimationName}
+                onEmoteNames={handleEmoteNames}
+                onModelHeight={handleModelHeight}
+                onModelReady={handleMainModelReady}
+              />
+            </Suspense>
+
+            {/* Defer companion/extra loads until main model is ready so they never block it. */}
+            {mainModelReady && companionModelUrl && (
+              <Suspense fallback={null}>
+                {/* Companion (e.g. Tibbers) — off-center back-right */}
                 <ChampionModel
-                  key={modelUrl}
-                  url={modelUrl}
+                  key={companionModelUrl}
+                  url={companionModelUrl}
                   viewMode={viewMode}
                   emoteRequest={emoteRequest}
-                  chromaTextureUrl={chromaTextureUrl}
-                  preferredIdleAnimation={preferredIdleAnimation}
+                  chromaTextureUrl={companionChromaTextureUrl ?? null}
                   facingRotationY={facingRotationY}
-                  positionOffset={companionModelUrl ? [0.4, 0, 1] : mainModelOffset}
-                  levelForm={levelForm}
-                  onChromaLoading={handleChromaLoading}
-                  onEmotesAvailable={handleEmotesAvailable}
-                  onEmoteFinished={handleEmoteFinished}
-                  onAnimationName={handleAnimationName}
-                  onEmoteNames={handleEmoteNames}
-                  onModelHeight={handleModelHeight}
+                  positionOffset={[-0.4, 0, -0.4]}
+                  isCompanion
+                  onChromaLoading={() => {}}
+                  onEmotesAvailable={() => {}}
+                  onEmoteFinished={() => {}}
+                  onAnimationName={() => {}}
+                  onEmoteNames={() => {}}
+                  onModelHeight={() => {}}
+                  onModelReady={() => {}}
                 />
-                {/* Companion (e.g. Tibbers) — off-center back-right */}
-                {companionModelUrl && (
-                  <ChampionModel
-                    key={companionModelUrl}
-                    url={companionModelUrl}
-                    viewMode={viewMode}
-                    emoteRequest={emoteRequest}
-                    chromaTextureUrl={companionChromaTextureUrl ?? null}
-                    facingRotationY={facingRotationY}
-                    positionOffset={[-0.4, 0, -0.4]}
-                    isCompanion
-                    onChromaLoading={() => {}}
-                    onEmotesAvailable={() => {}}
-                    onEmoteFinished={() => {}}
-                    onAnimationName={() => {}}
-                    onEmoteNames={() => {}}
-                    onModelHeight={() => {}}
-                  />
-                )}
-                {extraModels.map((extra, idx) => (
-                  <ChampionModel
-                    key={`${extra.url}#${idx}`}
-                    url={extra.url}
-                    viewMode={viewMode}
-                    emoteRequest={emoteRequest}
-                    chromaTextureUrl={null}
-                    facingRotationY={facingRotationY}
-                    positionOffset={extra.positionOffset}
-                    scaleMultiplier={extra.scaleMultiplier ?? 1}
-                    isCompanion
-                    onChromaLoading={() => {}}
-                    onEmotesAvailable={() => {}}
-                    onEmoteFinished={() => {}}
-                    onAnimationName={() => {}}
-                    onEmoteNames={() => {}}
-                    onModelHeight={() => {}}
-                  />
-                ))}
-              </>
-            </Suspense>
+              </Suspense>
+            )}
+            {mainModelReady && extraModels.map((extra, idx) => (
+              <Suspense key={`${extra.url}#wrap${idx}`} fallback={null}>
+                <ChampionModel
+                  key={`${extra.url}#${idx}`}
+                  url={extra.url}
+                  viewMode={viewMode}
+                  emoteRequest={emoteRequest}
+                  chromaTextureUrl={null}
+                  facingRotationY={facingRotationY}
+                  positionOffset={extra.positionOffset}
+                  scaleMultiplier={extra.scaleMultiplier ?? 1}
+                  isCompanion
+                  onChromaLoading={() => {}}
+                  onEmotesAvailable={() => {}}
+                  onEmoteFinished={() => {}}
+                  onAnimationName={() => {}}
+                  onEmoteNames={() => {}}
+                  onModelHeight={() => {}}
+                  onModelReady={() => {}}
+                />
+              </Suspense>
+            ))}
 
             {/* Shadow-casting light from the south-west — shadow falls to upper-right */}
             <directionalLight

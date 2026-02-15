@@ -1,7 +1,7 @@
 import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo } from './types';
 
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
-const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? 'https://cdn.modelviewer.lol').replace(/\/+$/, '');
+const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? '/model-cdn').replace(/\/+$/, '');
 const ASSET_BASE_URL = (import.meta.env.VITE_ASSET_BASE_URL ?? '').replace(/\/+$/, '');
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
 const CDRAGON_RAW = 'https://raw.communitydragon.org';
