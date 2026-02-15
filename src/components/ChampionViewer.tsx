@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
@@ -162,9 +162,17 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     return () => { cancelled = true; };
   }, [champion.id, selectedSkin.id]);
 
-  const extraModels = champion.id === 'Azir' && azirSoldierModelUrl
-    ? [{ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] as [number, number, number] }]
-    : [];
+  const extraModels = useMemo(
+    () => (champion.id === 'Azir' && azirSoldierModelUrl
+      ? [{ url: azirSoldierModelUrl, positionOffset: [0.9, 0, 1.0] as [number, number, number] }]
+      : []),
+    [champion.id, azirSoldierModelUrl],
+  );
+
+  const mainModelOffset = useMemo<[number, number, number] | undefined>(
+    () => (champion.id === 'Azir' ? [-0.6, 0, -0.9] : undefined),
+    [champion.id],
+  );
 
   // Alternate form can be either:
   // - a dedicated model alias (Elise/Nidalee/etc.), or
@@ -380,7 +388,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             modelUrl={modelUrl}
             companionModelUrl={companionModelUrl}
             extraModels={extraModels}
-            mainModelOffset={champion.id === 'Azir' ? [-0.6, 0, -0.9] : undefined}
+            mainModelOffset={mainModelOffset}
             chromaTextureUrl={activeMainTextureUrl}
             companionChromaTextureUrl={companionModelUrl ? companionChromaTextureUrl : null}
             preferredIdleAnimation={altIdleAnimation}

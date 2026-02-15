@@ -2252,6 +2252,10 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
   const [rawModelHeight, setRawModelHeight] = useState(4);
   const [resetCameraId, setResetCameraId] = useState(0);
   const controlsRef = useRef<any>(null);
+  const extraModelsKey = useMemo(
+    () => extraModels.map((m) => `${m.url}:${m.positionOffset.join(',')}`).join('|'),
+    [extraModels],
+  );
 
   /* Facing rotation: SW for blue side, NE for red side (only in ingame mode) */
   const facingRotationY = viewMode === 'ingame'
@@ -2267,7 +2271,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
     setChromaLoading(false);
     setCurrentAnimName('');
     setEmoteAnimNames({});
-  }, [modelUrl, companionModelUrl, extraModels]);
+  }, [modelUrl, companionModelUrl, extraModelsKey]);
 
   const handleChromaLoading = useCallback((loading: boolean) => {
     setChromaLoading(loading);
