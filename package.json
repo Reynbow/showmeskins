@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "sync-chromas": "npx tsx scripts/sync-chromas.ts"
+    "sync-chromas": "npx tsx scripts/sync-chromas.ts",
+    "sync-art": "npx tsx scripts/sync-art.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

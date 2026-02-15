@@ -177,7 +177,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const ddSplashUrl = getSplashArt(champion.id, selectedSkin.num);
   const [splashUrl, setSplashUrl] = useState(ddSplashUrl);
 
-  // When skin changes, try DDragon first; fall back to CommunityDragon CDN on error
+  // When skin changes, try Data Dragon first; fall back to CommunityDragon on error
   useEffect(() => {
     const dd = getSplashArt(champion.id, selectedSkin.num);
     setSplashUrl(dd);

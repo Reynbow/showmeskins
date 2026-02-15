@@ -1,0 +1,28 @@
+name: Sync Art
+
+on:
+  schedule:
+    # Run at 4:30 AM UTC on the 1st and 15th of each month
+    - cron: '30 4 1,15 * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Sync champion preview art to Vercel Blob
+        run: npm run sync-art
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+

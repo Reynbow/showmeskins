@@ -2,6 +2,7 @@ import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo } from './type
 
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
 const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? 'https://cdn.modelviewer.lol').replace(/\/+$/, '');
+const ASSET_BASE_URL = (import.meta.env.VITE_ASSET_BASE_URL ?? '').replace(/\/+$/, '');
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
 const CDRAGON_RAW = 'https://raw.communitydragon.org';
 
@@ -149,10 +150,16 @@ export function getChampionIcon(id: string, version: string): string {
 }
 
 export function getSplashArt(championId: string, skinNum: number): string {
+  if (ASSET_BASE_URL) {
+    return `${ASSET_BASE_URL}/art/splash/${championId}_${skinNum}.webp`;
+  }
   return `${BASE_URL}/cdn/img/champion/splash/${championId}_${skinNum}.jpg`;
 }
 
 export function getLoadingArt(championId: string, skinNum: number): string {
+  if (ASSET_BASE_URL) {
+    return `${ASSET_BASE_URL}/art/loading/${championId}_${skinNum}.webp`;
+  }
   return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
 }
 

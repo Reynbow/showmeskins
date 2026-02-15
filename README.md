@@ -35,6 +35,24 @@ npm run build
 npm run preview
 ```
 
+## Asset Sync (Vercel Blob)
+
+You can mirror CDN-heavy assets to your own Blob store to improve reliability:
+
+```bash
+npm run sync-chromas
+npm run sync-art
+```
+
+Required environment variable:
+
+- `BLOB_READ_WRITE_TOKEN` (Vercel Blob read/write token)
+
+Optional runtime variables:
+
+- `VITE_BLOB_BASE_URL` for chroma textures
+- `VITE_ASSET_BASE_URL` for splash/loading preview art
+
 ## Tech
 
 - React + TypeScript + Vite
