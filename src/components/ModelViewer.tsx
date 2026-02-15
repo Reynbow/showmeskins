@@ -68,6 +68,7 @@ interface Props {
   companionModelUrl?: string | null;
   extraModels?: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number }>;
   mainModelOffset?: [number, number, number];
+  mainModelScaleMultiplier?: number;
   chromaTextureUrl: string | null;
   companionChromaTextureUrl?: string | null;
   /** Optional forced idle animation for alternate forms (e.g. Bel'Veth ult). */
@@ -2282,7 +2283,7 @@ function getAlternateModelSourceUrl(url: string): string | null {
   return null;
 }
 
-export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
+export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, mainModelScaleMultiplier = 1, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
   const [modelError, setModelError] = useState(false);
   const [mainModelReady, setMainModelReady] = useState(false);
   const [useAlternateSource, setUseAlternateSource] = useState(false);
@@ -2441,6 +2442,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
                 preferredIdleAnimation={preferredIdleAnimation}
                 facingRotationY={facingRotationY}
                 positionOffset={companionModelUrl ? [0.4, 0, 1] : mainModelOffset}
+                scaleMultiplier={mainModelScaleMultiplier}
                 levelForm={levelForm}
                 onChromaLoading={handleChromaLoading}
                 onEmotesAvailable={handleEmotesAvailable}

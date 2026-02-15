@@ -63,6 +63,7 @@ type LCUConnector struct {
 
 	championMap map[string]ChampInfo // numeric key → ChampInfo
 	lastUpdate  string               // dedup key
+	lastUpdateMu sync.Mutex
 	authHeader  string
 
 	onStatus      StatusCallback
@@ -116,6 +117,23 @@ func (l *LCUConnector) isStopped() bool {
 	l.stoppedMu.Lock()
 	defer l.stoppedMu.Unlock()
 	return l.stopped
+}
+
+// ResetChampSelectDedup clears the last emitted champ-select key.
+func (l *LCUConnector) ResetChampSelectDedup() {
+	l.lastUpdateMu.Lock()
+	l.lastUpdate = ""
+	l.lastUpdateMu.Unlock()
+}
+
+func (l *LCUConnector) updateDedupKey(next string) bool {
+	l.lastUpdateMu.Lock()
+	defer l.lastUpdateMu.Unlock()
+	if next == l.lastUpdate {
+		return false
+	}
+	l.lastUpdate = next
+	return true
 }
 
 // ── Data Dragon champion list ───────────────────────────────────────────
@@ -270,7 +288,7 @@ func (l *LCUConnector) connectToLCU() {
 		if err != nil {
 			log.Printf("[lcu] WebSocket closed: %v", err)
 			l.ws = nil
-			l.lastUpdate = ""
+			l.ResetChampSelectDedup()
 			l.setPartyMembers(nil)
 			if !l.isStopped() {
 				l.onStatus("Disconnected – Reconnecting…")
@@ -343,7 +361,7 @@ func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 	log.Printf("[lcu] Champ select event: %s", event.EventType)
 
 	if event.EventType == "Delete" {
-		l.lastUpdate = ""
+		l.ResetChampSelectDedup()
 		l.onStatus("Connected – Waiting for Champion Select…")
 		l.onChampSelect(ChampSelectUpdate{Type: "champSelectEnd"})
 		return
@@ -353,7 +371,7 @@ func (l *LCUConnector) handleEvent(raw json.RawMessage) {
 		// Start of a fresh champ-select session: always clear dedupe.
 		// Some client flows may skip a prior "Delete", and without this reset
 		// selecting the same champion/skin in the next game can be ignored.
-		l.lastUpdate = ""
+		l.ResetChampSelectDedup()
 		go l.refreshPartyMembers()
 	}
 
@@ -439,10 +457,9 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 
 	// De-duplicate: don't re-emit if nothing changed
 	key := fmt.Sprintf("%s:%d", champInfo.ID, skinNum)
-	if key == l.lastUpdate {
+	if !l.updateDedupKey(key) {
 		return
 	}
-	l.lastUpdate = key
 
 	log.Printf("[lcu] Champion select: %s skin #%d", champInfo.Name, skinNum)
 

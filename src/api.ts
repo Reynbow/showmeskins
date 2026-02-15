@@ -206,6 +206,8 @@ export interface ChampionModelVersion {
   id: string;
   /** UI label (e.g. "2011") */
   label: string;
+  /** Optional list of skin IDs this version applies to */
+  skinIds?: string[];
   /** Model alias in the model CDN path (required for dedicated model variants) */
   alias?: string;
   /** Optional texture file override for texture-only variants */
@@ -215,6 +217,17 @@ export interface ChampionModelVersion {
 }
 
 export const CHAMPION_MODEL_VERSIONS: Record<string, ChampionModelVersion[]> = {
+  Lux: [
+    { id: 'elementalist-air', label: 'Air', alias: 'luxair', skinIds: ['99007'] },
+    { id: 'elementalist-fire', label: 'Fire', alias: 'luxfire', skinIds: ['99007'] },
+    { id: 'elementalist-water', label: 'Water', alias: 'luxwater', skinIds: ['99007'] },
+    { id: 'elementalist-nature', label: 'Nature', alias: 'luxnature', skinIds: ['99007'] },
+    { id: 'elementalist-ice', label: 'Ice', alias: 'luxice', skinIds: ['99007'] },
+    { id: 'elementalist-storm', label: 'Storm', alias: 'luxstorm', skinIds: ['99007'] },
+    { id: 'elementalist-magma', label: 'Magma', alias: 'luxmagma', skinIds: ['99007'] },
+    { id: 'elementalist-mystic', label: 'Mystic', alias: 'luxmystic', skinIds: ['99007'] },
+    { id: 'elementalist-dark', label: 'Dark', alias: 'luxdark', skinIds: ['99007'] },
+  ],
   // Example:
   // Caitlyn: [{ id: 'legacy-2011', label: '2011', alias: 'caitlyn_2011' }],
 };

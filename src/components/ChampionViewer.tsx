@@ -18,6 +18,7 @@ interface Props {
 }
 
 type ExtraModel = { url: string; positionOffset: [number, number, number]; scaleMultiplier?: number };
+type ExtraModelSpec = { aliases: string[]; positionOffset: [number, number, number]; scaleMultiplier?: number; fallbackSkinIds?: string[] };
 type ResolvedModelVersion = ChampionModelVersion & { modelUrl: string; resolvedSkinId: string };
 const EMPTY_MODEL_VERSIONS: ChampionModelVersion[] = [];
 
@@ -110,8 +111,9 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   // Resolve historical/alternate model versions for this champion + selected skin.
   // If the selected skin variant is unavailable, fall back to base skin.
   const modelVersions = useMemo(
-    () => CHAMPION_MODEL_VERSIONS[champion.id] ?? EMPTY_MODEL_VERSIONS,
-    [champion.id],
+    () => (CHAMPION_MODEL_VERSIONS[champion.id] ?? EMPTY_MODEL_VERSIONS)
+      .filter((version) => !version.skinIds || version.skinIds.includes(selectedSkin.id)),
+    [champion.id, selectedSkin.id],
   );
   useEffect(() => {
     if (modelVersions.length === 0) {
@@ -193,7 +195,8 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
   // Champion-specific extra models (e.g. Azir soldiers).
   useEffect(() => {
-    const getExtraModelSpecs = () => {
+    const getExtraModelSpecs = (): ExtraModelSpec[] => {
+      const baseSkinId = `${parseInt(champion.key, 10) * 1000}`;
       if (champion.id === 'Azir') {
         return [
           { aliases: ['azirsoldier', 'azir_soldier', 'azirsandwarrior'], positionOffset: [0.9, 0, 1.0] as [number, number, number] },
@@ -204,6 +207,31 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
         // Bard's meeps are exposed as the "bardfollower" model family.
         return [
           { aliases: ['bardfollower', 'bard_follower', 'bardmeep'], positionOffset: [0.95, 0, 1.2] as [number, number, number], scaleMultiplier: 0.18 },
+        ];
+      }
+      if (champion.id === 'Heimerdinger') {
+        return [
+          { aliases: ['heimertblue'], positionOffset: [0.7, 0, 0.7] as [number, number, number], scaleMultiplier: 0.33},
+        ];
+      }
+      if (champion.id === 'Ivern') {
+        return [
+          {
+            aliases: ['ivernminion'],
+            positionOffset: [0, 0, -0.35] as [number, number, number],
+            scaleMultiplier: 0.8,
+            fallbackSkinIds: [baseSkinId],
+          },
+        ];
+      }
+      if (champion.id === 'Kindred') {
+        return [
+          {
+            aliases: ['kindredwolf'],
+            positionOffset: [-0.9, 0, -1.1] as [number, number, number],
+            scaleMultiplier: 0.75,
+            fallbackSkinIds: [baseSkinId],
+          },
         ];
       }
       return [];
@@ -217,21 +245,24 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
     let cancelled = false;
 
-    const resolveModelFromAliases = async (aliases: string[]): Promise<string | null> => {
-      for (const alias of aliases) {
-        const url = getModelAssetUrl(alias, selectedSkin.id);
-        try {
-          const res = await fetch(url, { method: 'HEAD' });
-          if (res.ok) return url;
-        } catch {
-          // Ignore and try the next alias candidate.
+    const resolveModelFromAliases = async (aliases: string[], skinIds: string[]): Promise<string | null> => {
+      for (const skinId of skinIds) {
+        for (const alias of aliases) {
+          const url = getModelAssetUrl(alias, skinId);
+          try {
+            const res = await fetch(url, { method: 'HEAD' });
+            if (res.ok) return url;
+          } catch {
+            // Ignore and try the next alias candidate.
+          }
         }
       }
       return null;
     };
 
     Promise.all(specs.map(async (spec) => {
-      const url = await resolveModelFromAliases(spec.aliases);
+      const skinCandidates = Array.from(new Set([selectedSkin.id, ...(spec.fallbackSkinIds ?? [])]));
+      const url = await resolveModelFromAliases(spec.aliases, skinCandidates);
       if (!url) return null;
       const model: ExtraModel = {
         url,
@@ -245,12 +276,20 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     });
 
     return () => { cancelled = true; };
-  }, [champion.id, selectedSkin.id]);
+  }, [champion.id, champion.key, selectedSkin.id]);
 
   const extraModels = resolvedExtraModels;
 
   const mainModelOffset = useMemo<[number, number, number] | undefined>(
-    () => (champion.id === 'Azir' ? [-0.6, 0, -0.2] : undefined),
+    () => {
+      if (champion.id === 'Azir') return [-0.6, 0, -0.2];
+      if (champion.id === 'Ivern') return [0.45, 0, 1.45];
+      return undefined;
+    },
+    [champion.id],
+  );
+  const mainModelScaleMultiplier = useMemo(
+    () => (champion.id === 'Ivern' ? 0.8 : 1),
     [champion.id],
   );
 
@@ -427,7 +466,32 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </button>
         )}
 
-        {resolvedModelVersions.length > 0 && !companionModelUrl && (
+        {resolvedModelVersions.length > 1 && !companionModelUrl && !useAltForm && (
+          <div className="level-form-selector">
+            <span className="level-form-label">Forms</span>
+            <div className="level-form-buttons">
+              <button
+                className={`level-form-btn${modelVersionIndex === 0 ? ' active' : ''}`}
+                onClick={() => setModelVersionIndex(0)}
+                title="Current"
+              >
+                Current
+              </button>
+              {resolvedModelVersions.map((version, idx) => (
+                <button
+                  key={version.id}
+                  className={`level-form-btn${modelVersionIndex === idx + 1 ? ' active' : ''}`}
+                  onClick={() => setModelVersionIndex(idx + 1)}
+                  title={version.label}
+                >
+                  {version.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {resolvedModelVersions.length === 1 && !companionModelUrl && (
           <button
             className={`form-toggle-btn${activeModelVersion ? ' active' : ''}`}
             onClick={() => setModelVersionIndex((idx) => (idx + 1) % (resolvedModelVersions.length + 1))}
@@ -497,6 +561,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             companionModelUrl={companionModelUrl}
             extraModels={extraModels}
             mainModelOffset={mainModelOffset}
+            mainModelScaleMultiplier={mainModelScaleMultiplier}
             chromaTextureUrl={activeMainTextureUrl}
             companionChromaTextureUrl={companionModelUrl ? companionChromaTextureUrl : null}
             preferredIdleAnimation={preferredIdleAnimation}
