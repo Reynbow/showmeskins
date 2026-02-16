@@ -8,7 +8,16 @@ import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
-import type { ChampionBasic, ChampionDetail, Skin, LiveGameData, LiveGamePlayer, ItemInfo, KillEventPlayerSnapshot } from './types';
+import type {
+  ChampionBasic,
+  ChampionDetail,
+  Skin,
+  LiveGameData,
+  LiveGamePlayer,
+  ItemInfo,
+  KillEventPlayerSnapshot,
+  LiveGameStats,
+} from './types';
 import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
 
@@ -50,6 +59,155 @@ function snapshotPlayers(players: LiveGamePlayer[]): KillEventPlayerSnapshot {
   }
 
   return { byName, byChamp };
+}
+
+const ZERO_LIVE_STATS: LiveGameStats = {
+  attackDamage: 0,
+  abilityPower: 0,
+  armor: 0,
+  magicResist: 0,
+  attackSpeed: 0,
+  critChance: 0,
+  critDamage: 0,
+  moveSpeed: 0,
+  maxHealth: 0,
+  currentHealth: 0,
+  resourceMax: 0,
+  resourceValue: 0,
+  resourceType: '',
+  abilityHaste: 0,
+  lifeSteal: 0,
+  omnivamp: 0,
+  physicalLethality: 0,
+  magicLethality: 0,
+  armorPenetrationFlat: 0,
+  armorPenetrationPercent: 0,
+  magicPenetrationFlat: 0,
+  magicPenetrationPercent: 0,
+  tenacity: 0,
+  healShieldPower: 0,
+  attackRange: 0,
+  healthRegenRate: 0,
+  resourceRegenRate: 0,
+};
+
+function readNumericField(raw: unknown, ...keys: string[]): number {
+  if (!raw || typeof raw !== 'object') return 0;
+  const source = raw as Record<string, unknown>;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return 0;
+}
+
+function readStringField(raw: unknown, ...keys: string[]): string {
+  if (!raw || typeof raw !== 'object') return '';
+  const source = raw as Record<string, unknown>;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string') return value;
+  }
+  return '';
+}
+
+function normalizeLiveStats(raw: unknown): LiveGameStats {
+  return {
+    attackDamage: readNumericField(raw, 'attackDamage', 'AttackDamage'),
+    abilityPower: readNumericField(raw, 'abilityPower', 'AbilityPower'),
+    armor: readNumericField(raw, 'armor', 'Armor'),
+    magicResist: readNumericField(raw, 'magicResist', 'MagicResist'),
+    attackSpeed: readNumericField(raw, 'attackSpeed', 'AttackSpeed'),
+    critChance: readNumericField(raw, 'critChance', 'CritChance'),
+    critDamage: readNumericField(raw, 'critDamage', 'CritDamage'),
+    moveSpeed: readNumericField(raw, 'moveSpeed', 'MoveSpeed'),
+    maxHealth: readNumericField(raw, 'maxHealth', 'MaxHealth'),
+    currentHealth: readNumericField(raw, 'currentHealth', 'CurrentHealth'),
+    resourceMax: readNumericField(raw, 'resourceMax', 'ResourceMax'),
+    resourceValue: readNumericField(raw, 'resourceValue', 'ResourceValue'),
+    resourceType: readStringField(raw, 'resourceType', 'ResourceType'),
+    abilityHaste: readNumericField(raw, 'abilityHaste', 'AbilityHaste'),
+    lifeSteal: readNumericField(raw, 'lifeSteal', 'LifeSteal'),
+    omnivamp: readNumericField(raw, 'omnivamp', 'Omnivamp'),
+    physicalLethality: readNumericField(raw, 'physicalLethality', 'PhysicalLethality'),
+    magicLethality: readNumericField(raw, 'magicLethality', 'MagicLethality'),
+    armorPenetrationFlat: readNumericField(raw, 'armorPenetrationFlat', 'ArmorPenetrationFlat'),
+    armorPenetrationPercent: readNumericField(raw, 'armorPenetrationPercent', 'ArmorPenetrationPercent'),
+    magicPenetrationFlat: readNumericField(raw, 'magicPenetrationFlat', 'MagicPenetrationFlat'),
+    magicPenetrationPercent: readNumericField(raw, 'magicPenetrationPercent', 'MagicPenetrationPercent'),
+    tenacity: readNumericField(raw, 'tenacity', 'Tenacity'),
+    healShieldPower: readNumericField(raw, 'healShieldPower', 'HealShieldPower'),
+    attackRange: readNumericField(raw, 'attackRange', 'AttackRange'),
+    healthRegenRate: readNumericField(raw, 'healthRegenRate', 'HealthRegenRate'),
+    resourceRegenRate: readNumericField(raw, 'resourceRegenRate', 'ResourceRegenRate'),
+  };
+}
+
+function normalizeActivePlayer(raw: unknown): LiveGameData['activePlayer'] {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      summonerName: '',
+      level: 0,
+      currentGold: 0,
+      stats: { ...ZERO_LIVE_STATS },
+    };
+  }
+
+  const source = raw as Record<string, unknown>;
+  const statsRaw = source.stats ?? source.championStats ?? source.ChampionStats;
+
+  return {
+    summonerName: readStringField(source, 'summonerName', 'SummonerName'),
+    level: readNumericField(source, 'level', 'Level'),
+    currentGold: readNumericField(source, 'currentGold', 'CurrentGold'),
+    stats: statsRaw ? normalizeLiveStats(statsRaw) : { ...ZERO_LIVE_STATS },
+  };
+}
+
+function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): LiveGameData | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const source = raw as Record<string, unknown>;
+
+  const players = Array.isArray(source.players) ? (source.players as LiveGamePlayer[]) : [];
+  const killFeed = Array.isArray(source.killFeed) ? (source.killFeed as LiveGameData['killFeed']) : [];
+  const liveEvents = Array.isArray(source.liveEvents) ? (source.liveEvents as LiveGameData['liveEvents']) : [];
+  const partyMembers = Array.isArray(source.partyMembers)
+    ? source.partyMembers.filter((name): name is string => typeof name === 'string')
+    : (prev?.partyMembers ?? []);
+  const gameTime = readNumericField(source, 'gameTime', 'GameTime');
+
+  const isNewTimeline =
+    !prev ||
+    gameTime < prev.gameTime ||
+    (killFeed?.length ?? 0) < (prev.killFeed?.length ?? 0) ||
+    (liveEvents?.length ?? 0) < (prev.liveEvents?.length ?? 0);
+  const snapshots: Record<number, KillEventPlayerSnapshot> =
+    isNewTimeline ? {} : { ...(prev?.killFeedSnapshots ?? {}) };
+
+  for (const kill of killFeed ?? []) {
+    if (!kill || typeof kill !== 'object') continue;
+    const eventTime = (kill as { eventTime?: unknown }).eventTime;
+    if (typeof eventTime !== 'number') continue;
+    if (!(eventTime in snapshots)) {
+      snapshots[eventTime] = snapshotPlayers(players);
+    }
+  }
+
+  return {
+    gameTime,
+    gameMode: readStringField(source, 'gameMode', 'GameMode') || 'CLASSIC',
+    gameResult: readStringField(source, 'gameResult', 'GameResult') || undefined,
+    activePlayer: normalizeActivePlayer(source.activePlayer),
+    players,
+    partyMembers,
+    killFeed,
+    liveEvents,
+    killFeedSnapshots: snapshots,
+  };
 }
 
 function App() {
@@ -487,36 +645,7 @@ function App() {
               pendingChampSelectRef.current = null;
 
               setLiveGameData((prev) => {
-                const players = data.players ?? [];
-                const killFeed = data.killFeed ?? [];
-                const liveEvents = data.liveEvents ?? [];
-                const gameTime = data.gameTime ?? 0;
-
-                const isNewTimeline =
-                  !prev ||
-                  gameTime < prev.gameTime ||
-                  killFeed.length < (prev.killFeed?.length ?? 0) ||
-                  liveEvents.length < (prev.liveEvents?.length ?? 0);
-                const snapshots: Record<number, KillEventPlayerSnapshot> =
-                  isNewTimeline ? {} : { ...(prev.killFeedSnapshots ?? {}) };
-
-                for (const kill of killFeed) {
-                  if (!(kill.eventTime in snapshots)) {
-                    snapshots[kill.eventTime] = snapshotPlayers(players);
-                  }
-                }
-
-                return {
-                  gameTime,
-                  gameMode: data.gameMode ?? 'CLASSIC',
-                  gameResult: data.gameResult || undefined,
-                  activePlayer: data.activePlayer ?? {},
-                  players,
-                  partyMembers: data.partyMembers ?? prev?.partyMembers ?? [],
-                  killFeed,
-                  liveEvents,
-                  killFeedSnapshots: snapshots,
-                };
+                return normalizeLiveGamePayload(data, prev) ?? prev;
               });
 
               // Auto-navigate to the live game page on first detection
@@ -539,12 +668,15 @@ function App() {
               const endResult: string | undefined = data.gameResult || undefined;
               // Capture the final snapshot before clearing live data
               setLiveGameData((lastSnapshot) => {
-                if (lastSnapshot) {
-                  // Merge the game result — prefer the end message's result,
+                const endSnapshot = normalizeLiveGamePayload(data.finalUpdate, lastSnapshot);
+                const baseSnapshot = endSnapshot ?? lastSnapshot;
+
+                if (baseSnapshot) {
+                  // Merge the game result: prefer the end message result,
                   // then fall back to whatever the last update had.
                   const finalData = {
-                    ...lastSnapshot,
-                    gameResult: endResult || lastSnapshot.gameResult,
+                    ...baseSnapshot,
+                    gameResult: endResult || baseSnapshot.gameResult,
                   };
                   setPostGameData(finalData);
                   setViewMode('postgame');

@@ -217,13 +217,16 @@ func onReady() {
 			}
 			bridgeSrv.Broadcast(update)
 		},
-		func(result string) {
+		func(result string, finalUpdate *LiveGameUpdate) {
 			if lcu != nil {
 				lcu.ResetChampSelectDedup()
 			}
-			msg := map[string]string{"type": "liveGameEnd"}
+			msg := map[string]interface{}{"type": "liveGameEnd"}
 			if result != "" {
 				msg["gameResult"] = result
+			}
+			if finalUpdate != nil {
+				msg["finalUpdate"] = finalUpdate
 			}
 			bridgeSrv.Broadcast(msg)
 		},

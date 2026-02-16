@@ -912,6 +912,13 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   const [showStats, setShowStats] = useState(true);
   const [championBaseStats, setChampionBaseStats] = useState<ChampionStats | null>(null);
   const toggleStats = useCallback(() => setShowStats((s) => !s), []);
+  const statValue = useCallback(
+    (key: keyof LiveGameData['activePlayer']['stats']) => {
+      const value = data.activePlayer?.stats?.[key];
+      return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+    },
+    [data.activePlayer],
+  );
 
   // Track the highest observed gold total (items + current) so it never dips on purchase
   const peakGoldRef = useRef(0);
@@ -1105,12 +1112,12 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
       .map((group) => ({
         ...group,
         stats: group.stats.filter((s) => {
-          const val = data.activePlayer.stats[s.key] as number;
+          const val = statValue(s.key);
           return s.showIf ? s.showIf(val) : true;
         }),
       }))
       .filter((group) => group.stats.length > 0);
-  }, [data.activePlayer.stats]);
+  }, [statValue]);
 
   return (
     <div className="live-game-page">
@@ -1355,7 +1362,7 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
                   <div className="lg-stats-group-label">{group.groupLabel}</div>
                   <div className="lg-stats-group-items">
                     {group.stats.map((stat) => {
-                      const val = data.activePlayer.stats[stat.key] as number;
+                      const val = statValue(stat.key);
                       const formatted = stat.format ? stat.format(val) : Math.round(val).toString();
                       const baseVal = championBaseStats && activePlayer
                         ? getBaseStatAtLevel(championBaseStats, activePlayer.level, stat.key)

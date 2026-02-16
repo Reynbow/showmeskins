@@ -15,6 +15,7 @@ import (
 const (
 	liveClientURL = "https://127.0.0.1:2999"
 	pollInterval  = 3 * time.Second
+	endAfterConsecutiveFailures = 3
 )
 
 // ── Messages sent to the website via the bridge ─────────────────────────
@@ -126,7 +127,7 @@ type LiveGameStats struct {
 // ── Callbacks ───────────────────────────────────────────────────────────
 
 type LiveGameUpdateCallback func(update LiveGameUpdate)
-type LiveGameEndCallback func(result string) // result: "Win", "Lose", or "" (unknown)
+type LiveGameEndCallback func(result string, finalUpdate *LiveGameUpdate) // result: "Win", "Lose", or "" (unknown)
 
 // ── LiveGameTracker ─────────────────────────────────────────────────────
 
@@ -146,6 +147,8 @@ type LiveGameTracker struct {
 	wasInGame  bool
 	lastHash   string
 	gameResult string // captured from GameEnd event
+	lastUpdate *LiveGameUpdate
+	failCount  int
 }
 
 // NewLiveGameTracker creates a tracker with the given callbacks.
@@ -209,16 +212,26 @@ func (t *LiveGameTracker) poll() {
 	data, err := t.fetchAllGameData()
 	if err != nil {
 		if t.wasInGame {
+			t.failCount++
+			if t.failCount < endAfterConsecutiveFailures {
+				log.Printf("[livegame] Poll failed (%d/%d) while in game: %v", t.failCount, endAfterConsecutiveFailures, err)
+				return
+			}
+
 			result := t.gameResult
+			finalSnapshot := t.lastUpdate
 			t.wasInGame = false
 			t.lastHash = ""
 			t.gameResult = ""
-			log.Printf("[livegame] Game ended (result: %q)", result)
-			t.onStatus("Connected – Waiting for Champion Select…")
-			t.onEnd(result)
+			t.lastUpdate = nil
+			t.failCount = 0
+			log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", endAfterConsecutiveFailures, result)
+			t.onStatus("Connected - Waiting for Champion Select...")
+			t.onEnd(result, finalSnapshot)
 		}
 		return
 	}
+	t.failCount = 0
 
 	// Check events for GameEnd result (appears in the last moments before the API goes away)
 	for _, ev := range data.Events.Events {
@@ -248,6 +261,7 @@ func (t *LiveGameTracker) poll() {
 		return
 	}
 	t.lastHash = hash
+	t.lastUpdate = update
 
 	log.Printf("[livegame] Scoreboard update: %d players, %.0fs",
 		len(update.Players), update.GameTime)
