@@ -91,7 +91,7 @@ function App() {
   // Refs for the companion-app WebSocket hook (avoids stale closures)
   const championsRef = useRef<ChampionBasic[]>([]);
   championsRef.current = champions;
-  const pendingChampSelectRef = useRef<{ championId: string; skinNum: number } | null>(null);
+  const pendingChampSelectRef = useRef<{ championId?: string; championKey?: string; skinNum: number } | null>(null);
   const champSelectSeenSinceLastLiveGame = useRef(false);
 
   // On first load: fetch champions, then check URL for deep-link
@@ -108,7 +108,12 @@ function App() {
         const pending = pendingChampSelectRef.current;
         if (pending) {
           pendingChampSelectRef.current = null;
-          const match = champList.find((c) => c.id.toLowerCase() === pending.championId.toLowerCase());
+          const championId = pending.championId ?? '';
+          const championKey = pending.championKey ?? '';
+          const match = champList.find((c) =>
+            (championId && c.id.toLowerCase() === championId.toLowerCase()) ||
+            (championKey && c.key === championKey),
+          );
           if (match) {
             try {
               const detail = await getChampionDetail(match.id);
@@ -404,8 +409,10 @@ function App() {
 
             // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
-              const championId = data.championId;
+              const championId: string = data.championId ?? '';
+              const championKey: string = data.championKey ?? '';
               const skinNum = data.skinNum ?? 0;
+              if (!championId && !championKey) return;
 
               champSelectSeenSinceLastLiveGame.current = true;
 
@@ -414,12 +421,14 @@ function App() {
               debounceTimer = setTimeout(async () => {
                 const champs = championsRef.current;
                 if (champs.length === 0) {
-                  pendingChampSelectRef.current = { championId, skinNum };
+                  pendingChampSelectRef.current = { championId, championKey, skinNum };
                   return;
                 }
 
                 const match = champs.find(
-                  (c) => c.id.toLowerCase() === championId.toLowerCase(),
+                  (c) =>
+                    (championId && c.id.toLowerCase() === championId.toLowerCase()) ||
+                    (championKey && c.key === championKey),
                 );
                 if (!match) return;
 

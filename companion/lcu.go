@@ -444,24 +444,27 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 		return
 	}
 
-	champInfo, ok := l.championMap[strconv.Itoa(championKey)]
-	if !ok {
-		log.Printf("[lcu] Champion key %d not in map (new champion?)", championKey)
-		return
-	}
-
 	skinNum := 0
 	if selectedSkinId > 0 {
 		skinNum = selectedSkinId % 1000
 	}
 
-	// De-duplicate: don't re-emit if nothing changed
-	key := fmt.Sprintf("%s:%d", champInfo.ID, skinNum)
+	// De-duplicate: don't re-emit if nothing changed.
+	// Use numeric champion key so updates still flow even if championMap is stale/unavailable.
+	key := fmt.Sprintf("%d:%d", championKey, skinNum)
 	if !l.updateDedupKey(key) {
 		return
 	}
 
-	log.Printf("[lcu] Champion select: %s skin #%d", champInfo.Name, skinNum)
+	champID := ""
+	champName := ""
+	if champInfo, ok := l.championMap[strconv.Itoa(championKey)]; ok {
+		champID = champInfo.ID
+		champName = champInfo.Name
+		log.Printf("[lcu] Champion select: %s skin #%d", champInfo.Name, skinNum)
+	} else {
+		log.Printf("[lcu] Champion select key %d skin #%d (champion map missing entry)", championKey, skinNum)
+	}
 
 	skinID := strconv.Itoa(selectedSkinId)
 	if selectedSkinId == 0 {
@@ -470,8 +473,8 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 
 	l.onChampSelect(ChampSelectUpdate{
 		Type:         "champSelectUpdate",
-		ChampionID:   champInfo.ID,
-		ChampionName: champInfo.Name,
+		ChampionID:   champID,
+		ChampionName: champName,
 		ChampionKey:  strconv.Itoa(championKey),
 		SkinNum:      skinNum,
 		SkinID:       skinID,
