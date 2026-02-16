@@ -66,7 +66,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
             </svg>
             Download for Windows
           </a>
-          <span className="companion-version">v0.3.5 Beta &middot; Windows 10/11</span>
+          <span className="companion-version">v0.3.8 Beta &middot; Windows 10/11</span>
           <p className="companion-download-tagline">Live and post-game information tracker</p>
         </div>
 

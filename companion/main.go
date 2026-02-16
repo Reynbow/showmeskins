@@ -128,9 +128,9 @@ func hideConsole() {
 func onReady() {
 	// Set tray icon
 	systray.SetIcon(pngToICO(iconPNG))
-	tooltipPrefix := "Show Me Skins Companion"
+	tooltipPrefix := "Dev Build"
 	if Version != "0.0.0" {
-		tooltipPrefix += " v" + Version
+		tooltipPrefix = "v" + Version
 	}
 	systray.SetTooltip(tooltipPrefix)
 
