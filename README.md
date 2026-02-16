@@ -8,10 +8,6 @@ Live site: [showmeskins.lol](https://showmeskins.lol)
 
 ![Show Me Skins Icon](companion/assets/icon.png)
 
-| Blue Side | Red Side |
-| --- | --- |
-| ![Blue Side](public/blue-side.png) | ![Red Side](public/red-side.png) |
-
 ## Features
 
 - Browse all champions and skins
