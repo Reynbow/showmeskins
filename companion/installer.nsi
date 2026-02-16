@@ -11,7 +11,7 @@
 ; PRODUCT_VERSION can be overridden: makensis /DPRODUCT_VERSION=0.3.0 installer.nsi
 
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "0.3.8"
+!define PRODUCT_VERSION "0.3.9"
 !endif
 
 !define PRODUCT_NAME "Show Me Skins Companion"
