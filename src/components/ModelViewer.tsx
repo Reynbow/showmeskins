@@ -13,7 +13,14 @@ import { OrbitControls, useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ChromaInfo } from '../types';
 import { getChampionScale, FRIGHT_NIGHT_BASE_SKIN_IDS } from '../api';
-import { DEFAULT_IDLE_ANIMATIONS } from '../data/defaultIdleAnimations';
+import {
+  DEFAULT_DANCE_ANIMATIONS,
+  DEFAULT_IDLE_ANIMATIONS,
+  DEFAULT_JOKE_ANIMATIONS,
+  DEFAULT_LAUGH_ANIMATIONS,
+  DEFAULT_RECALL_ANIMATIONS,
+  DEFAULT_TAUNT_ANIMATIONS,
+} from '../data/defaultIdleAnimations';
 import './ModelViewer.css';
 
 /* ================================================================
@@ -45,7 +52,7 @@ const SKIN_OVERRIDES: Record<string, { scale?: number; xShift?: number; yShift?:
   'teemo/17008': { scale: 1.27 },
   'teemomushroom/17008': { scale: 0.4 },
   // Cat-in-the-Box Shaco trap (35064): fallback placement markers differ from other shacobox skins.
-  'shacobox/35064': { scale: 1.35, yShift: 0.95 },
+  'shacobox/35064': { scale: 6.75, yShift: 0.95 },
 };
 
 /** Flip all champion models horizontally. */
@@ -58,7 +65,7 @@ const GLOBAL_PLATFORM_Y_BASE = -1.78;
    ================================================================ */
 export type ViewMode = 'model' | 'ingame';
 
-export type EmoteType = 'idle' | 'joke' | 'taunt' | 'dance' | 'laugh';
+export type EmoteType = 'idle' | 'joke' | 'taunt' | 'dance' | 'laugh' | 'recall';
 
 interface EmoteVariant {
   intro?: string;   // animation name for intro (e.g. "Joke_In")
@@ -182,6 +189,23 @@ function normalizeAnimName(name: string): string {
   return name.trim().toLowerCase().replace(/\.anm$/i, '');
 }
 
+function getConfiguredAnimationByKey(
+  map: Record<string, string>,
+  alias?: string,
+  skinId?: string,
+): string | undefined {
+  const aliasKey = alias?.toLowerCase();
+  const skinKey = skinId?.toLowerCase();
+
+  if (aliasKey && skinKey) {
+    const perSkin = map[`${aliasKey}/${skinKey}`];
+    if (perSkin) return perSkin;
+  }
+  if (aliasKey && map[aliasKey]) return map[aliasKey];
+  if (skinKey && map[skinKey]) return map[skinKey];
+  return undefined;
+}
+
 function resolveConfiguredAnimation(
   names: string[],
   configured: string,
@@ -218,14 +242,12 @@ function resolveConfiguredAnimation(
   return undefined;
 }
 
-function findIdleName(names: string[], alias?: string): string | undefined {
+function findIdleName(names: string[], alias?: string, skinId?: string): string | undefined {
   // Check for a champion-specific configured idle first.
-  if (alias) {
-    const preferred = DEFAULT_IDLE_ANIMATIONS[alias.toLowerCase()];
-    if (preferred) {
-      const matched = resolveConfiguredAnimation(names, preferred, alias);
-      if (matched) return matched;
-    }
+  const preferred = getConfiguredAnimationByKey(DEFAULT_IDLE_ANIMATIONS, alias, skinId);
+  if (preferred) {
+    const matched = resolveConfiguredAnimation(names, preferred, alias);
+    if (matched) return matched;
   }
   // First try matching from candidate idle animations only
   const idles = names.filter(isIdleAnimation);
@@ -335,6 +357,26 @@ function findEmoteVariants(animNames: string[], emoteType: string): EmoteVariant
   return variants;
 }
 
+function getConfiguredEmoteAnimation(type: EmoteType, alias?: string, skinId?: string): string | undefined {
+  if (type === 'joke') return getConfiguredAnimationByKey(DEFAULT_JOKE_ANIMATIONS, alias, skinId);
+  if (type === 'taunt') return getConfiguredAnimationByKey(DEFAULT_TAUNT_ANIMATIONS, alias, skinId);
+  if (type === 'dance') return getConfiguredAnimationByKey(DEFAULT_DANCE_ANIMATIONS, alias, skinId);
+  if (type === 'laugh') return getConfiguredAnimationByKey(DEFAULT_LAUGH_ANIMATIONS, alias, skinId);
+  if (type === 'recall') return getConfiguredAnimationByKey(DEFAULT_RECALL_ANIMATIONS, alias, skinId);
+  return undefined;
+}
+
+function resolveConfiguredEmoteVariant(
+  variants: EmoteVariant[],
+  configured: string,
+  alias?: string,
+): EmoteVariant | undefined {
+  const variantNames = variants.flatMap((v) => [v.intro, v.main, v.outro].filter(Boolean) as string[]);
+  const matchedName = resolveConfiguredAnimation(variantNames, configured, alias);
+  if (!matchedName) return undefined;
+  return variants.find((v) => v.intro === matchedName || v.main === matchedName || v.outro === matchedName);
+}
+
 /* ================================================================
    Error Boundary
    ================================================================ */
@@ -439,6 +481,12 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
 
   /* ── Idle animation name (stable for the current model/form) ─── */
   const idleName = useMemo(() => {
+    if (aliasLower === 'shacobox' && skinId === '35064') {
+      const catIdle =
+        resolveConfiguredAnimation(names, 'Idle.SKINS_Shaco_Skin64.anm', champAlias)
+        ?? resolveConfiguredAnimation(names, 'Idle1', champAlias);
+      if (catIdle) return catIdle;
+    }
     if (udyrStanceIdle) {
       const stanceIdle = resolveConfiguredAnimation(names, udyrStanceIdle, champAlias);
       if (stanceIdle) return stanceIdle;
@@ -474,8 +522,8 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
         if (pre16Idle) return pre16Idle;
       }
     }
-    return findIdleName(names, champAlias);
-  }, [names, animations, champAlias, isKayle, isKayleLevel16, preferredIdleAnimation, udyrStanceIdle]);
+    return findIdleName(names, champAlias, skinId);
+  }, [names, animations, champAlias, skinId, isKayle, isKayleLevel16, preferredIdleAnimation, udyrStanceIdle]);
 
   /* ── All idle animation names for cycling ────────────────────── */
   const allIdleNames = useMemo(() => findAllIdleNames(names), [names]);
@@ -502,14 +550,36 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
   /* ── Build a map of available emotes → their animation variants  */
   const emoteMap = useMemo(() => {
     const map = new Map<EmoteType, EmoteVariant[]>();
-    for (const type of ['joke', 'taunt', 'dance', 'laugh'] as EmoteType[]) {
+    for (const type of ['joke', 'taunt', 'dance', 'laugh', 'recall'] as EmoteType[]) {
       const variants = findEmoteVariants(names, type);
-      if (variants.length > 0) {
-        map.set(type, variants);
+      const configured = getConfiguredEmoteAnimation(type, champAlias, skinId);
+      const configuredMatched = configured
+        ? resolveConfiguredAnimation(names, configured, champAlias)
+        : undefined;
+      let resolvedVariants = variants;
+
+      if (configuredMatched) {
+        const existing = variants.find(
+          (v) => v.intro === configuredMatched || v.main === configuredMatched || v.outro === configuredMatched,
+        );
+        if (existing) {
+          resolvedVariants = [existing, ...variants.filter((v) => v !== existing)];
+        } else {
+          resolvedVariants = [
+            {
+              main: configuredMatched,
+              loops: /_loop(?:\.anm)?$/i.test(configuredMatched),
+            },
+            ...variants,
+          ];
+        }
+      }
+      if (resolvedVariants.length > 0) {
+        map.set(type, resolvedVariants);
       }
     }
     return map;
-  }, [names]);
+  }, [names, champAlias, skinId]);
 
   /* ── Report available emotes and their animation names to parent ─ */
   const prevEmotesKey = useRef('');
@@ -552,7 +622,9 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
 
       // Enable shadow casting on all visible meshes
       mesh.castShadow = true;
-      if (isAzirFamily) {
+      if (isAzirFamily || isCompanion) {
+        // Summons/companions can have animated bounds that cull incorrectly.
+        // Keep them always renderable to avoid pop/disappear issues.
         mesh.frustumCulled = false;
       }
 
@@ -1489,8 +1561,11 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
     const variants = emoteMap.get(emoteRequest.type);
     if (!variants?.length) return;
 
-    // Pick a random variant
-    const variant = variants[Math.floor(Math.random() * variants.length)];
+    const configuredEmote = getConfiguredEmoteAnimation(emoteRequest.type, champAlias, skinId);
+    const configuredVariant = configuredEmote
+      ? resolveConfiguredEmoteVariant(variants, configuredEmote, champAlias)
+      : undefined;
+    const variant = configuredVariant ?? variants[Math.floor(Math.random() * variants.length)];
     if (!isCompanion) onAnimationName(variant.intro ?? variant.main);
 
     // Fade out idle
@@ -2305,6 +2380,13 @@ const EMOTE_ICONS: Record<EmoteType, ReactNode> = {
       <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" strokeLinecap="round" />
     </svg>
   ),
+  recall: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M12 3a9 9 0 1 0 8.49 12" />
+      <path d="M12 7v5l3 2" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  ),
 };
 
 const EMOTE_LABELS: Record<EmoteType, string> = {
@@ -2313,6 +2395,7 @@ const EMOTE_LABELS: Record<EmoteType, string> = {
   taunt: 'Taunt',
   dance: 'Dance',
   laugh: 'Laugh',
+  recall: 'Recall',
 };
 
 /* ================================================================
@@ -2354,6 +2437,7 @@ function getAlternateModelSourceUrl(url: string): string | null {
 }
 
 export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, mainModelScaleMultiplier = 1, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
+  const isDevBuild = import.meta.env.DEV;
   const [modelError, setModelError] = useState(false);
   const [mainModelReady, setMainModelReady] = useState(false);
   const [useAlternateSource, setUseAlternateSource] = useState(false);
@@ -2376,6 +2460,10 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
     () => (useAlternateSource && alternateModelUrl ? alternateModelUrl : modelUrl),
     [modelUrl, alternateModelUrl, useAlternateSource],
   );
+  const activeModelSkinId = useMemo(() => {
+    const m = activeModelUrl.match(/\/models\/[^/]+\/([^/]+)\//i);
+    return m ? m[1] : null;
+  }, [activeModelUrl]);
   const MODEL_LOAD_TIMEOUT_MS = 8_000;
 
   /* Facing rotation: SW for blue side, NE for red side (only in ingame mode) */
@@ -2671,6 +2759,13 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
         </button>
       )}
 
+      {/* Dev-only skin ID badge (never shown in production builds) */}
+      {isDevBuild && viewMode === 'model' && !modelError && activeModelSkinId && (
+        <div className="dev-skin-id-badge" title={`Current model skin ID: ${activeModelSkinId}`}>
+          Skin ID: {activeModelSkinId}
+        </div>
+      )}
+
       {/* Map side toggle buttons (ingame mode only) */}
       {viewMode === 'ingame' && !modelError && (
         <>
@@ -2704,7 +2799,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
       {/* Emote buttons */}
       {availableEmotes.length > 0 && !modelError && (
         <div className="emote-bar">
-          {(['idle', 'joke', 'taunt', 'dance', 'laugh'] as EmoteType[]).map(
+          {(['idle', 'joke', 'taunt', 'dance', 'laugh', 'recall'] as EmoteType[]).map(
             (type) =>
               availableEmotes.includes(type) && (
                 <div key={type} className="emote-btn-wrapper">

@@ -142,7 +142,21 @@ export async function getChampionDetail(id: string): Promise<ChampionDetail> {
   const version = await getLatestVersion();
   const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/champion/${id}.json`);
   const data = await res.json();
-  return data.data[id];
+  const detail = data.data[id] as ChampionDetail;
+
+  // Seraphine's launch ultimate skin ships as three progression variants in
+  // Data Dragon. Treat them as one skin card and expose variants in-model.
+  if (id === 'Seraphine') {
+    detail.skins = detail.skins
+      .filter((skin) => skin.id !== '147002' && skin.id !== '147003')
+      .map((skin) =>
+        skin.id === '147001'
+          ? { ...skin, name: 'K/DA ALL OUT Seraphine' }
+          : skin,
+      );
+  }
+
+  return detail;
 }
 
 export function getChampionIcon(id: string, version: string): string {
@@ -208,6 +222,8 @@ export interface ChampionModelVersion {
   label: string;
   /** Optional list of skin IDs this version applies to */
   skinIds?: string[];
+  /** Optional explicit skin ID to use for this variant's model/texture lookup */
+  skinIdOverride?: string;
   /** Model alias in the model CDN path (required for dedicated model variants) */
   alias?: string;
   /** Optional texture file override for texture-only variants */
@@ -217,6 +233,11 @@ export interface ChampionModelVersion {
 }
 
 export const CHAMPION_MODEL_VERSIONS: Record<string, ChampionModelVersion[]> = {
+  Seraphine: [
+    { id: 'kda-indie', label: 'Indie', alias: 'seraphine', skinIds: ['147001'], skinIdOverride: '147001' },
+    { id: 'kda-rising-star', label: 'Rising Star', alias: 'seraphine', skinIds: ['147001'], skinIdOverride: '147002' },
+    { id: 'kda-superstar', label: 'Superstar', alias: 'seraphine', skinIds: ['147001'], skinIdOverride: '147003' },
+  ],
   Lux: [
     { id: 'elementalist-air', label: 'Air', alias: 'luxair', skinIds: ['99007'] },
     { id: 'elementalist-fire', label: 'Fire', alias: 'luxfire', skinIds: ['99007'] },
@@ -417,7 +438,7 @@ export function getAlternateFormTextureUrl(championId: string, skinId: string): 
  */
 export function getModelVersionUrl(version: ChampionModelVersion, championId: string, skinId: string): string | null {
   if (!version.alias) return null;
-  return getModelAssetUrl(version.alias, skinId);
+  return getModelAssetUrl(version.alias, version.skinIdOverride ?? skinId);
 }
 
 /**
@@ -427,7 +448,7 @@ export function getModelVersionUrl(version: ChampionModelVersion, championId: st
 export function getModelVersionTextureUrl(version: ChampionModelVersion, championId: string, skinId: string): string | null {
   if (!version.textureFile) return null;
   const alias = version.alias ?? championId.toLowerCase();
-  return getModelAssetUrl(alias, skinId, version.textureFile);
+  return getModelAssetUrl(alias, version.skinIdOverride ?? skinId, version.textureFile);
 }
 
 /**

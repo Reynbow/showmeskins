@@ -49,7 +49,7 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   fiddlesticks: 183,
   fiora: 220,
   fizz: 111,
-  galio: 4880,
+  galio: 280,
   gangplank: 203,
   garen: 216,
   gnar: 74,

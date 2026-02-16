@@ -308,6 +308,24 @@
   opacity: 1;
 }
 
+.dev-skin-id-badge {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 7px 12px;
+  background: rgba(1, 10, 19, 0.75);
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
 /* ── Map Side Toggle Buttons ───────────────────────────────── */
 .side-btn {
   position: absolute;

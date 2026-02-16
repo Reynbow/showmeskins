@@ -35,6 +35,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [resolvedExtraModels, setResolvedExtraModels] = useState<ExtraModel[]>([]);
   const [resolvedModelVersions, setResolvedModelVersions] = useState<ResolvedModelVersion[]>([]);
   const [modelVersionIndex, setModelVersionIndex] = useState(0);
+  const hideCurrentModelOption = champion.id === 'Seraphine' && selectedSkin.id === '147001';
 
   // Track which skin the current chroma state belongs to.
   // When the skin changes we clear chroma state synchronously during render
@@ -155,11 +156,16 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     return () => { cancelled = true; };
   }, [champion.id, champion.key, modelVersions, selectedSkin.id]);
 
-  // Reset selected historical version when changing champion, or when variants
-  // shrink and the current index becomes invalid.
+  // Reset selected historical version when changing champion.
   useEffect(() => {
     setModelVersionIndex(0);
   }, [champion.id]);
+
+  // For unified K/DA Seraphine, default to Indie (first explicit variant),
+  // so we don't expose a duplicate "Current" option.
+  useEffect(() => {
+    if (hideCurrentModelOption) setModelVersionIndex(1);
+  }, [hideCurrentModelOption, selectedSkin.id]);
 
   useEffect(() => {
     if (modelVersionIndex > resolvedModelVersions.length) setModelVersionIndex(0);
@@ -384,8 +390,10 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     ? getAlternateFormTextureUrl(champion.id, selectedSkin.id)
     : null;
   const altIdleAnimation = useAltForm ? (altForm?.idleAnimation ?? null) : null;
-  const activeModelVersion = !useAltForm && modelVersionIndex > 0
-    ? (resolvedModelVersions[modelVersionIndex - 1] ?? null)
+  const activeModelVersion = !useAltForm
+    ? (hideCurrentModelOption
+      ? (resolvedModelVersions[Math.max(0, modelVersionIndex - 1)] ?? null)
+      : (modelVersionIndex > 0 ? (resolvedModelVersions[modelVersionIndex - 1] ?? null) : null))
     : null;
   const nextModelVersionLabel = useMemo(() => {
     if (resolvedModelVersions.length === 0) return 'alternate';
@@ -551,13 +559,15 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           <div className="level-form-selector">
             <span className="level-form-label">Forms</span>
             <div className="level-form-buttons">
-              <button
-                className={`level-form-btn${modelVersionIndex === 0 ? ' active' : ''}`}
-                onClick={() => setModelVersionIndex(0)}
-                title="Current"
-              >
-                Current
-              </button>
+              {!hideCurrentModelOption && (
+                <button
+                  className={`level-form-btn${modelVersionIndex === 0 ? ' active' : ''}`}
+                  onClick={() => setModelVersionIndex(0)}
+                  title="Current"
+                >
+                  Current
+                </button>
+              )}
               {resolvedModelVersions.map((version, idx) => (
                 <button
                   key={version.id}

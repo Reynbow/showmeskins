@@ -1,9 +1,14 @@
 /**
  * Default idle animation overrides by champion alias.
+ * Key priority:
+ *   1) "alias/skinId" (specific skin)
+ *   2) "alias" (all skins for champion)
+ *   3) "skinId" (any champion model using that skin id)
  */
 export const DEFAULT_IDLE_ANIMATIONS: Record<string, string> = {
   aatrox: 'Aatrox_Idle1',
   ahri: 'Idle1',
+  'ahri/103089': 'idle.SKINS_Ahri_Skin89',
   akali: 'Idle1',
   akshan: 'Idle1_Base',
   alistar: 'Idle1',
@@ -174,4 +179,40 @@ export const DEFAULT_IDLE_ANIMATIONS: Record<string, string> = {
   zilean: 'Idle1',
   zoe: 'Idle1_Base',
   zyra: 'Idle1',
+};
+
+/**
+ * Default joke animation overrides by champion alias.
+ * Supports keys: "alias/skinId", "alias", or "skinId".
+ */
+export const DEFAULT_JOKE_ANIMATIONS: Record<string, string> = {
+  sett: "Sett_Joke"
+};
+
+/**
+ * Default taunt animation overrides by champion alias.
+ * Supports keys: "alias/skinId", "alias", or "skinId".
+ */
+export const DEFAULT_TAUNT_ANIMATIONS: Record<string, string> = {
+'ahri/103089': 'Taunt.SKINS_Ahri_Skin89',
+};
+
+/**
+ * Default dance animation overrides by champion alias.
+ * Supports keys: "alias/skinId", "alias", or "skinId".
+ */
+export const DEFAULT_DANCE_ANIMATIONS: Record<string, string> = {};
+
+/**
+ * Default laugh animation overrides by champion alias.
+ * Supports keys: "alias/skinId", "alias", or "skinId".
+ */
+export const DEFAULT_LAUGH_ANIMATIONS: Record<string, string> = {};
+
+/**
+ * Default recall animation overrides by champion alias.
+ * Supports keys: "alias/skinId", "alias", or "skinId".
+ */
+export const DEFAULT_RECALL_ANIMATIONS: Record<string, string> = {
+aatrox: 'Aatrox_Recall',
 };
