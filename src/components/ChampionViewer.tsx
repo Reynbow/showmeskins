@@ -17,7 +17,7 @@ interface Props {
   onLiveGame?: () => void;
 }
 
-type ExtraModel = { url: string; positionOffset: [number, number, number]; scaleMultiplier?: number };
+type ExtraModel = { url: string; alias: string; positionOffset: [number, number, number]; scaleMultiplier?: number };
 type ExtraModelSpec = { aliases: string[]; positionOffset: [number, number, number]; scaleMultiplier?: number; fallbackSkinIds?: string[] };
 type ResolvedModelVersion = ChampionModelVersion & { modelUrl: string; resolvedSkinId: string };
 const EMPTY_MODEL_VERSIONS: ChampionModelVersion[] = [];
@@ -31,6 +31,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const [chromaResolving, setChromaResolving] = useState(false);
   const [chromaTextureUrl, setChromaTextureUrl] = useState<string | null>(null);
   const [companionChromaTextureUrl, setCompanionChromaTextureUrl] = useState<string | null>(null);
+  const [extraModelChromaTextureUrls, setExtraModelChromaTextureUrls] = useState<(string | null)[]>([]);
   const [resolvedExtraModels, setResolvedExtraModels] = useState<ExtraModel[]>([]);
   const [resolvedModelVersions, setResolvedModelVersions] = useState<ResolvedModelVersion[]>([]);
   const [modelVersionIndex, setModelVersionIndex] = useState(0);
@@ -79,6 +80,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     if (selectedChromaId == null) {
       setChromaTextureUrl(null);
       setCompanionChromaTextureUrl(null);
+      setExtraModelChromaTextureUrls([]);
       setChromaResolving(false);
       return;
     }
@@ -234,6 +236,58 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           },
         ];
       }
+      if (champion.id === 'Teemo') {
+        return [
+          {
+            aliases: ['teemomushroom', 'teemo_mushroom'],
+            positionOffset: [0.95, 0, 0.9] as [number, number, number],
+            scaleMultiplier: 0.33,
+            fallbackSkinIds: [baseSkinId],
+          },
+        ];
+      }
+      if (champion.id === 'Shaco') {
+        return [
+          {
+            aliases: ['shacobox', 'shaco_box'],
+            positionOffset: [0.9, 0, 0.8] as [number, number, number],
+            scaleMultiplier: 0.416,
+            fallbackSkinIds: [baseSkinId],
+          },
+        ];
+      }
+      if (champion.id === 'Yorick') {
+        return [
+          {
+            aliases: ['yorickghoulmelee', 'yorick_ghoulmelee'],
+            positionOffset: [-1.05, 0, 0.95] as [number, number, number],
+            scaleMultiplier: 0.62,
+            fallbackSkinIds: [baseSkinId],
+          },
+          {
+            aliases: ['yorickbigghoul', 'yorick_bigghoul'],
+            positionOffset: [1.75, 0, -1.85] as [number, number, number],
+            scaleMultiplier: 1.23,
+            fallbackSkinIds: [baseSkinId],
+          },
+        ];
+      }
+      if (champion.id === 'Zyra') {
+        return [
+          {
+            aliases: ['zyrathornplant', 'zyra_thornplant'],
+            positionOffset: [1.0, 0, 0.75] as [number, number, number],
+            scaleMultiplier: 0.62,
+            fallbackSkinIds: [baseSkinId],
+          },
+          {
+            aliases: ['zyragraspingplant', 'zyra_graspingplant'],
+            positionOffset: [-1.0, 0, 0.75] as [number, number, number],
+            scaleMultiplier: 0.62,
+            fallbackSkinIds: [baseSkinId],
+          },
+        ];
+      }
       return [];
     };
 
@@ -245,13 +299,16 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
     let cancelled = false;
 
-    const resolveModelFromAliases = async (aliases: string[], skinIds: string[]): Promise<string | null> => {
+    const resolveModelFromAliases = async (
+      aliases: string[],
+      skinIds: string[],
+    ): Promise<{ url: string; alias: string } | null> => {
       for (const skinId of skinIds) {
         for (const alias of aliases) {
           const url = getModelAssetUrl(alias, skinId);
           try {
             const res = await fetch(url, { method: 'HEAD' });
-            if (res.ok) return url;
+            if (res.ok) return { url, alias };
           } catch {
             // Ignore and try the next alias candidate.
           }
@@ -262,10 +319,11 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
     Promise.all(specs.map(async (spec) => {
       const skinCandidates = Array.from(new Set([selectedSkin.id, ...(spec.fallbackSkinIds ?? [])]));
-      const url = await resolveModelFromAliases(spec.aliases, skinCandidates);
-      if (!url) return null;
+      const resolved = await resolveModelFromAliases(spec.aliases, skinCandidates);
+      if (!resolved) return null;
       const model: ExtraModel = {
-        url,
+        url: resolved.url,
+        alias: resolved.alias,
         positionOffset: spec.positionOffset,
       };
       if (spec.scaleMultiplier != null) model.scaleMultiplier = spec.scaleMultiplier;
@@ -278,7 +336,30 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     return () => { cancelled = true; };
   }, [champion.id, champion.key, selectedSkin.id]);
 
-  const extraModels = resolvedExtraModels;
+  useEffect(() => {
+    if (selectedChromaId == null || resolvedExtraModels.length === 0) {
+      setExtraModelChromaTextureUrls([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      resolvedExtraModels.map((model) =>
+        resolveChromaTextureUrl(champion.id, selectedChromaId, selectedSkin.id, model.alias).catch(() => null),
+      ),
+    ).then((urls) => {
+      if (cancelled) return;
+      setExtraModelChromaTextureUrls(urls);
+    });
+    return () => { cancelled = true; };
+  }, [champion.id, resolvedExtraModels, selectedChromaId, selectedSkin.id]);
+
+  const extraModels = useMemo(
+    () => resolvedExtraModels.map((model, idx) => ({
+      ...model,
+      chromaTextureUrl: extraModelChromaTextureUrls[idx] ?? null,
+    })),
+    [extraModelChromaTextureUrls, resolvedExtraModels],
+  );
 
   const mainModelOffset = useMemo<[number, number, number] | undefined>(
     () => {

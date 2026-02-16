@@ -132,7 +132,7 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   rammus: 101,
   reksai: 110,
   rell: 230,
-  renataglasc: 203,
+  renata: 223,
   renekton: 244,
   rengar: 243,
   rhaast: 274,
@@ -144,7 +144,7 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   senna: 240,
   seraphine: 220,
   sett: 215,
-  shaco: 215,
+  shaco: 245,
   shen: 203,
   shyvana: 238,
   shyvanadragon: 240,
@@ -162,7 +162,7 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   taliyah: 195,
   talon: 223,
   taric: 208,
-  teemo: 99,
+  teemo: 139,
   thresh: 244,
   tristana: 99,
   trundle: 245,
@@ -172,7 +172,7 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   udyr: 218,
   urgot: 205,
   varus: 250,
-  vayne: 245,
+  vayne: 285,
   veigar: 99,
   velkoz: 220,
   vex: 129,
@@ -181,8 +181,8 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   viktor: 188,
   vladimir: 221,
   volibear: 264,
-  warwick: 234,
-  wukong: 228,
+  warwick: 214,
+  wukong: 268,
   xayah: 195,
   xerath: 257,
   xinzhao: 233,
@@ -198,15 +198,11 @@ export const CHAMPION_HEIGHTS_CM: Record<string, number> = {
   ziggs: 99,
   zilean: 225,
   zoe: 205,
-  zyra: 260,
+  zyra: 290,
 };
 
 /** Reference height (cm) for scale 1.0. Champions at this height render at default size. */
 export const REFERENCE_HEIGHT_CM = 175;
-
-/** Min/max scale factors to avoid absurd sizes (Yuumi 20cm, Galio 48m). */
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 2;
 
 /**
  * Get scale factor for a champion based on lore height.
@@ -216,6 +212,5 @@ const MAX_SCALE = 2;
 export function getChampionScaleFromHeight(alias: string): number {
   const heightCm = CHAMPION_HEIGHTS_CM[alias.toLowerCase()];
   if (heightCm == null) return 1;
-  const rawScale = heightCm / REFERENCE_HEIGHT_CM;
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, rawScale));
+  return heightCm / REFERENCE_HEIGHT_CM;
 }

@@ -255,6 +255,35 @@ export interface LevelFormChampion {
 }
 
 export const LEVEL_FORM_CHAMPIONS: Record<string, LevelFormChampion> = {
+  Udyr: {
+    label: 'Stance',
+    forms: [
+      {
+        // Q: Wilding Claw (Bear/Tiger material families, skin-dependent)
+        label: 'Claw',
+        show: ['bear', 'beararms', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'bearshoes', 'bearclaws', 'bearbodytattoofx', 'bearfx', 'normalbear', 'tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'lefthand', 'leftbandage', 'face'],
+        hide: ['boar', 'boararms', 'boarshoes', 'boarbodytattoofx', 'boarfx', 'normalboar', 'turtlearms', 'turtlearmsmax', 'turtlehairmax', 'ram', 'ramarms', 'ramhorns', 'ramshoes', 'rambodytattoofx', 'ramhornfx', 'normalram', 'phoenix', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'phoenixshoes', 'phoenixbodytattoofx', 'phoenixfx', 'normalphoenix', 'orb'],
+      },
+      {
+        // W: Iron Mantle (Boar/Turtle material families)
+        label: 'Mantle',
+        show: ['boar', 'boararms', 'boarshoes', 'boarbodytattoofx', 'boarfx', 'normalboar', 'turtlearms', 'turtlearmsmax', 'turtlehairmax'],
+        hide: ['bear', 'beararms', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'bearshoes', 'bearclaws', 'bearbodytattoofx', 'bearfx', 'normalbear', 'tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'lefthand', 'leftbandage', 'face', 'ram', 'ramarms', 'ramhorns', 'ramshoes', 'rambodytattoofx', 'ramhornfx', 'normalram', 'phoenix', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'phoenixshoes', 'phoenixbodytattoofx', 'phoenixfx', 'normalphoenix', 'orb'],
+      },
+      {
+        // E: Blazing Stampede (Ram material family)
+        label: 'Stampede',
+        show: ['ram', 'ramarms', 'ramhorns', 'ramshoes', 'rambodytattoofx', 'ramhornfx', 'normalram'],
+        hide: ['bear', 'beararms', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'bearshoes', 'bearclaws', 'bearbodytattoofx', 'bearfx', 'normalbear', 'tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'lefthand', 'leftbandage', 'face', 'boar', 'boararms', 'boarshoes', 'boarbodytattoofx', 'boarfx', 'normalboar', 'turtlearms', 'turtlearmsmax', 'turtlehairmax', 'phoenix', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'phoenixshoes', 'phoenixbodytattoofx', 'phoenixfx', 'normalphoenix', 'orb'],
+      },
+      {
+        // R: Wingborne Tempest (Phoenix material family)
+        label: 'Tempest',
+        show: ['phoenix', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'phoenixshoes', 'phoenixbodytattoofx', 'phoenixfx', 'normalphoenix', 'orb'],
+        hide: ['bear', 'beararms', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'bearshoes', 'bearclaws', 'bearbodytattoofx', 'bearfx', 'normalbear', 'tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'lefthand', 'leftbandage', 'face', 'boar', 'boararms', 'boarshoes', 'boarbodytattoofx', 'boarfx', 'normalboar', 'turtlearms', 'turtlearmsmax', 'turtlehairmax', 'ram', 'ramarms', 'ramhorns', 'ramshoes', 'rambodytattoofx', 'ramhornfx', 'normalram'],
+      },
+    ],
+  },
   Kayle: {
     label: 'Ascension',
     forms: [
@@ -292,6 +321,32 @@ export const LEVEL_FORM_CHAMPIONS: Record<string, LevelFormChampion> = {
  * Takes precedence over LEVEL_FORM_CHAMPIONS when the selected skin matches.
  */
 export const LEVEL_FORM_SKINS: Record<string, LevelFormChampion> = {
+  // Spirit Guard Udyr (77003) uses Tiger/Turtle/Bear/Phoenix material families.
+  '77003': {
+    label: 'Stance',
+    forms: [
+      {
+        label: 'Claw',
+        show: ['tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax'],
+        hide: ['turtlearms', 'turtlearmsmax', 'turtlehairmax', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'orb'],
+      },
+      {
+        label: 'Mantle',
+        show: ['turtlearms', 'turtlearmsmax', 'turtlehairmax'],
+        hide: ['tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'bearhorns', 'bearhornsmax', 'bearhairmax', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'orb'],
+      },
+      {
+        label: 'Stampede',
+        show: ['bearhorns', 'bearhornsmax', 'bearhairmax'],
+        hide: ['tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'turtlearms', 'turtlearmsmax', 'turtlehairmax', 'phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'orb'],
+      },
+      {
+        label: 'Tempest',
+        show: ['phoenixarms', 'phoenixarmsmax', 'phoenixarmswing', 'phoenixhairmax', 'orb'],
+        hide: ['tigerarms', 'tigerarmsmax', 'tigersharearms', 'tigerhairmax', 'turtlearms', 'turtlearmsmax', 'turtlehairmax', 'bearhorns', 'bearhornsmax', 'bearhairmax'],
+      },
+    ],
+  },
   /* Gun Goddess Miss Fortune (skin 21016) — 4 weapon/exosuit forms.
      In this GLB, form-specific geometry is keyed by MATERIAL names:
        Weapon0 (default visible), Weapon1/2/3 (default hidden).

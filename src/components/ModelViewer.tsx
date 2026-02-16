@@ -39,10 +39,19 @@ export type MapSide = 'blue' | 'red';
  *   3. "alias"         – e.g. "evelynn"           (all skins of a champion)
  */
 const SKIN_OVERRIDES: Record<string, { scale?: number; xShift?: number; yShift?: number; zShift?: number }> = {
+  // Fright Night Veigar (45060) imports a slightly smaller rig scale than other Veigar skins.
+  'veigar/45060': { scale: 1 },
+  // Omega Squad Teemo (17008): main model appears undersized; mushroom appears oversized.
+  'teemo/17008': { scale: 1.27 },
+  'teemomushroom/17008': { scale: 0.4 },
+  // Cat-in-the-Box Shaco trap (35064): fallback placement markers differ from other shacobox skins.
+  'shacobox/35064': { scale: 1.35, yShift: 0.95 },
 };
 
 /** Flip all champion models horizontally. */
 const GLOBAL_MIRROR_X = true;
+/** Global vertical baseline for placing models onto the platform (higher magnitude = lower). */
+const GLOBAL_PLATFORM_Y_BASE = -1.78;
 
 /* ================================================================
    Types
@@ -66,7 +75,7 @@ interface EmoteRequest {
 interface Props {
   modelUrl: string;
   companionModelUrl?: string | null;
-  extraModels?: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number }>;
+  extraModels?: Array<{ url: string; positionOffset: [number, number, number]; scaleMultiplier?: number; chromaTextureUrl?: string | null }>;
   mainModelOffset?: [number, number, number];
   mainModelScaleMultiplier?: number;
   chromaTextureUrl: string | null;
@@ -410,6 +419,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
   const isFrightNight = skinId != null && FRIGHT_NIGHT_BASE_SKIN_IDS.has(skinId);
   const isKayle = champAlias?.toLowerCase() === 'kayle';
   const aliasLower = champAlias?.toLowerCase() ?? '';
+  const isDarkStarShaco = aliasLower === 'shaco' && skinId === '35008';
   const isAzirFamily =
     aliasLower === 'azir' ||
     aliasLower === 'azirsoldier' ||
@@ -417,9 +427,22 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
     aliasLower === 'azirsandwarrior';
 
   const isKayleLevel16 = isKayle && !!levelForm && /\b16\b/.test(levelForm.label);
+  const udyrStanceIdle = useMemo(() => {
+    if (aliasLower !== 'udyr' || !levelForm) return null;
+    const form = levelForm.label.toLowerCase();
+    if (form.includes('claw')) return 'Spell1_Idle';
+    if (form.includes('mantle')) return 'Spell2_Idle';
+    if (form.includes('stampede')) return 'Spell3_Idle';
+    if (form.includes('tempest')) return 'Spell4_Idle';
+    return null;
+  }, [aliasLower, levelForm]);
 
   /* ── Idle animation name (stable for the current model/form) ─── */
   const idleName = useMemo(() => {
+    if (udyrStanceIdle) {
+      const stanceIdle = resolveConfiguredAnimation(names, udyrStanceIdle, champAlias);
+      if (stanceIdle) return stanceIdle;
+    }
     if (preferredIdleAnimation) {
       const forcedIdle = resolveConfiguredAnimation(names, preferredIdleAnimation, champAlias);
       if (forcedIdle) return forcedIdle;
@@ -452,7 +475,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       }
     }
     return findIdleName(names, champAlias);
-  }, [names, animations, champAlias, isKayle, isKayleLevel16, preferredIdleAnimation]);
+  }, [names, animations, champAlias, isKayle, isKayleLevel16, preferredIdleAnimation, udyrStanceIdle]);
 
   /* ── All idle animation names for cycling ────────────────────── */
   const allIdleNames = useMemo(() => findAllIdleNames(names), [names]);
@@ -534,13 +557,15 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       }
 
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const allDefaultHidden = mats.every(
+        (mat) => (mat as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> }).userData?.visible === false,
+      );
+      if (allDefaultHidden) {
+        mesh.visible = false;
+        mesh.castShadow = false;
+      }
       for (const mat of mats) {
         const m = mat as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> };
-
-        if (m.userData?.visible === false) {
-          mesh.visible = false;
-          mesh.castShadow = false;
-        }
 
         if (m.transparent) {
           m.alphaTest = m.alphaTest || 0.1;
@@ -567,7 +592,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
     /* 2b. Fix negative scales on nodes (some models use negative scale for mirroring).
            Negative scale can cause degenerate bounding boxes and tiny rendering.
            Kayle needs authored mirror transforms intact for correct sword hand. */
-    if (!isKayle) {
+    if (!isKayle && !isDarkStarShaco) {
       scene.traverse((child) => {
         // Keep the intentional global mirror on the root scene node.
         if (child === scene && GLOBAL_MIRROR_X) {
@@ -737,7 +762,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
 
     scene.position.set(
       -centerX + (overrides?.xShift ?? 0) + positionOffset[0],
-      -footY - 1.7 + (overrides?.yShift ?? 0) + positionOffset[1],
+      -footY + GLOBAL_PLATFORM_Y_BASE + (overrides?.yShift ?? 0) + positionOffset[1],
       -centerZ + (overrides?.zShift ?? 0) + positionOffset[2],
     );
 
@@ -752,7 +777,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       pendingRevealRef.current = false;
       Object.values(actions).forEach((a) => a?.stop());
     };
-  }, [scene, actions, names, idleName, isFrightNight, isKayle, isAzirFamily, positionOffset, scaleMultiplier]);
+  }, [scene, actions, names, idleName, isFrightNight, isKayle, isDarkStarShaco, isAzirFamily, positionOffset, scaleMultiplier]);
 
   /* ── Level-form mesh visibility (Kayle ascension, etc.) ────────
        Toggles submesh visibility based on the active form definition.
@@ -802,7 +827,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 
       // 1) Reset to default visibility (same logic as the setup effect)
-      const defaultHidden = mats.some(
+      const defaultHidden = mats.every(
         (m) => (m as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> }).userData?.visible === false,
       );
       mesh.visible = !defaultHidden;
@@ -821,6 +846,51 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       }
     });
   }, [scene, levelForm]);
+
+  // Dark Star Shaco (35008): model contains a duplicate lowercase head chain
+  // (head/L_hat*/R_hat*) authored near the root. Move that chain to the real
+  // head and stop its own animation tracks so it doesn't jitter/drift.
+  const shacoLowerHeadRef = useRef<THREE.Object3D | null>(null);
+  useEffect(() => {
+    shacoLowerHeadRef.current = null;
+    if (aliasLower !== 'shaco' || skinId !== '35008') return;
+
+    const upperHead = scene.getObjectByName('Head');
+    const lowerHead = scene.getObjectByName('head');
+    if (!upperHead || !lowerHead) return;
+    shacoLowerHeadRef.current = lowerHead;
+
+    const lowerChainNames = new Set([
+      'head',
+      'l_hat',
+      'l_hat_b',
+      'l_hat_c',
+      'r_hat',
+      'r_hat_b',
+      'r_hat_c',
+    ]);
+    const isLowerChainTrack = (trackName: string): boolean => {
+      const n = trackName.toLowerCase();
+      for (const boneName of lowerChainNames) {
+        const escaped = boneName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(^|\\.|\\[)${escaped}(\\]|\\.|$)`, 'i').test(n)) return true;
+      }
+      return false;
+    };
+
+    for (const clip of animations) {
+      const mark = ((clip.userData ??= {}) as Record<string, unknown>);
+      if (mark.__darkStarLowerHeadStripped) continue;
+      clip.tracks = clip.tracks.filter((track) => !isLowerChainTrack(track.name));
+      mark.__darkStarLowerHeadStripped = true;
+    }
+
+    if (lowerHead.parent !== upperHead) upperHead.attach(lowerHead);
+    lowerHead.position.set(0, 0, 0);
+    lowerHead.rotation.set(0, 0, 0);
+    lowerHead.scale.set(1, 1, 1);
+    lowerHead.updateMatrixWorld(true);
+  }, [scene, aliasLower, skinId, animations]);
 
   /* Kayle level-16 dual-wield runtime sword clone.
      The GLB ships one sword setup; the game spawns the second sword at runtime. */
@@ -1031,7 +1101,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const defaultHidden = mats.some(
+      const defaultHidden = mats.every(
         (m) => (m as THREE.MeshStandardMaterial & { userData?: Record<string, unknown> }).userData?.visible === false,
       );
       if (!defaultHidden) mesh.visible = true;
@@ -2061,16 +2131,16 @@ function Particles() {
 function IngameLighting() {
   return (
     <>
-      <ambientLight intensity={0.7} color="#f5f0e0" />
+      <ambientLight intensity={0.92} color="#f7f4ec" />
       <directionalLight
         position={[8, 12, 6]}
-        intensity={1.4}
-        color="#fff8e0"
+        intensity={1.3}
+        color="#fff9ec"
       />
-      <directionalLight position={[-4, 6, -4]} intensity={0.3} color="#a0d0ff" />
+      <directionalLight position={[-4, 6, -4]} intensity={0.28} color="#b8d8f5" />
       <hemisphereLight
-        color="#87ceeb"
-        groundColor="#3a5a2a"
+        color="#a7d2ee"
+        groundColor="#60785a"
         intensity={0.5}
       />
     </>
@@ -2177,17 +2247,17 @@ function SplashFallback({ url }: { url: string }) {
 function ModelViewerLighting() {
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[8.2, 8, -2.0]} intensity={1.3} color="#f0e6d2" />
-      <directionalLight position={[-0.1, 4, -5.9]} intensity={0.45} color="#0ac8b9" />
-      <pointLight position={[0.9, 3, -4.9]} intensity={0.7} color="#0ac8b9" />
-      <pointLight position={[5.3, 3, 2.2]} intensity={0.7} color="#c8aa6e" />
-      <pointLight position={[-3.6, -1, 1.5]} intensity={0.5} color="#0ac8b9" />
-      <spotLight position={[0, 8, 0]} intensity={0.9} color="#f0e6d2" angle={0.5} penumbra={0.8} />
+      <ambientLight intensity={0.9} color="#f5f2eb" />
+      <directionalLight position={[8.2, 8, -2.0]} intensity={1.18} color="#f5eddc" />
+      <directionalLight position={[-0.1, 4, -5.9]} intensity={0.36} color="#77cfc7" />
+      <pointLight position={[0.9, 3, -4.9]} intensity={0.55} color="#7fd4cc" />
+      <pointLight position={[5.3, 3, 2.2]} intensity={0.58} color="#d6c39a" />
+      <pointLight position={[-3.6, -1, 1.5]} intensity={0.38} color="#88d8d0" />
+      <spotLight position={[0, 8, 0]} intensity={0.84} color="#f6efdf" angle={0.5} penumbra={0.8} />
       {/* Uplight hitting the platform from below-front to brighten the stone tiers */}
-      <pointLight position={[-2.5, -1.5, 1.1]} intensity={0.4} color="#f0e6d2" />
+      <pointLight position={[-2.5, -1.5, 1.1]} intensity={0.38} color="#f3ead7" />
       {/* Pink accent light from the opposite side */}
-      <pointLight position={[-5, 4, 4]} intensity={0.6} color="#ff69b4" />
+      <pointLight position={[-5, 4, 4]} intensity={0.36} color="#e9a9c9" />
     </>
   );
 }
@@ -2419,7 +2489,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.2,
+              toneMappingExposure: 1.24,
               ...(viewMode === 'ingame' ? { alpha: true } : {}),
             }}
             style={{ background: viewMode === 'ingame' ? 'transparent' : bgColor }}
@@ -2484,7 +2554,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
                   url={extra.url}
                   viewMode={viewMode}
                   emoteRequest={emoteRequest}
-                  chromaTextureUrl={null}
+                  chromaTextureUrl={extra.chromaTextureUrl ?? null}
                   facingRotationY={facingRotationY}
                   positionOffset={extra.positionOffset}
                   scaleMultiplier={extra.scaleMultiplier ?? 1}
