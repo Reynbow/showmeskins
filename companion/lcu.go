@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -134,6 +135,55 @@ func (l *LCUConnector) updateDedupKey(next string) bool {
 	}
 	l.lastUpdate = next
 	return true
+}
+
+// SetSelectedSkinID updates the local player's selected skin in champion select.
+func (l *LCUConnector) SetSelectedSkinID(skinID int) error {
+	if skinID <= 0 {
+		return fmt.Errorf("invalid skin ID: %d", skinID)
+	}
+	if l.port == "" {
+		return fmt.Errorf("league client not connected")
+	}
+
+	auth := l.authHeader
+	if auth == "" && l.token != "" {
+		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte("riot:"+l.token))
+	}
+	if auth == "" {
+		return fmt.Errorf("missing auth header")
+	}
+
+	body, _ := json.Marshal(map[string]int{"selectedSkinId": skinID})
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		fmt.Sprintf("https://127.0.0.1:%s/lol-champ-select/v1/session/my-selection", l.port),
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", auth)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	log.Printf("[lcu] Applied skin selection: %d", skinID)
+	return nil
 }
 
 // ── Data Dragon champion list ───────────────────────────────────────────

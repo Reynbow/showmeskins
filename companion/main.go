@@ -159,7 +159,14 @@ func onReady() {
 	quitItem := systray.AddMenuItem("Quit", "Exit the companion app")
 
 	// Start the WebSocket bridge
-	bridgeSrv = NewBridgeServer(bridgePort)
+	bridgeSrv = NewBridgeServer(bridgePort, func(skinID int) {
+		if lcu == nil {
+			return
+		}
+		if err := lcu.SetSelectedSkinID(skinID); err != nil {
+			log.Printf("[bridge] Failed to set selected skin %d: %v", skinID, err)
+		}
+	})
 	bridgeSrv.Start()
 
 	// Status callback shared by LCU and live game tracker.

@@ -93,6 +93,7 @@ function App() {
   championsRef.current = champions;
   const pendingChampSelectRef = useRef<{ championId?: string; championKey?: string; skinNum: number } | null>(null);
   const champSelectSeenSinceLastLiveGame = useRef(false);
+  const companionWsRef = useRef<WebSocket | null>(null);
 
   // On first load: fetch champions, then check URL for deep-link
   useEffect(() => {
@@ -354,6 +355,11 @@ function App() {
       const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
       window.history.replaceState(null, '', `/${selectedChampion.id}${skinPath}`);
     }
+    const ws = companionWsRef.current;
+    const skinId = parseInt(skin.id, 10);
+    if (ws && ws.readyState === WebSocket.OPEN && Number.isFinite(skinId) && skinId > 0) {
+      ws.send(JSON.stringify({ type: 'setSkin', skinId }));
+    }
   }, [selectedChampion]);
 
   const navigateChampion = useCallback(async (direction: 1 | -1) => {
@@ -395,7 +401,10 @@ function App() {
       try {
         ws = new WebSocket(COMPANION_URL);
 
-        ws.onopen = () => console.log('[companion] Connected to companion app');
+        ws.onopen = () => {
+          companionWsRef.current = ws;
+          console.log('[companion] Connected to companion app');
+        };
 
         ws.onmessage = (event) => {
           try {
@@ -551,6 +560,7 @@ function App() {
         };
 
         ws.onclose = () => {
+          if (companionWsRef.current === ws) companionWsRef.current = null;
           ws = null;
           if (!disposed) {
             reconnectTimer = setTimeout(connect, 5000);
@@ -575,6 +585,7 @@ function App() {
       clearTimeout(reconnectTimer);
       clearTimeout(debounceTimer);
       ws?.close();
+      companionWsRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

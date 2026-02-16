@@ -14,15 +14,17 @@ import (
 type BridgeServer struct {
 	port     string
 	upgrader websocket.Upgrader
+	onSetSkin func(skinID int)
 
 	mu      sync.Mutex
 	clients map[*websocket.Conn]struct{}
 }
 
 // NewBridgeServer creates a new bridge on the given port (e.g. "8234").
-func NewBridgeServer(port string) *BridgeServer {
+func NewBridgeServer(port string, onSetSkin func(skinID int)) *BridgeServer {
 	return &BridgeServer{
 		port: port,
+		onSetSkin: onSetSkin,
 		upgrader: websocket.Upgrader{
 			// Allow connections from any origin (the website runs on a different domain)
 			CheckOrigin: func(r *http.Request) bool { return true },
@@ -79,11 +81,26 @@ func (b *BridgeServer) handleWS(w http.ResponseWriter, r *http.Request) {
 			log.Println("[bridge] Website disconnected")
 		}()
 		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
+			_, raw, err := conn.ReadMessage()
+			if err != nil {
 				break
 			}
+			b.handleClientMessage(raw)
 		}
 	}()
+}
+
+func (b *BridgeServer) handleClientMessage(raw []byte) {
+	var msg struct {
+		Type   string `json:"type"`
+		SkinID int    `json:"skinId"`
+	}
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return
+	}
+	if msg.Type == "setSkin" && msg.SkinID > 0 && b.onSetSkin != nil {
+		go b.onSetSkin(msg.SkinID)
+	}
 }
 
 // Broadcast sends a JSON message to all connected clients.
