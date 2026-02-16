@@ -149,6 +149,11 @@ type LiveGameTracker struct {
 	gameResult string // captured from GameEnd event
 	lastUpdate *LiveGameUpdate
 	failCount  int
+
+	// Accumulated events across polls – survives API truncation/windowing.
+	seenEventIDs  map[int]bool
+	accKillFeed   []KillEvent
+	accLiveEvents []LiveGameEvent
 }
 
 // NewLiveGameTracker creates a tracker with the given callbacks.
@@ -163,7 +168,8 @@ func NewLiveGameTracker(onStatus StatusCallback, onUpdate LiveGameUpdateCallback
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		stopCh: make(chan struct{}),
+		stopCh:       make(chan struct{}),
+		seenEventIDs: make(map[int]bool),
 	}
 }
 
@@ -225,6 +231,9 @@ func (t *LiveGameTracker) poll() {
 			t.gameResult = ""
 			t.lastUpdate = nil
 			t.failCount = 0
+			t.seenEventIDs = make(map[int]bool)
+			t.accKillFeed = nil
+			t.accLiveEvents = nil
 			log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", endAfterConsecutiveFailures, result)
 			t.onStatus("Connected - Waiting for Champion Select...")
 			t.onEnd(result, finalSnapshot)
@@ -244,6 +253,9 @@ func (t *LiveGameTracker) poll() {
 	if !t.wasInGame {
 		t.wasInGame = true
 		t.gameResult = ""
+		t.seenEventIDs = make(map[int]bool)
+		t.accKillFeed = nil
+		t.accLiveEvents = nil
 		log.Println("[livegame] Live game detected")
 		t.onStatus("In Game – Tracking scoreboard")
 	}
@@ -301,6 +313,7 @@ type gameEvents struct {
 }
 
 type gameEvent struct {
+	EventID      int      `json:"EventID"`
 	EventName    string   `json:"EventName"`
 	EventTime    float64  `json:"EventTime"`
 	Result       string   `json:"Result,omitempty"`       // "Win" or "Lose" on GameEnd events
@@ -499,12 +512,17 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		nameToChamp[name] = p.ChampionName
 	}
 
-	// Extract kill feed + live events from game events
-	var killFeed []KillEvent
-	var liveEvents []LiveGameEvent
+	// Accumulate events across polls – only process events we haven't seen yet.
+	// This ensures events are never lost even if the API starts returning a
+	// truncated/windowed subset of the full event history.
 	for _, ev := range data.Events.Events {
+		if t.seenEventIDs[ev.EventID] {
+			continue
+		}
+		t.seenEventIDs[ev.EventID] = true
+
 		// Pass through objective/timeline event metadata for richer front-end estimation.
-		liveEvents = append(liveEvents, LiveGameEvent{
+		t.accLiveEvents = append(t.accLiveEvents, LiveGameEvent{
 			EventName:    ev.EventName,
 			EventTime:    ev.EventTime,
 			KillerName:   ev.KillerName,
@@ -541,7 +559,7 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			victimChamp, victimDisplay = resolveNonPlayerKiller(ev.VictimName)
 		}
 
-		killFeed = append(killFeed, KillEvent{
+		t.accKillFeed = append(t.accKillFeed, KillEvent{
 			EventTime:   ev.EventTime,
 			KillerName:  killerDisplay,
 			VictimName:  victimDisplay,
@@ -561,8 +579,8 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			CurrentGold:  data.ActivePlayer.CurrentGold,
 			Stats:        stats,
 		},
-		Players:  players,
-		KillFeed: killFeed,
-		LiveEvents: liveEvents,
+		Players:    players,
+		KillFeed:   t.accKillFeed,
+		LiveEvents: t.accLiveEvents,
 	}
 }

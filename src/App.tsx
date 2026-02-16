@@ -14,6 +14,8 @@ import type {
   Skin,
   LiveGameData,
   LiveGamePlayer,
+  LiveGameEvent,
+  KillEvent,
   ItemInfo,
   KillEventPlayerSnapshot,
   LiveGameStats,
@@ -168,32 +170,65 @@ function normalizeActivePlayer(raw: unknown): LiveGameData['activePlayer'] {
   };
 }
 
+/** Composite key for kill-event deduplication */
+function killEventKey(k: KillEvent): string {
+  return `${k.eventTime}:${k.killerChamp}:${k.victimChamp}`;
+}
+
+/** Composite key for live-event deduplication */
+function liveEventKey(e: LiveGameEvent): string {
+  return `${e.eventTime}:${e.eventName}:${e.killerName ?? ''}:${e.victimName ?? ''}:${e.turretKilled ?? ''}:${e.inhibKilled ?? ''}`;
+}
+
 function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): LiveGameData | null {
   if (!raw || typeof raw !== 'object') return null;
   const source = raw as Record<string, unknown>;
 
-  const players = Array.isArray(source.players) ? (source.players as LiveGamePlayer[]) : [];
-  const killFeed = Array.isArray(source.killFeed) ? (source.killFeed as LiveGameData['killFeed']) : [];
-  const liveEvents = Array.isArray(source.liveEvents) ? (source.liveEvents as LiveGameData['liveEvents']) : [];
+  const incomingPlayers = Array.isArray(source.players) ? (source.players as LiveGamePlayer[]) : [];
+  const incomingKillFeed = Array.isArray(source.killFeed) ? (source.killFeed as LiveGameData['killFeed']) : [];
+  const incomingLiveEvents = Array.isArray(source.liveEvents) ? (source.liveEvents as LiveGameData['liveEvents']) : [];
   const partyMembers = Array.isArray(source.partyMembers)
     ? source.partyMembers.filter((name): name is string => typeof name === 'string')
     : (prev?.partyMembers ?? []);
   const gameTime = readNumericField(source, 'gameTime', 'GameTime');
 
-  const isNewTimeline =
-    !prev ||
-    gameTime < prev.gameTime ||
-    (killFeed?.length ?? 0) < (prev.killFeed?.length ?? 0) ||
-    (liveEvents?.length ?? 0) < (prev.liveEvents?.length ?? 0);
-  const snapshots: Record<number, KillEventPlayerSnapshot> =
-    isNewTimeline ? {} : { ...(prev?.killFeedSnapshots ?? {}) };
+  // Detect new game session (game time jumped backwards significantly)
+  const isNewGame = !prev || gameTime < prev.gameTime - 10;
 
-  for (const kill of killFeed ?? []) {
+  // Accumulate events across updates so that data survives API truncation
+  // or WebSocket reconnections that cause intermediate updates to be missed.
+  let killFeed: KillEvent[];
+  let liveEvents: LiveGameEvent[];
+
+  if (isNewGame) {
+    killFeed = incomingKillFeed ?? [];
+    liveEvents = incomingLiveEvents ?? [];
+  } else {
+    const prevKillKeys = new Set((prev.killFeed ?? []).map(killEventKey));
+    const newKills = (incomingKillFeed ?? []).filter((k) => !prevKillKeys.has(killEventKey(k)));
+    killFeed =
+      newKills.length > 0
+        ? [...(prev.killFeed ?? []), ...newKills].sort((a, b) => a.eventTime - b.eventTime)
+        : (prev.killFeed ?? []);
+
+    const prevEventKeys = new Set((prev.liveEvents ?? []).map(liveEventKey));
+    const newEvents = (incomingLiveEvents ?? []).filter((e) => !prevEventKeys.has(liveEventKey(e)));
+    liveEvents =
+      newEvents.length > 0
+        ? [...(prev.liveEvents ?? []), ...newEvents].sort((a, b) => a.eventTime - b.eventTime)
+        : (prev.liveEvents ?? []);
+  }
+
+  // Carry over snapshots (reset only on new game, not on event-count fluctuation)
+  const snapshots: Record<number, KillEventPlayerSnapshot> =
+    isNewGame ? {} : { ...(prev?.killFeedSnapshots ?? {}) };
+
+  for (const kill of killFeed) {
     if (!kill || typeof kill !== 'object') continue;
     const eventTime = (kill as { eventTime?: unknown }).eventTime;
     if (typeof eventTime !== 'number') continue;
     if (!(eventTime in snapshots)) {
-      snapshots[eventTime] = snapshotPlayers(players);
+      snapshots[eventTime] = snapshotPlayers(incomingPlayers);
     }
   }
 
@@ -202,7 +237,7 @@ function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): Live
     gameMode: readStringField(source, 'gameMode', 'GameMode') || 'CLASSIC',
     gameResult: readStringField(source, 'gameResult', 'GameResult') || undefined,
     activePlayer: normalizeActivePlayer(source.activePlayer),
-    players,
+    players: incomingPlayers,
     partyMembers,
     killFeed,
     liveEvents,
