@@ -331,7 +331,7 @@
 .pg-mvp-standing-icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: 4px;
   border: 1px solid rgba(30, 40, 45, 0.6);
   flex-shrink: 0;
 }
@@ -468,7 +468,7 @@
 .pg-portrait {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: 4px;
   border: 2px solid var(--lol-gold-dark);
   position: relative;
   flex-shrink: 0;
@@ -479,7 +479,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 50%;
+  border-radius: 4px;
 }
 
 .pg-portrait-level {
