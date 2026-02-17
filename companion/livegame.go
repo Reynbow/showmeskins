@@ -55,6 +55,10 @@ type LiveGameEvent struct {
 	MonsterType  string   `json:"monsterType,omitempty"`
 	DragonType   string   `json:"dragonType,omitempty"`
 	Stolen       bool     `json:"stolen,omitempty"`
+	KillStreak   int      `json:"killStreak,omitempty"`   // Multikill: multi-kill count (2=double..5=penta)
+	Acer         string   `json:"acer,omitempty"`         // Ace: player who scored the ace
+	AcingTeam    string   `json:"acingTeam,omitempty"`    // Ace: team that aced
+	Recipient    string   `json:"recipient,omitempty"`    // FirstBlood: player who got first blood
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -325,6 +329,10 @@ type gameEvent struct {
 	MonsterType  string   `json:"MonsterType,omitempty"`  // DragonKill/BaronKill/HeraldKill/etc
 	DragonType   string   `json:"DragonType,omitempty"`   // DragonKill
 	Stolen       bool     `json:"Stolen,omitempty"`       // epic objective stolen
+	KillStreak   int      `json:"KillStreak,omitempty"`   // Multikill event: multi-kill count (2=double..5=penta)
+	Acer         string   `json:"Acer,omitempty"`         // Ace event: player who scored the ace
+	AcingTeam    string   `json:"AcingTeam,omitempty"`    // Ace event: team that aced ("ORDER" or "CHAOS")
+	Recipient    string   `json:"Recipient,omitempty"`    // FirstBlood event: player who got first blood
 }
 
 type activePlayerData struct {
@@ -533,6 +541,10 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			MonsterType:  ev.MonsterType,
 			DragonType:   ev.DragonType,
 			Stolen:       ev.Stolen,
+			KillStreak:   ev.KillStreak,
+			Acer:         ev.Acer,
+			AcingTeam:    ev.AcingTeam,
+			Recipient:    ev.Recipient,
 		})
 
 		if ev.EventName != "ChampionKill" {

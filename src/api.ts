@@ -177,14 +177,20 @@ export function getLoadingArt(championId: string, skinNum: number): string {
   return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
 }
 
-/** CommunityDragon CDN fallback for splash art (uses numeric champion key) */
-export function getSplashArtFallback(championKey: string, skinNum: number): string {
-  return `https://cdn.communitydragon.org/latest/champion/${championKey}/splash-art/skin/${skinNum}`;
+/** Fallback for splash art – tries loading art from the same asset host */
+export function getSplashArtFallback(championId: string, skinNum: number): string {
+  if (ASSET_BASE_URL) {
+    return `${ASSET_BASE_URL}/art/loading/${championId}_${skinNum}.webp`;
+  }
+  return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
 }
 
-/** CommunityDragon CDN fallback for loading/tile art (uses numeric champion key) */
-export function getLoadingArtFallback(championKey: string, skinNum: number): string {
-  return `https://cdn.communitydragon.org/latest/champion/${championKey}/tile/skin/${skinNum}`;
+/** Fallback for loading/tile art – tries splash art from the same asset host */
+export function getLoadingArtFallback(championId: string, skinNum: number): string {
+  if (ASSET_BASE_URL) {
+    return `${ASSET_BASE_URL}/art/splash/${championId}_${skinNum}.webp`;
+  }
+  return `${BASE_URL}/cdn/img/champion/splash/${championId}_${skinNum}.jpg`;
 }
 
 /**

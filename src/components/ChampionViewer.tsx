@@ -187,16 +187,16 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const ddSplashUrl = getSplashArt(champion.id, selectedSkin.num);
   const [splashUrl, setSplashUrl] = useState(ddSplashUrl);
 
-  // When skin changes, try Data Dragon first; fall back to CommunityDragon on error
+  // When skin changes, try splash art first; fall back to loading art on error
   useEffect(() => {
     const dd = getSplashArt(champion.id, selectedSkin.num);
     setSplashUrl(dd);
     const img = new Image();
     img.src = dd;
     img.onload = () => setSplashUrl(dd);
-    img.onerror = () => setSplashUrl(getSplashArtFallback(champion.key, selectedSkin.num));
+    img.onerror = () => setSplashUrl(getSplashArtFallback(champion.id, selectedSkin.num));
     return () => { img.onload = null; img.onerror = null; };
-  }, [champion.id, champion.key, selectedSkin.num]);
+  }, [champion.id, selectedSkin.num]);
 
   // Companion model (e.g. Annie + Tibbers) — shown alongside main, no toggle
   const companionModelUrl = getCompanionModelUrl(champion.id, selectedSkin.id);
@@ -641,7 +641,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             }}
             draggable={false}
             onError={(e) => {
-              const fallback = getSplashArtFallback(champion.key, selectedSkin.num);
+              const fallback = getSplashArtFallback(champion.id, selectedSkin.num);
               if (e.currentTarget.src !== fallback) e.currentTarget.src = fallback;
             }}
           />

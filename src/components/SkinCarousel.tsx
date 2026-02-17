@@ -83,8 +83,8 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
                       onError={(e) => {
                         const img = e.currentTarget;
                         const fallback = isActive
-                          ? getSplashArtFallback(champion.key, skin.num)
-                          : getLoadingArtFallback(champion.key, skin.num);
+                          ? getSplashArtFallback(champion.id, skin.num)
+                          : getLoadingArtFallback(champion.id, skin.num);
                         if (img.src !== fallback) img.src = fallback;
                       }}
                     />

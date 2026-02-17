@@ -769,10 +769,9 @@ class ModelErrorBoundary extends Component<{ fallback: ReactNode; children: Reac
 function HeroArtCard({ player, champions, side }: { player: LiveGamePlayer; champions: ChampionBasic[]; side: 'blue' | 'red' }) {
   const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
   const championId = match?.id ?? player.championName;
-  const championKey = match?.key ?? '0';
   const skinNum = player.skinID;
   const artUrl = getLoadingArt(championId, skinNum);
-  const fallbackUrl = getLoadingArtFallback(championKey, skinNum);
+  const fallbackUrl = getLoadingArtFallback(championId, skinNum);
   const baseFallbackUrl = getLoadingArt(championId, 0);
 
   return (
@@ -974,11 +973,10 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
     if (!player) return null;
     const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
     const championId = match?.id ?? player.championName;
-    const championKey = match?.key ?? '0';
     const skinNum = player.skinID;
     return {
       artUrl: getLoadingArt(championId, skinNum),
-      fallbackUrl: getLoadingArtFallback(championKey, skinNum),
+      fallbackUrl: getLoadingArtFallback(championId, skinNum),
       baseFallbackUrl: getLoadingArt(championId, 0),
     };
   }, [champions]);
@@ -1021,8 +1019,8 @@ export function LiveGamePage({ data, champions, version, itemData, onBack }: Pro
   const blueKills = blueTeam.reduce((sum, p) => sum + p.kills, 0);
   const redKills = redTeam.reduce((sum, p) => sum + p.kills, 0);
   const enrichedKillFeed = useMemo(
-    () => enrichKillFeed(data.killFeed ?? [], data.players, data.killFeedSnapshots),
-    [data.killFeed, data.players, data.killFeedSnapshots],
+    () => enrichKillFeed(data.killFeed ?? [], data.players, data.killFeedSnapshots, data.liveEvents),
+    [data.killFeed, data.players, data.killFeedSnapshots, data.liveEvents],
   );
 
   // Active player row index and side (for floating "you" chevron)

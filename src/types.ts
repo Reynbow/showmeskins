@@ -182,6 +182,10 @@ export interface LiveGameEvent {
   monsterType?: string;
   dragonType?: string;
   stolen?: boolean;
+  killStreak?: number;   // Multikill event: multi-kill count (2=double..5=penta)
+  acer?: string;         // Ace event: player who scored the ace
+  acingTeam?: string;    // Ace event: team that aced ("ORDER" or "CHAOS")
+  recipient?: string;    // FirstBlood event: player who got first blood
 }
 
 export interface LiveGameData {

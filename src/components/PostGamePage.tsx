@@ -363,11 +363,10 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     if (!player) return null;
     const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
     const championId = match?.id ?? player.championName;
-    const championKey = match?.key ?? '0';
     const skinNum = player.skinID;
     return {
       artUrl: getLoadingArt(championId, skinNum),
-      fallbackUrl: getLoadingArtFallback(championKey, skinNum),
+      fallbackUrl: getLoadingArtFallback(championId, skinNum),
       baseFallbackUrl: getLoadingArt(championId, 0),
     };
   };
@@ -380,8 +379,8 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
   const blueKills = blueTeam.reduce((s, p) => s + p.kills, 0);
   const redKills = redTeam.reduce((s, p) => s + p.kills, 0);
   const enrichedKillFeed = useMemo(
-    () => enrichKillFeed(data.killFeed ?? [], data.players, data.killFeedSnapshots),
-    [data.killFeed, data.players, data.killFeedSnapshots],
+    () => enrichKillFeed(data.killFeed ?? [], data.players, data.killFeedSnapshots, data.liveEvents),
+    [data.killFeed, data.players, data.killFeedSnapshots, data.liveEvents],
   );
 
   // Active player row index and side (for floating "you" chevron)
