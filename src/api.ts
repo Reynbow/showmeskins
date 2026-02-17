@@ -185,12 +185,9 @@ export function getSplashArtFallback(championId: string, skinNum: number): strin
   return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
 }
 
-/** Fallback for loading/tile art – tries splash art from the same asset host */
-export function getLoadingArtFallback(championId: string, skinNum: number): string {
-  if (ASSET_BASE_URL) {
-    return `${ASSET_BASE_URL}/art/splash/${championId}_${skinNum}.webp`;
-  }
-  return `${BASE_URL}/cdn/img/champion/splash/${championId}_${skinNum}.jpg`;
+/** Direct Data Dragon loading art URL (always external, JPG) */
+export function getLoadingArtDdragon(championId: string, skinNum: number): string {
+  return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
 }
 
 /**

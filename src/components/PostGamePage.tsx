@@ -2,9 +2,10 @@ import { useMemo, useRef, useState, useEffect, useCallback, type ReactNode } fro
 import type { LiveGameData, LiveGamePlayer, KillEvent, KillEventPlayerSnapshot, ChampionBasic, ItemInfo, PlayerPosition, LiveGameEvent } from '../types';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
-import { getLoadingArt, getLoadingArtFallback } from '../api';
+import { getLoadingArt, getLoadingArtDdragon } from '../api';
 import { enrichKillFeed } from '../utils/killFeed';
 import { buildKillEventKeys } from '../utils/killFeedKey';
+import { FallbackArtImg } from './FallbackArtImg';
 import './PostGamePage.css';
 
 interface Props {
@@ -364,11 +365,11 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
     const match = champions.find((c) => c.name.toLowerCase() === player.championName.toLowerCase());
     const championId = match?.id ?? player.championName;
     const skinNum = player.skinID;
-    return {
-      artUrl: getLoadingArt(championId, skinNum),
-      fallbackUrl: getLoadingArtFallback(championId, skinNum),
-      baseFallbackUrl: getLoadingArt(championId, 0),
-    };
+    return [
+      getLoadingArt(championId, skinNum),
+      getLoadingArtDdragon(championId, skinNum),
+      getLoadingArt(championId, 0),
+    ];
   };
   const leftArt = resolveArtUrls(leftPlayer);
   const rightArt = resolveArtUrls(rightPlayer);
@@ -488,37 +489,19 @@ export function PostGamePage({ data, champions, version, itemData, onBack, backL
       {/* Champion artwork flanking the showcase — left and right */}
       {leftArt && (
         <div className="pg-art-bg pg-art-bg--left">
-          <img
-            className="pg-art-bg-img"
-            src={leftArt.artUrl}
+          <FallbackArtImg
+            urls={leftArt}
             alt=""
-            loading="eager"
-            onError={(e) => {
-              const img = e.currentTarget;
-              if (img.src !== leftArt.fallbackUrl && img.src !== leftArt.baseFallbackUrl) {
-                img.src = leftArt.fallbackUrl;
-              } else if (img.src === leftArt.fallbackUrl) {
-                img.src = leftArt.baseFallbackUrl;
-              }
-            }}
+            className="pg-art-bg-img"
           />
         </div>
       )}
       {rightArt && (
         <div className="pg-art-bg pg-art-bg--right">
-          <img
-            className="pg-art-bg-img"
-            src={rightArt.artUrl}
+          <FallbackArtImg
+            urls={rightArt}
             alt=""
-            loading="eager"
-            onError={(e) => {
-              const img = e.currentTarget;
-              if (img.src !== rightArt.fallbackUrl && img.src !== rightArt.baseFallbackUrl) {
-                img.src = rightArt.fallbackUrl;
-              } else if (img.src === rightArt.fallbackUrl) {
-                img.src = rightArt.baseFallbackUrl;
-              }
-            }}
+            className="pg-art-bg-img"
           />
         </div>
       )}

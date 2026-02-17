@@ -110,6 +110,11 @@ export interface LiveGameStats {
 
 export type PlayerPosition = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | '';
 
+export interface SummonerSpell {
+  id: string;          // Data Dragon spell key, e.g. "SummonerFlash"
+  displayName: string; // Human-readable name, e.g. "Flash"
+}
+
 export interface LiveGamePlayer {
   summonerName: string;
   championName: string;
@@ -126,6 +131,8 @@ export interface LiveGamePlayer {
   isActivePlayer: boolean;
   isDead: boolean;
   respawnTimer: number;
+  spellD?: SummonerSpell;
+  spellF?: SummonerSpell;
 }
 
 export interface LiveGameActivePlayer {

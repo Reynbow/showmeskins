@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	liveClientURL = "https://127.0.0.1:2999"
-	pollInterval  = 3 * time.Second
-	endAfterConsecutiveFailures = 3
+	liveClientURL               = "https://127.0.0.1:2999"
+	pollInterval                = 3 * time.Second
+	endAfterConsecutiveFailures = 6
 )
 
 // ── Messages sent to the website via the bridge ─────────────────────────
@@ -69,6 +69,12 @@ type ActivePlayerInfo struct {
 	Stats        LiveGameStats `json:"stats"`
 }
 
+// SummonerSpell holds the identity of a summoner spell for the frontend.
+type SummonerSpell struct {
+	ID          string `json:"id"`          // Data Dragon spell key, e.g. "SummonerFlash"
+	DisplayName string `json:"displayName"` // Human-readable name, e.g. "Flash"
+}
+
 // PlayerInfo holds per-player data visible on the scoreboard.
 type PlayerInfo struct {
 	SummonerName   string         `json:"summonerName"`
@@ -86,6 +92,8 @@ type PlayerInfo struct {
 	IsActivePlayer bool           `json:"isActivePlayer"`
 	IsDead         bool           `json:"isDead"`
 	RespawnTimer   float64        `json:"respawnTimer"`
+	SpellD         *SummonerSpell `json:"spellD,omitempty"`
+	SpellF         *SummonerSpell `json:"spellF,omitempty"`
 }
 
 // LiveGameItem represents a single item slot.
@@ -167,7 +175,7 @@ func NewLiveGameTracker(onStatus StatusCallback, onUpdate LiveGameUpdateCallback
 		onEnd:    onEnd,
 		onStatus: onStatus,
 		client: &http.Client{
-			Timeout: 2 * time.Second,
+			Timeout: 3 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
@@ -356,6 +364,15 @@ type playerData struct {
 	Team            string     `json:"team"`
 	IsDead          bool       `json:"isDead"`
 	RespawnTimer    float64    `json:"respawnTimer"`
+	SummonerSpells  struct {
+		One apiSpellData `json:"summonerSpellOne"`
+		Two apiSpellData `json:"summonerSpellTwo"`
+	} `json:"summonerSpells"`
+}
+
+type apiSpellData struct {
+	DisplayName    string `json:"displayName"`
+	RawDisplayName string `json:"rawDisplayName"`
 }
 
 type itemData struct {
@@ -441,6 +458,32 @@ func resolveNonPlayerKiller(raw string) (string, string) {
 	return "_unknown", raw
 }
 
+// extractSpellID derives the Data Dragon spell key from the Riot API's rawDisplayName.
+// e.g. "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName" → "SummonerFlash"
+func extractSpellID(rawDisplayName string) string {
+	const prefix = "GeneratedTip_SummonerSpell_"
+	const suffix = "_DisplayName"
+	s := rawDisplayName
+	if idx := strings.Index(s, prefix); idx >= 0 {
+		s = s[idx+len(prefix):]
+	}
+	if strings.HasSuffix(s, suffix) {
+		s = s[:len(s)-len(suffix)]
+	}
+	return s
+}
+
+// parseSummonerSpell converts an API spell entry to the frontend SummonerSpell struct.
+func parseSummonerSpell(spell apiSpellData) *SummonerSpell {
+	if spell.DisplayName == "" && spell.RawDisplayName == "" {
+		return nil
+	}
+	return &SummonerSpell{
+		ID:          extractSpellID(spell.RawDisplayName),
+		DisplayName: spell.DisplayName,
+	}
+}
+
 // ── Build the update message ────────────────────────────────────────────
 
 func (t *LiveGameTracker) isActivePlayer(p *playerData, active *activePlayerData) bool {
@@ -490,6 +533,14 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			displayName = p.SummonerName
 		}
 
+		spellD := parseSummonerSpell(p.SummonerSpells.One)
+		spellF := parseSummonerSpell(p.SummonerSpells.Two)
+		if spellD == nil && spellF == nil {
+			log.Printf("[livegame] %s: no spells parsed — raw spellOne={display=%q, raw=%q} spellTwo={display=%q, raw=%q}",
+				displayName, p.SummonerSpells.One.DisplayName, p.SummonerSpells.One.RawDisplayName,
+				p.SummonerSpells.Two.DisplayName, p.SummonerSpells.Two.RawDisplayName)
+		}
+
 		players = append(players, PlayerInfo{
 			SummonerName:   displayName,
 			ChampionName:   p.ChampionName,
@@ -506,6 +557,8 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			IsActivePlayer: t.isActivePlayer(p, &data.ActivePlayer),
 			IsDead:         p.IsDead,
 			RespawnTimer:   p.RespawnTimer,
+			SpellD:         spellD,
+			SpellF:         spellF,
 		})
 	}
 

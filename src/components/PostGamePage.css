@@ -265,8 +265,13 @@
 }
 
 .pg-mvp-congrats-champ {
-  font-size: 13px;
-  color: var(--lol-text-dim);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  text-shadow: 0 0 10px rgba(200, 170, 110, 0.25);
 }
 
 .pg-mvp-congrats-msg {
@@ -519,8 +524,12 @@
 }
 
 .pg-player-champ {
-  font-size: 12px;
-  color: var(--lol-text-dim);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
 }
 
 .pg-mvp-badge {
@@ -918,14 +927,14 @@
   background: rgba(200, 170, 110, 0.03);
 }
 
-/* Blue side: items | name | kda | cs | portrait */
+/* Blue side: items | name | kda | cs | spells | portrait */
 .pg-sb-side--blue {
-  grid-template-columns: 210px 1fr 80px 40px 42px;
+  grid-template-columns: 210px 1fr 80px 40px 32px 42px;
 }
 
-/* Red side: portrait | cs | kda | name | items */
+/* Red side: portrait | spells | cs | kda | name | items */
 .pg-sb-side--red {
-  grid-template-columns: 42px 40px 80px 1fr 210px;
+  grid-template-columns: 42px 32px 40px 80px 1fr 210px;
 }
 
 /* Active player highlight */
@@ -1098,6 +1107,47 @@
   font-size: 13px;
   color: var(--lol-text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Summoner Spells ─────────────────────────────────────────────────── */
+
+.pg-sb-spells {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pg-sb-spell {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  overflow: visible;
+  border: 1px solid rgba(200, 170, 110, 0.2);
+  flex-shrink: 0;
+}
+
+.pg-sb-spell-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 3px;
+}
+
+.pg-sb-spell-key {
+  position: absolute;
+  bottom: -1px;
+  right: 0px;
+  font-size: 7px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6);
+  line-height: 1;
+  pointer-events: none;
 }
 
 /* ── Items ────────────────────────────────────────────────────────────── */
@@ -1390,14 +1440,17 @@
 }
 
 .pg-kf-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
   min-width: 80px;
 }
 
-.pg-kf-name--blue    { color: #60a5fa; }
-.pg-kf-name--red     { color: #f87171; }
+.pg-kf-name--blue    { color: var(--lol-gold); }
+.pg-kf-name--red     { color: var(--lol-gold); }
 .pg-kf-name--neutral { color: var(--lol-text-dim); }
 
 /* ── Arrow ───────────────────────────────────────────────────────────── */
@@ -1682,9 +1735,12 @@
 }
 
 .pg-kf-detail-champ-name {
-  font-size: 15px;
+  font-family: var(--font-heading);
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1786,9 +1842,12 @@
 }
 
 .pg-kf-detail-assist-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1814,10 +1873,10 @@
 
 @media (max-width: 1100px) {
   .pg-sb-side--blue {
-    grid-template-columns: 160px 1fr 70px 36px 38px;
+    grid-template-columns: 160px 1fr 70px 36px 28px 38px;
   }
   .pg-sb-side--red {
-    grid-template-columns: 38px 36px 70px 1fr 160px;
+    grid-template-columns: 38px 28px 36px 70px 1fr 160px;
   }
   .pg-sb-item-slot {
     width: 22px;
@@ -1848,10 +1907,10 @@
   .pg-sb-items { display: none; }
 
   .pg-sb-side--blue {
-    grid-template-columns: 1fr 70px 36px 38px;
+    grid-template-columns: 1fr 70px 36px 28px 38px;
   }
   .pg-sb-side--red {
-    grid-template-columns: 38px 36px 70px 1fr;
+    grid-template-columns: 38px 28px 36px 70px 1fr;
   }
 
   .pg-sb-side {
@@ -2002,14 +2061,14 @@
     padding: 0 8px 32px;
   }
 
-  /* Hide CS on mobile, just portrait + KDA + name */
+  /* Hide CS on mobile, just portrait + spells + KDA + name */
   .pg-sb-cs { display: none; }
 
   .pg-sb-side--blue {
-    grid-template-columns: 1fr 60px 32px;
+    grid-template-columns: 1fr 60px 24px 32px;
   }
   .pg-sb-side--red {
-    grid-template-columns: 32px 60px 1fr;
+    grid-template-columns: 32px 24px 60px 1fr;
   }
 
   .pg-sb-side {
@@ -2020,6 +2079,15 @@
   .pg-sb-portrait {
     width: 28px;
     height: 28px;
+  }
+
+  .pg-sb-spell {
+    width: 13px;
+    height: 13px;
+  }
+
+  .pg-sb-spell-key {
+    font-size: 6px;
   }
 
   .pg-sb-player-name { font-size: 11px; }

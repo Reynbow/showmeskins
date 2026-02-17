@@ -348,6 +348,62 @@
 .text-tooltip--execute::after { border-top-color: rgba(148, 163, 184, 0.65); }
 .text-tooltip--execute::before { border-top-color: rgba(14, 16, 20, 0.98); }
 
+/* ── Summoner Spell tooltip content ──────────────────────────────────── */
+
+.spell-tooltip-content {
+  white-space: normal;
+  max-width: 260px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.spell-tooltip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  color: var(--lol-gold);
+  font-size: 13px;
+}
+
+.spell-tooltip-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.spell-tooltip-keybind {
+  color: var(--lol-text-dim);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.spell-tooltip-cd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #60a5fa;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.spell-tooltip-desc {
+  color: var(--lol-text-secondary);
+  font-size: 11px;
+}
+
+.spell-tooltip-egg {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(200, 170, 110, 0.15);
+  color: #f87171;
+  font-size: 10px;
+  font-style: italic;
+}
+
 /* ── Tooltip header (icon + name + gold) ─────────────────────────────── */
 
 .item-tooltip-header {

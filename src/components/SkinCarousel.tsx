@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ChampionDetail, Skin } from '../types';
-import { getLoadingArt, getSplashArt, getLoadingArtFallback, getSplashArtFallback } from '../api';
+import { getLoadingArt, getSplashArt, getLoadingArtDdragon, getSplashArtFallback } from '../api';
 import './SkinCarousel.css';
 
 interface Props {
@@ -84,7 +84,7 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
                         const img = e.currentTarget;
                         const fallback = isActive
                           ? getSplashArtFallback(champion.id, skin.num)
-                          : getLoadingArtFallback(champion.id, skin.num);
+                          : getLoadingArtDdragon(champion.id, skin.num);
                         if (img.src !== fallback) img.src = fallback;
                       }}
                     />

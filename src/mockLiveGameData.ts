@@ -65,6 +65,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerTeleport', displayName: 'Teleport' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'JGKing',
@@ -86,6 +88,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerSmite', displayName: 'Smite' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'You',
@@ -109,6 +113,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: true,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerHeal', displayName: 'Heal' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'SuppGap',
@@ -130,6 +136,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerDot', displayName: 'Ignite' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'MidOrFeed',
@@ -152,6 +160,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerFlash', displayName: 'Flash' },
+      spellF: { id: 'SummonerDot', displayName: 'Ignite' },
     },
     // ── Red team (CHAOS) ──
     {
@@ -175,6 +185,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerFlash', displayName: 'Flash' },
+      spellF: { id: 'SummonerTeleport', displayName: 'Teleport' },
     },
     {
       summonerName: 'ForestGuard',
@@ -196,6 +208,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: true,
       respawnTimer: 18,
+      spellD: { id: 'SummonerFlash', displayName: 'Flash' },
+      spellF: { id: 'SummonerSmite', displayName: 'Smite' },
     },
     {
       summonerName: 'ZedMain420',
@@ -217,6 +231,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerDot', displayName: 'Ignite' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'ADC Diff',
@@ -238,6 +254,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: false,
       respawnTimer: 0,
+      spellD: { id: 'SummonerHeal', displayName: 'Heal' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
     {
       summonerName: 'WardBot',
@@ -259,6 +277,8 @@ const sampleLiveGame: LiveGameData = {
       isActivePlayer: false,
       isDead: true,
       respawnTimer: 22,
+      spellD: { id: 'SummonerExhaust', displayName: 'Exhaust' },
+      spellF: { id: 'SummonerFlash', displayName: 'Flash' },
     },
   ],
   killFeed: [
