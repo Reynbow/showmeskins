@@ -987,7 +987,7 @@
 .pg-sb-portrait {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: 4px;
   border: 2px solid rgba(30, 40, 45, 0.8);
   position: relative;
   flex-shrink: 0;
@@ -1006,8 +1006,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 50%;
-  transform: scale(1.15);
+  border-radius: 4px;
 }
 
 .pg-sb-portrait-level {
@@ -1338,7 +1337,7 @@
 .pg-kf-portrait {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 4px;
   flex-shrink: 0;
   border: 2px solid var(--lol-border);
   position: relative;
@@ -1350,8 +1349,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 50%;
-  transform: scale(1.15);
+  border-radius: 4px;
 }
 
 .pg-kf-portrait-level {
@@ -1553,13 +1551,12 @@
 .pg-kf-assist-mini-icon {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 3px;
   border: 1.5px solid var(--lol-border);
   flex-shrink: 0;
   opacity: 0.85;
   transition: opacity 0.15s;
   object-fit: cover;
-  transform: scale(1.15);
 }
 
 .pg-kf-entry:hover .pg-kf-assist-mini-icon {
@@ -1673,11 +1670,10 @@
 .pg-kf-detail-champ-icon {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 4px;
   flex-shrink: 0;
   border: 2px solid var(--lol-border);
   object-fit: cover;
-  transform: scale(1.15);
 }
 
 .pg-kf-detail-champ-info {
@@ -1779,11 +1775,10 @@
 .pg-kf-detail-assist-icon {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 4px;
   border: 2px solid var(--lol-border);
   flex-shrink: 0;
   object-fit: cover;
-  transform: scale(1.15);
 }
 
 .pg-kf-detail-assist-info {
