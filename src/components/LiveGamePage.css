@@ -796,13 +796,10 @@
   left: 0;
   right: 0;
   text-align: center;
-  font-family: var(--font-heading);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lol-gold);
-  text-shadow: 0 0 8px rgba(200, 170, 110, 0.4), 0 1px 4px rgba(0, 0, 0, 0.9);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(240, 230, 210, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
   z-index: 2;
   padding: 0 4px;
   line-height: 1.2;
@@ -824,8 +821,7 @@
     padding: 0 8px;
   }
   .lg-hero-card-name {
-    font-size: 0.45rem;
-    letter-spacing: 0.5px;
+    font-size: 0.5rem;
   }
 }
 
@@ -842,8 +838,7 @@
     padding: 0 6px;
   }
   .lg-hero-card-name {
-    font-size: 0.4rem;
-    letter-spacing: 0.3px;
+    font-size: 0.45rem;
     bottom: 2px;
   }
 }
@@ -1198,21 +1193,18 @@
 }
 
 .lg-kill-name {
-  font-family: var(--font-heading);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lol-gold);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   min-width: 80px;
 }
 
 .lg-kill-name--blue {
-  color: var(--lol-gold);
+  color: #60a5fa;
 }
 
 .lg-kill-name--red {
-  color: var(--lol-gold);
+  color: #f87171;
 }
 
 .lg-kill-name--neutral {
@@ -1559,12 +1551,9 @@
 }
 
 .lg-kill-detail-champ-name {
-  font-family: var(--font-heading);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lol-gold);
+  letter-spacing: 0.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1668,12 +1657,9 @@
 }
 
 .lg-kill-detail-assist-name {
-  font-family: var(--font-heading);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lol-gold);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1798,15 +1784,6 @@
   .lg-sb-portrait {
     width: 28px;
     height: 28px;
-  }
-
-  .lg-sb-spell {
-    width: 13px;
-    height: 13px;
-  }
-
-  .lg-sb-spell-key {
-    font-size: 6px;
   }
 
   .lg-sb-player-name { font-size: 11px; }
