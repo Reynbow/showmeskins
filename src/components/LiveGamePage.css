@@ -463,6 +463,7 @@
   object-fit: cover;
   display: block;
   border-radius: 50%;
+  transform: scale(1.15);
 }
 
 .lg-sb-portrait-level {
@@ -1142,9 +1143,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 15%;
   display: block;
   border-radius: 50%;
+  transform: scale(1.15);
 }
 
 .lg-kill-portrait-level {
@@ -1363,7 +1364,7 @@
   opacity: 0.85;
   transition: opacity 0.15s;
   object-fit: cover;
-  object-position: center 15%;
+  transform: scale(1.15);
 }
 
 .lg-kill-entry:hover .lg-kill-assist-mini-icon {
@@ -1540,7 +1541,7 @@
   flex-shrink: 0;
   border: 2px solid var(--lol-border);
   object-fit: cover;
-  object-position: center 15%;
+  transform: scale(1.15);
 }
 
 .lg-kill-detail-champ-info {
@@ -1646,7 +1647,7 @@
   border: 2px solid var(--lol-border);
   flex-shrink: 0;
   object-fit: cover;
-  object-position: center 15%;
+  transform: scale(1.15);
 }
 
 .lg-kill-detail-assist-info {

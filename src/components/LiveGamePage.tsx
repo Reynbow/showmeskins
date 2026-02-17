@@ -1423,16 +1423,16 @@ function KillFeedEntity({
   displayName,
   side,
   champions,
+  version,
   level,
-  skinID,
 }: {
   isEntity: boolean;
   champ: string;
   displayName: string;
   side: string;
   champions: ChampionBasic[];
+  version: string;
   level?: number;
-  skinID?: number;
 }) {
   if (isEntity) {
     return (
@@ -1446,26 +1446,13 @@ function KillFeedEntity({
       </>
     );
   }
-  const championId = resolveChampionId(champ, champions);
-  const skinNum = skinID ?? 0;
-  const artUrl = getLoadingArt(championId, skinNum);
-  const fallbackUrl = getLoadingArtDdragon(championId, skinNum);
-  const baseFallbackUrl = getLoadingArt(championId, 0);
   return (
     <>
       <span className={`lg-kill-portrait lg-kill-icon--${side}`}>
         <img
           className="lg-kill-portrait-img"
-          src={artUrl}
+          src={getChampionIconUrl(version, champ, champions)}
           alt={champ}
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (img.src !== fallbackUrl && img.src !== baseFallbackUrl) {
-              img.src = fallbackUrl;
-            } else if (img.src === fallbackUrl) {
-              img.src = baseFallbackUrl;
-            }
-          }}
         />
         {level != null && <span className="lg-kill-portrait-level">{level}</span>}
       </span>
@@ -1615,8 +1602,8 @@ function KillFeed({
                   displayName={kill.killerName}
                   side={killerSide}
                   champions={champions}
+                  version={version}
                   level={killerPlayer?.level}
-                  skinID={killerPlayer?.skinID}
                 />
                 {/* Assister icons inline next to the killer */}
                 <span className={`lg-kill-assist-icons${liveAssisterPlayers.length === 0 ? ' lg-kill-assist-icons--empty' : ''}`}>
@@ -1624,26 +1611,13 @@ function KillFeed({
                   {liveAssisterPlayers.map((ap) => {
                     const apTeam = nameToTeam[ap.summonerName];
                     const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
-                    const apChampId = resolveChampionId(ap.championName, champions);
-                    const apSkinNum = ap.skinID ?? 0;
-                    const apArtUrl = getLoadingArt(apChampId, apSkinNum);
-                    const apFallback = getLoadingArtDdragon(apChampId, apSkinNum);
-                    const apBaseFallback = getLoadingArt(apChampId, 0);
                     return (
                       <img
                         key={ap.summonerName}
                         className={`lg-kill-assist-mini-icon lg-kill-icon--${apSide}`}
-                        src={apArtUrl}
+                        src={getChampionIconUrl(version, ap.championName, champions)}
                         alt={ap.championName}
                         title={ap.championName}
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.src !== apFallback && img.src !== apBaseFallback) {
-                            img.src = apFallback;
-                          } else if (img.src === apFallback) {
-                            img.src = apBaseFallback;
-                          }
-                        }}
                       />
                     );
                   })}
@@ -1658,8 +1632,8 @@ function KillFeed({
                   displayName={kill.victimName}
                   side={victimSide}
                   champions={champions}
+                  version={version}
                   level={victimPlayer?.level}
-                  skinID={victimPlayer?.skinID}
                 />
                 <span className="lg-kill-right">
                   {(kill.multiKill || kill.killStreak || kill.firstBlood || kill.shutdown || kill.ace || kill.execute) && (
@@ -1763,25 +1737,12 @@ function KillFeed({
                           {assisterPlayers.map((ap) => {
                             const apTeam = nameToTeam[ap.summonerName];
                             const apSide = apTeam === 'ORDER' ? 'blue' : apTeam === 'CHAOS' ? 'red' : 'neutral';
-                            const apChampId = resolveChampionId(ap.championName, champions);
-                            const apSkinNum = ap.skinID ?? 0;
-                            const apArtUrl = getLoadingArt(apChampId, apSkinNum);
-                            const apFallback = getLoadingArtDdragon(apChampId, apSkinNum);
-                            const apBaseFallback = getLoadingArt(apChampId, 0);
                             return (
                               <div key={ap.summonerName} className="lg-kill-detail-assist-player">
                                 <img
                                   className={`lg-kill-detail-assist-icon lg-kill-icon--${apSide}`}
-                                  src={apArtUrl}
+                                  src={getChampionIconUrl(version, ap.championName, champions)}
                                   alt={ap.championName}
-                                  onError={(e) => {
-                                    const img = e.currentTarget;
-                                    if (img.src !== apFallback && img.src !== apBaseFallback) {
-                                      img.src = apFallback;
-                                    } else if (img.src === apFallback) {
-                                      img.src = apBaseFallback;
-                                    }
-                                  }}
                                 />
                                 <div className="lg-kill-detail-assist-info">
                                   <span className={`lg-kill-detail-assist-name lg-kill-name--${apSide}`}>
@@ -1871,11 +1832,6 @@ function KillDetailColumn({
   }
 
   const playerItems = player.items.filter((it) => it.itemID > 0);
-  const detailChampId = resolveChampionId(player.championName, champions);
-  const detailSkinNum = player.skinID ?? 0;
-  const detailArtUrl = getLoadingArt(detailChampId, detailSkinNum);
-  const detailFallback = getLoadingArtDdragon(detailChampId, detailSkinNum);
-  const detailBaseFallback = getLoadingArt(detailChampId, 0);
 
   return (
     <div className="lg-kill-detail-col">
@@ -1883,16 +1839,8 @@ function KillDetailColumn({
       <div className="lg-kill-detail-champ">
         <img
           className={`lg-kill-detail-champ-icon lg-kill-icon--${side}`}
-          src={detailArtUrl}
+          src={getChampionIconUrl(version, player.championName, champions)}
           alt={player.championName}
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (img.src !== detailFallback && img.src !== detailBaseFallback) {
-              img.src = detailFallback;
-            } else if (img.src === detailFallback) {
-              img.src = detailBaseFallback;
-            }
-          }}
         />
         <div className="lg-kill-detail-champ-info">
           <span className={`lg-kill-detail-champ-name lg-kill-name--${side}`}>
