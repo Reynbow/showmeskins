@@ -3,7 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
-import { DevPage, type AccountInfo } from './components/DevPage';
+import { DevPage, type AccountInfo, type CompanionLiveDebug } from './components/DevPage';
 import { LiveGamePage } from './components/LiveGamePage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
@@ -245,6 +245,23 @@ function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): Live
   };
 }
 
+function summarizeWsPayload(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return '';
+  const source = raw as Record<string, unknown>;
+  const parts: string[] = [];
+  const gameTime = readNumericField(source, 'gameTime', 'GameTime');
+  if (gameTime > 0) parts.push(`t=${Math.floor(gameTime)}s`);
+  const players = Array.isArray(source.players) ? source.players.length : 0;
+  if (players > 0) parts.push(`players=${players}`);
+  const kills = Array.isArray(source.killFeed) ? source.killFeed.length : 0;
+  if (kills > 0) parts.push(`kills=${kills}`);
+  const events = Array.isArray(source.liveEvents) ? source.liveEvents.length : 0;
+  if (events > 0) parts.push(`events=${events}`);
+  const result = readStringField(source, 'gameResult', 'GameResult');
+  if (result) parts.push(`result=${result}`);
+  return parts.join(' | ');
+}
+
 function App() {
   const [champions, setChampions] = useState<ChampionBasic[]>([]);
   const [selectedChampion, setSelectedChampion] = useState<ChampionDetail | null>(null);
@@ -257,6 +274,20 @@ function App() {
   const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [liveDebug, setLiveDebug] = useState<CompanionLiveDebug>({
+    companionConnected: false,
+    lastMessageAt: null,
+    lastMessageType: '',
+    lastMessageSummary: '',
+    messageCounts: {},
+    parseErrorCount: 0,
+    liveUpdateCount: 0,
+    liveEndCount: 0,
+    lastLiveUpdateAt: null,
+    lastLiveUpdateIntervalMs: null,
+    latestLivePayload: null,
+    latestLiveEndPayload: null,
+  });
 
   // SEO: update document head (invisible to users; for search engines)
   const seoTitle = 'Show Me Skins!';
@@ -597,11 +628,26 @@ function App() {
         ws.onopen = () => {
           companionWsRef.current = ws;
           console.log('[companion] Connected to companion app');
+          setLiveDebug((prev) => ({ ...prev, companionConnected: true }));
         };
 
         ws.onmessage = (event) => {
+          const now = Date.now();
           try {
             const data = JSON.parse(event.data as string);
+            const msgType = typeof data?.type === 'string' ? data.type : 'unknown';
+            const summary = summarizeWsPayload(data);
+            setLiveDebug((prev) => {
+              const nextCounts = { ...prev.messageCounts };
+              nextCounts[msgType] = (nextCounts[msgType] ?? 0) + 1;
+              return {
+                ...prev,
+                lastMessageAt: now,
+                lastMessageType: msgType,
+                lastMessageSummary: summary,
+                messageCounts: nextCounts,
+              };
+            });
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
@@ -673,6 +719,13 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
+              setLiveDebug((prev) => ({
+                ...prev,
+                liveUpdateCount: prev.liveUpdateCount + 1,
+                lastLiveUpdateIntervalMs: prev.lastLiveUpdateAt ? now - prev.lastLiveUpdateAt : null,
+                lastLiveUpdateAt: now,
+                latestLivePayload: data,
+              }));
               // Reset champ-select dedup once a game is in progress.
               // If champ-select end is ever missed, the next lobby should still
               // be able to re-emit the same champion/skin combination.
@@ -693,6 +746,11 @@ function App() {
 
             // ── Game ended ── transition to post-game summary
             if (data.type === 'liveGameEnd') {
+              setLiveDebug((prev) => ({
+                ...prev,
+                liveEndCount: prev.liveEndCount + 1,
+                latestLiveEndPayload: data,
+              }));
               // Ensure next champ-select session can emit the same champion/skin.
               if (champSelectSeenSinceLastLiveGame.current) {
                 liveGameAutoNavDone.current = false;
@@ -722,13 +780,14 @@ function App() {
               liveGameAutoNavDone.current = false;
             }
           } catch {
-            /* ignore malformed messages */
+            setLiveDebug((prev) => ({ ...prev, parseErrorCount: prev.parseErrorCount + 1 }));
           }
         };
 
         ws.onclose = () => {
           if (companionWsRef.current === ws) companionWsRef.current = null;
           ws = null;
+          setLiveDebug((prev) => ({ ...prev, companionConnected: false }));
           if (!disposed) {
             reconnectTimer = setTimeout(connect, 5000);
           }
@@ -803,7 +862,7 @@ function App() {
           onLiveGame={handleLiveGameNavigate}
         />
       ) : viewMode === 'dev' && import.meta.env.DEV ? (
-        <DevPage accountInfo={accountInfo} champions={champions} onBack={handleDevBack} />
+        <DevPage accountInfo={accountInfo} liveDebug={liveDebug} onBack={handleDevBack} />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}

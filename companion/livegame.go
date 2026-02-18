@@ -16,6 +16,7 @@ const (
 	liveClientURL               = "https://127.0.0.1:2999"
 	pollInterval                = 3 * time.Second
 	endAfterConsecutiveFailures = 6
+	forceEndAfterFailures       = 30
 )
 
 // ── Messages sent to the website via the bridge ─────────────────────────
@@ -55,10 +56,10 @@ type LiveGameEvent struct {
 	MonsterType  string   `json:"monsterType,omitempty"`
 	DragonType   string   `json:"dragonType,omitempty"`
 	Stolen       bool     `json:"stolen,omitempty"`
-	KillStreak   int      `json:"killStreak,omitempty"`   // Multikill: multi-kill count (2=double..5=penta)
-	Acer         string   `json:"acer,omitempty"`         // Ace: player who scored the ace
-	AcingTeam    string   `json:"acingTeam,omitempty"`    // Ace: team that aced
-	Recipient    string   `json:"recipient,omitempty"`    // FirstBlood: player who got first blood
+	KillStreak   int      `json:"killStreak,omitempty"` // Multikill: multi-kill count (2=double..5=penta)
+	Acer         string   `json:"acer,omitempty"`       // Ace: player who scored the ace
+	AcingTeam    string   `json:"acingTeam,omitempty"`  // Ace: team that aced
+	Recipient    string   `json:"recipient,omitempty"`  // FirstBlood: player who got first blood
 }
 
 // ActivePlayerInfo holds detailed data for the local player (gold, stats).
@@ -235,14 +236,16 @@ func (t *LiveGameTracker) poll() {
 				log.Printf("[livegame] Poll failed (%d/%d) while in game: %v", t.failCount, endAfterConsecutiveFailures, err)
 				return
 			}
-			if t.gameResult == "" {
-				// Never end a live game on transport failures alone.
-				// Wait for an explicit GameEnd event from Riot data.
-				log.Printf("[livegame] Poll failed (%d/%d) but no GameEnd event yet; keeping live view active", t.failCount, endAfterConsecutiveFailures)
-				t.failCount = endAfterConsecutiveFailures
+			if t.gameResult == "" && t.failCount < forceEndAfterFailures {
+				// Prefer explicit GameEnd events from Riot when available.
+				// If they never arrive, keep trying for a longer grace period.
+				if t.failCount == endAfterConsecutiveFailures || t.failCount%5 == 0 {
+					log.Printf("[livegame] Poll failed (%d/%d) and no GameEnd event yet; waiting before forced end", t.failCount, forceEndAfterFailures)
+				}
 				return
 			}
 
+			failures := t.failCount
 			result := t.gameResult
 			finalSnapshot := t.lastUpdate
 			t.wasInGame = false
@@ -253,7 +256,11 @@ func (t *LiveGameTracker) poll() {
 			t.seenEventIDs = make(map[int]bool)
 			t.accKillFeed = nil
 			t.accLiveEvents = nil
-			log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", endAfterConsecutiveFailures, result)
+			if result != "" {
+				log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", failures, result)
+			} else {
+				log.Printf("[livegame] GameEnd event missing after %d consecutive failures; ending with unknown result", failures)
+			}
 			t.onStatus("Connected - Waiting for Champion Select...")
 			t.onEnd(result, finalSnapshot)
 		}
@@ -569,15 +576,27 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		})
 	}
 
-	// Build name→champion lookup for the kill feed
-	nameToChamp := make(map[string]string, len(data.AllPlayers))
+	// Build name→champion and name→displayName lookups for the kill feed.
+	// Index by both RiotIdGameName and SummonerName so kill events resolve
+	// regardless of which name format Riot uses in event data.
+	nameToChamp := make(map[string]string, len(data.AllPlayers)*2)
+	nameToDisplay := make(map[string]string, len(data.AllPlayers)*2)
 	for i := range data.AllPlayers {
 		p := &data.AllPlayers[i]
-		name := p.RiotIdGameName
-		if name == "" {
-			name = p.SummonerName
+		displayName := p.RiotIdGameName
+		if displayName == "" {
+			displayName = p.SummonerName
 		}
-		nameToChamp[name] = p.ChampionName
+		nameToChamp[displayName] = p.ChampionName
+		nameToDisplay[displayName] = displayName
+		if p.SummonerName != "" && p.SummonerName != displayName {
+			nameToChamp[p.SummonerName] = p.ChampionName
+			nameToDisplay[p.SummonerName] = displayName
+		}
+		if p.RiotIdGameName != "" && p.RiotIdGameName != displayName {
+			nameToChamp[p.RiotIdGameName] = p.ChampionName
+			nameToDisplay[p.RiotIdGameName] = displayName
+		}
 	}
 
 	// Accumulate events across polls – only process events we haven't seen yet.
@@ -589,12 +608,30 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		}
 		t.seenEventIDs[ev.EventID] = true
 
-		// Pass through objective/timeline event metadata for richer front-end estimation.
+		// Normalize player names in event metadata so the frontend can match
+		// them against the player list regardless of Riot's name format.
+		evKillerName := ev.KillerName
+		if d, ok := nameToDisplay[evKillerName]; ok {
+			evKillerName = d
+		}
+		evVictimName := ev.VictimName
+		if d, ok := nameToDisplay[evVictimName]; ok {
+			evVictimName = d
+		}
+		evAcer := ev.Acer
+		if d, ok := nameToDisplay[evAcer]; ok {
+			evAcer = d
+		}
+		evRecipient := ev.Recipient
+		if d, ok := nameToDisplay[evRecipient]; ok {
+			evRecipient = d
+		}
+
 		t.accLiveEvents = append(t.accLiveEvents, LiveGameEvent{
 			EventName:    ev.EventName,
 			EventTime:    ev.EventTime,
-			KillerName:   ev.KillerName,
-			VictimName:   ev.VictimName,
+			KillerName:   evKillerName,
+			VictimName:   evVictimName,
 			Assisters:    ev.Assisters,
 			TurretKilled: ev.TurretKilled,
 			InhibKilled:  ev.InhibKilled,
@@ -602,9 +639,9 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 			DragonType:   ev.DragonType,
 			Stolen:       ev.Stolen,
 			KillStreak:   ev.KillStreak,
-			Acer:         ev.Acer,
+			Acer:         evAcer,
 			AcingTeam:    ev.AcingTeam,
-			Recipient:    ev.Recipient,
+			Recipient:    evRecipient,
 		})
 
 		if ev.EventName != "ChampionKill" {
@@ -620,8 +657,17 @@ func (t *LiveGameTracker) buildUpdate(data *allGameData) *LiveGameUpdate {
 		}
 		killerChamp := nameToChamp[ev.KillerName]
 		victimChamp := nameToChamp[ev.VictimName]
-		killerDisplay := ev.KillerName
-		victimDisplay := ev.VictimName
+
+		// Normalize to canonical display names so the frontend can match
+		// kill event names against the player list reliably.
+		killerDisplay := nameToDisplay[ev.KillerName]
+		if killerDisplay == "" {
+			killerDisplay = ev.KillerName
+		}
+		victimDisplay := nameToDisplay[ev.VictimName]
+		if victimDisplay == "" {
+			victimDisplay = ev.VictimName
+		}
 
 		// Non-player killers (turrets, minions, monsters) use internal names
 		if killerChamp == "" {

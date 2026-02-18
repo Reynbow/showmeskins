@@ -1,7 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import type { ChampionBasic } from '../types';
-import { PregameHeroFormation } from './LiveGamePage';
-import { sampleLiveGameData } from '../mockLiveGameData';
+import { useState, useEffect } from 'react';
 import './DevPage.css';
 
 export interface AccountInfo {
@@ -12,17 +9,24 @@ export interface AccountInfo {
   platformId?: string;
 }
 
-const ROLE_ORDER: Record<string, number> = {
-  TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4,
-};
-
-function sortByRole<T extends { position: string }>(players: T[]): T[] {
-  return [...players].sort((a, b) => (ROLE_ORDER[a.position] ?? 99) - (ROLE_ORDER[b.position] ?? 99));
+export interface CompanionLiveDebug {
+  companionConnected: boolean;
+  lastMessageAt: number | null;
+  lastMessageType: string;
+  lastMessageSummary: string;
+  messageCounts: Record<string, number>;
+  parseErrorCount: number;
+  liveUpdateCount: number;
+  liveEndCount: number;
+  lastLiveUpdateAt: number | null;
+  lastLiveUpdateIntervalMs: number | null;
+  latestLivePayload: unknown;
+  latestLiveEndPayload: unknown;
 }
 
 interface Props {
   accountInfo: AccountInfo | null;
-  champions: ChampionBasic[];
+  liveDebug: CompanionLiveDebug;
   onBack: () => void;
 }
 
@@ -31,19 +35,34 @@ interface MatchHistoryResponse {
   region: string;
 }
 
-export function DevPage({ accountInfo, champions, onBack }: Props) {
-  const sampleBlueTeam = useMemo(
-    () => sortByRole(sampleLiveGameData.players.filter((p) => p.team === 'ORDER')),
-    [],
-  );
-  const sampleRedTeam = useMemo(
-    () => sortByRole(sampleLiveGameData.players.filter((p) => p.team === 'CHAOS')),
-    [],
-  );
+function formatAgeMs(ms: number | null): string {
+  if (ms === null) return 'Never';
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+function freshnessStatus(ageMs: number | null): 'ok' | 'warn' | 'error' {
+  if (ageMs === null) return 'error';
+  if (ageMs <= 6000) return 'ok';
+  if (ageMs <= 15000) return 'warn';
+  return 'error';
+}
+
+export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
   const [matchIds, setMatchIds] = useState<string[]>([]);
   const [region, setRegion] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const lastMsgAge = liveDebug.lastMessageAt ? now - liveDebug.lastMessageAt : null;
+  const lastLiveAge = liveDebug.lastLiveUpdateAt ? now - liveDebug.lastLiveUpdateAt : null;
+  const liveStatus = freshnessStatus(lastLiveAge);
 
   useEffect(() => {
     if (!accountInfo?.puuid) {
@@ -177,18 +196,70 @@ export function DevPage({ accountInfo, champions, onBack }: Props) {
           )}
         </section>
 
-        {/* Pregame hero formation sample */}
+        {/* Live API stream inspector */}
         <section className="dev-section">
-          <h2>Pregame Hero Formation (Sample)</h2>
-          <p className="dev-hero-desc">
-            Preview of the pregame lineup shown on the live page before the match starts. Champion loading art in a row.
-          </p>
-          <div className="dev-hero-formation-wrap">
-            <PregameHeroFormation
-              blueTeam={sampleBlueTeam}
-              redTeam={sampleRedTeam}
-              champions={champions}
-            />
+          <h2>Live Broadcast Inspector</h2>
+          <div className="dev-card dev-live-inspector">
+            <div className="dev-live-grid">
+              <div className="dev-row">
+                <span className="dev-label">Companion Socket</span>
+                <span className={`dev-badge ${liveDebug.companionConnected ? 'dev-badge--ok' : 'dev-badge--error'}`}>
+                  {liveDebug.companionConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Live Update Freshness</span>
+                <span className={`dev-badge ${liveStatus === 'ok' ? 'dev-badge--ok' : liveStatus === 'warn' ? 'dev-badge--warn' : 'dev-badge--error'}`}>
+                  {formatAgeMs(lastLiveAge)} ago
+                </span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Last Message Type</span>
+                <span className="dev-value">{liveDebug.lastMessageType || 'None'}</span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Last Message Age</span>
+                <span className="dev-value">{formatAgeMs(lastMsgAge)} ago</span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Live Update Count</span>
+                <span className="dev-value">{liveDebug.liveUpdateCount}</span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Live End Count</span>
+                <span className="dev-value">{liveDebug.liveEndCount}</span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Update Interval</span>
+                <span className="dev-value">{formatAgeMs(liveDebug.lastLiveUpdateIntervalMs)}</span>
+              </div>
+              <div className="dev-row">
+                <span className="dev-label">Parse Errors</span>
+                <span className={`dev-value ${liveDebug.parseErrorCount > 0 ? 'dev-text-error' : 'dev-text-ok'}`}>
+                  {liveDebug.parseErrorCount}
+                </span>
+              </div>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Last Message Summary</span>
+              <code className="dev-code">{liveDebug.lastMessageSummary || '(no summary)'}</code>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Message Type Counts</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.messageCounts, null, 2)}</pre>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Latest liveGameUpdate Payload</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.latestLivePayload, null, 2)}</pre>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Latest liveGameEnd Payload</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.latestLiveEndPayload, null, 2)}</pre>
+            </div>
           </div>
         </section>
 
