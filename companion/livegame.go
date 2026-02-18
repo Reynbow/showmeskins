@@ -235,6 +235,13 @@ func (t *LiveGameTracker) poll() {
 				log.Printf("[livegame] Poll failed (%d/%d) while in game: %v", t.failCount, endAfterConsecutiveFailures, err)
 				return
 			}
+			if t.gameResult == "" {
+				// Never end a live game on transport failures alone.
+				// Wait for an explicit GameEnd event from Riot data.
+				log.Printf("[livegame] Poll failed (%d/%d) but no GameEnd event yet; keeping live view active", t.failCount, endAfterConsecutiveFailures)
+				t.failCount = endAfterConsecutiveFailures
+				return
+			}
 
 			result := t.gameResult
 			finalSnapshot := t.lastUpdate
