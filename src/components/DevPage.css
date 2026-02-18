@@ -465,3 +465,30 @@
   font-size: 11px;
   color: #b8d4f2;
 }
+
+.dev-log-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dev-log-btn {
+  border: 1px solid var(--lol-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--lol-text-secondary);
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.dev-log-btn:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+}
+
+.dev-log-btn--primary {
+  background: rgba(80, 170, 255, 0.12);
+  border-color: rgba(80, 170, 255, 0.4);
+  color: #a9d6ff;
+}

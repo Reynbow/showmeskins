@@ -22,6 +22,15 @@ export interface CompanionLiveDebug {
   lastLiveUpdateIntervalMs: number | null;
   latestLivePayload: unknown;
   latestLiveEndPayload: unknown;
+  logs: CompanionLogEntry[];
+}
+
+export interface CompanionLogEntry {
+  ts: number;
+  level: 'info' | 'warn' | 'error';
+  source: string;
+  message: string;
+  payload?: unknown;
 }
 
 interface Props {
@@ -63,6 +72,25 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
   const lastMsgAge = liveDebug.lastMessageAt ? now - liveDebug.lastMessageAt : null;
   const lastLiveAge = liveDebug.lastLiveUpdateAt ? now - liveDebug.lastLiveUpdateAt : null;
   const liveStatus = freshnessStatus(lastLiveAge);
+
+  const handleDownloadLogs = () => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      accountInfo,
+      liveDebug,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `showmeskins-dev-log-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (!accountInfo?.puuid) {
@@ -246,6 +274,12 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
               <code className="dev-code">{liveDebug.lastMessageSummary || '(no summary)'}</code>
             </div>
 
+            <div className="dev-log-actions">
+              <button className="dev-log-btn dev-log-btn--primary" onClick={handleDownloadLogs}>
+                Download Logs
+              </button>
+            </div>
+
             <div className="dev-row">
               <span className="dev-label">Message Type Counts</span>
               <pre className="dev-json">{JSON.stringify(liveDebug.messageCounts, null, 2)}</pre>
@@ -259,6 +293,11 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
             <div className="dev-row">
               <span className="dev-label">Latest liveGameEnd Payload</span>
               <pre className="dev-json">{JSON.stringify(liveDebug.latestLiveEndPayload, null, 2)}</pre>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Runtime Logs ({liveDebug.logs.length})</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.logs, null, 2)}</pre>
             </div>
           </div>
         </section>

@@ -23,6 +23,8 @@ import type {
 import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
 
+const MAX_DEBUG_LOGS = 800;
+
 /** Turn a skin name into a URL-friendly slug: "Dark Star Thresh" → "dark-star-thresh" */
 function skinSlug(name: string): string {
   return name
@@ -262,6 +264,16 @@ function summarizeWsPayload(raw: unknown): string {
   return parts.join(' | ');
 }
 
+function normalizeErrorMessage(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function App() {
   const [champions, setChampions] = useState<ChampionBasic[]>([]);
   const [selectedChampion, setSelectedChampion] = useState<ChampionDetail | null>(null);
@@ -287,7 +299,23 @@ function App() {
     lastLiveUpdateIntervalMs: null,
     latestLivePayload: null,
     latestLiveEndPayload: null,
+    logs: [],
   });
+
+  const appendDebugLog = useCallback((
+    level: 'info' | 'warn' | 'error',
+    source: string,
+    message: string,
+    payload?: unknown,
+  ) => {
+    setLiveDebug((prev) => {
+      const next = [...prev.logs, { ts: Date.now(), level, source, message, payload }];
+      return {
+        ...prev,
+        logs: next.length > MAX_DEBUG_LOGS ? next.slice(next.length - MAX_DEBUG_LOGS) : next,
+      };
+    });
+  }, []);
 
   // SEO: update document head (invisible to users; for search engines)
   const seoTitle = 'Show Me Skins!';
@@ -609,6 +637,27 @@ function App() {
   const handlePrevChampion = useCallback(() => navigateChampion(-1), [navigateChampion]);
   const handleNextChampion = useCallback(() => navigateChampion(1), [navigateChampion]);
 
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      appendDebugLog('error', 'window.error', event.message || 'Unhandled error', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      appendDebugLog('error', 'window.unhandledrejection', normalizeErrorMessage(event.reason), {
+        reason: normalizeErrorMessage(event.reason),
+      });
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, [appendDebugLog]);
+
   // ── Companion app WebSocket integration ────────────────────────────
   // Connects to the local companion app (ws://localhost:8234) which
   // detects champion-select state from the League client and forwards
@@ -629,6 +678,7 @@ function App() {
           companionWsRef.current = ws;
           console.log('[companion] Connected to companion app');
           setLiveDebug((prev) => ({ ...prev, companionConnected: true }));
+          appendDebugLog('info', 'ws', 'Connected to companion bridge');
         };
 
         ws.onmessage = (event) => {
@@ -648,6 +698,7 @@ function App() {
                 messageCounts: nextCounts,
               };
             });
+            appendDebugLog('info', 'ws.message', `type=${msgType}${summary ? ` | ${summary}` : ''}`);
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
@@ -781,6 +832,9 @@ function App() {
             }
           } catch {
             setLiveDebug((prev) => ({ ...prev, parseErrorCount: prev.parseErrorCount + 1 }));
+            appendDebugLog('error', 'ws.parse', 'Malformed WebSocket message', {
+              raw: String(event.data ?? ''),
+            });
           }
         };
 
@@ -788,16 +842,18 @@ function App() {
           if (companionWsRef.current === ws) companionWsRef.current = null;
           ws = null;
           setLiveDebug((prev) => ({ ...prev, companionConnected: false }));
+          appendDebugLog('warn', 'ws', 'Connection closed; reconnect scheduled');
           if (!disposed) {
             reconnectTimer = setTimeout(connect, 5000);
           }
         };
 
         ws.onerror = () => {
-          // Will trigger onclose → reconnect
+          appendDebugLog('error', 'ws', 'WebSocket error event fired');
           ws?.close();
         };
       } catch {
+        appendDebugLog('error', 'ws', 'Failed to create WebSocket; reconnect scheduled');
         if (!disposed) {
           reconnectTimer = setTimeout(connect, 5000);
         }
