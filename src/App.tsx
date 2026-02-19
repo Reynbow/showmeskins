@@ -931,8 +931,13 @@ function App() {
                     gameResult: endResult || baseSnapshot.gameResult,
                   };
                   setPostGameData(finalData);
-                  setViewMode('postgame');
-                  window.history.pushState(null, '', '/postgame');
+                  const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
+                  if (!shouldStayOnDev) {
+                    setViewMode('postgame');
+                    window.history.pushState(null, '', '/postgame');
+                  } else {
+                    appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /postgame (Stay On Dev enabled)');
+                  }
                 }
                 return null;
               });
