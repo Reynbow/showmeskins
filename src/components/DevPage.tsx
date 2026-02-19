@@ -54,6 +54,8 @@ export interface CompanionMatchTrace {
 interface Props {
   accountInfo: AccountInfo | null;
   liveDebug: CompanionLiveDebug;
+  stayOnDevDuringLive: boolean;
+  onStayOnDevDuringLiveChange: (enabled: boolean) => void;
   onBack: () => void;
 }
 
@@ -75,7 +77,13 @@ function freshnessStatus(ageMs: number | null): 'ok' | 'warn' | 'error' {
   return 'error';
 }
 
-export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
+export function DevPage({
+  accountInfo,
+  liveDebug,
+  stayOnDevDuringLive,
+  onStayOnDevDuringLiveChange,
+  onBack,
+}: Props) {
   const [matchIds, setMatchIds] = useState<string[]>([]);
   const [region, setRegion] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -313,6 +321,18 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
             <div className="dev-row">
               <span className="dev-label">Last Message Summary</span>
               <code className="dev-code">{liveDebug.lastMessageSummary || '(no summary)'}</code>
+            </div>
+
+            <div className="dev-row dev-toggle-row">
+              <span className="dev-label">Auto Navigation</span>
+              <label className="dev-toggle">
+                <input
+                  type="checkbox"
+                  checked={stayOnDevDuringLive}
+                  onChange={(e) => onStayOnDevDuringLiveChange(e.target.checked)}
+                />
+                <span>Stay On Dev During Live</span>
+              </label>
             </div>
 
             <div className="dev-log-actions">

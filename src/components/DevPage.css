@@ -497,3 +497,20 @@
   border-color: rgba(80, 170, 255, 0.4);
   color: #a9d6ff;
 }
+
+.dev-toggle-row {
+  gap: 8px;
+}
+
+.dev-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lol-text-primary);
+  font-size: 13px;
+}
+
+.dev-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}

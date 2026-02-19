@@ -284,6 +284,13 @@ function App() {
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev'>('select');
+  const [stayOnDevDuringLive, setStayOnDevDuringLive] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('sms_stay_on_dev_during_live') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
@@ -352,6 +359,21 @@ function App() {
   // Track whether we've already auto-navigated for this game session
   // (so we don't force the user back if they navigate away)
   const liveGameAutoNavDone = useRef(false);
+  const viewModeRef = useRef(viewMode);
+  const stayOnDevDuringLiveRef = useRef(stayOnDevDuringLive);
+
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  useEffect(() => {
+    stayOnDevDuringLiveRef.current = stayOnDevDuringLive;
+    try {
+      window.localStorage.setItem('sms_stay_on_dev_during_live', stayOnDevDuringLive ? '1' : '0');
+    } catch {
+      // ignore storage failures
+    }
+  }, [stayOnDevDuringLive]);
 
   // Track whether initial URL-based load has been attempted
   const initialLoadDone = useRef(false);
@@ -834,10 +856,13 @@ function App() {
               });
 
               // Auto-navigate to the live game page on first detection
-              if (!liveGameAutoNavDone.current) {
+              const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
+              if (!liveGameAutoNavDone.current && !shouldStayOnDev) {
                 liveGameAutoNavDone.current = true;
                 setViewMode('livegame');
                 window.history.pushState(null, '', '/live');
+              } else if (shouldStayOnDev) {
+                appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /live (Stay On Dev enabled)');
               }
             }
 
@@ -1001,7 +1026,13 @@ function App() {
           onLiveGame={handleLiveGameNavigate}
         />
       ) : viewMode === 'dev' && import.meta.env.DEV ? (
-        <DevPage accountInfo={accountInfo} liveDebug={liveDebug} onBack={handleDevBack} />
+        <DevPage
+          accountInfo={accountInfo}
+          liveDebug={liveDebug}
+          stayOnDevDuringLive={stayOnDevDuringLive}
+          onStayOnDevDuringLiveChange={setStayOnDevDuringLive}
+          onBack={handleDevBack}
+        />
       ) : selectedChampion && selectedSkin ? (
         <ChampionViewer
           champion={selectedChampion}
