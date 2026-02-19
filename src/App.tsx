@@ -24,6 +24,8 @@ import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
 
 const MAX_DEBUG_LOGS = 800;
+const MAX_MATCH_EVENTS = 2500;
+const MAX_COMPLETED_MATCHES = 8;
 
 /** Turn a skin name into a URL-friendly slug: "Dark Star Thresh" → "dark-star-thresh" */
 function skinSlug(name: string): string {
@@ -300,6 +302,9 @@ function App() {
     latestLivePayload: null,
     latestLiveEndPayload: null,
     logs: [],
+    activeMatch: null,
+    completedMatches: [],
+    nextMatchId: 1,
   });
 
   const appendDebugLog = useCallback((
@@ -310,9 +315,20 @@ function App() {
   ) => {
     setLiveDebug((prev) => {
       const next = [...prev.logs, { ts: Date.now(), level, source, message, payload }];
+      const ts = Date.now();
+      const activeMatch = prev.activeMatch
+        ? {
+          ...prev.activeMatch,
+          events: [
+            ...prev.activeMatch.events,
+            { ts, source: `app.${source}`, message: `${level}: ${message}`, payload },
+          ].slice(-MAX_MATCH_EVENTS),
+        }
+        : prev.activeMatch;
       return {
         ...prev,
         logs: next.length > MAX_DEBUG_LOGS ? next.slice(next.length - MAX_DEBUG_LOGS) : next,
+        activeMatch,
       };
     });
   }, []);
@@ -698,7 +714,7 @@ function App() {
                 messageCounts: nextCounts,
               };
             });
-            appendDebugLog('info', 'ws.message', `type=${msgType}${summary ? ` | ${summary}` : ''}`);
+            appendDebugLog('info', 'ws.message', `type=${msgType}${summary ? ` | ${summary}` : ''}`, data);
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
@@ -770,13 +786,43 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
-              setLiveDebug((prev) => ({
-                ...prev,
-                liveUpdateCount: prev.liveUpdateCount + 1,
-                lastLiveUpdateIntervalMs: prev.lastLiveUpdateAt ? now - prev.lastLiveUpdateAt : null,
-                lastLiveUpdateAt: now,
-                latestLivePayload: data,
-              }));
+              setLiveDebug((prev) => {
+                let activeMatch = prev.activeMatch;
+                let nextMatchId = prev.nextMatchId;
+
+                if (!activeMatch) {
+                  activeMatch = {
+                    id: nextMatchId,
+                    startedAt: now,
+                    endedAt: null,
+                    events: [],
+                  };
+                  nextMatchId += 1;
+                }
+
+                const nextEvents = [
+                  ...activeMatch.events,
+                  {
+                    ts: now,
+                    source: 'liveGameUpdate',
+                    message: summarizeWsPayload(data) || 'live update',
+                    payload: data,
+                  },
+                ];
+
+                return {
+                  ...prev,
+                  liveUpdateCount: prev.liveUpdateCount + 1,
+                  lastLiveUpdateIntervalMs: prev.lastLiveUpdateAt ? now - prev.lastLiveUpdateAt : null,
+                  lastLiveUpdateAt: now,
+                  latestLivePayload: data,
+                  activeMatch: {
+                    ...activeMatch,
+                    events: nextEvents.length > MAX_MATCH_EVENTS ? nextEvents.slice(nextEvents.length - MAX_MATCH_EVENTS) : nextEvents,
+                  },
+                  nextMatchId,
+                };
+              });
               // Reset champ-select dedup once a game is in progress.
               // If champ-select end is ever missed, the next lobby should still
               // be able to re-emit the same champion/skin combination.
@@ -797,11 +843,48 @@ function App() {
 
             // ── Game ended ── transition to post-game summary
             if (data.type === 'liveGameEnd') {
-              setLiveDebug((prev) => ({
-                ...prev,
-                liveEndCount: prev.liveEndCount + 1,
-                latestLiveEndPayload: data,
-              }));
+              setLiveDebug((prev) => {
+                let activeMatch = prev.activeMatch;
+                let nextMatchId = prev.nextMatchId;
+                if (!activeMatch) {
+                  activeMatch = {
+                    id: nextMatchId,
+                    startedAt: now,
+                    endedAt: null,
+                    events: [],
+                  };
+                  nextMatchId += 1;
+                }
+
+                const nextEvents = [
+                  ...activeMatch.events,
+                  {
+                    ts: now,
+                    source: 'liveGameEnd',
+                    message: `liveGameEnd${typeof data.gameResult === 'string' && data.gameResult ? ` result=${data.gameResult}` : ''}`,
+                    payload: data,
+                  },
+                ];
+
+                const completed = {
+                  ...activeMatch,
+                  endedAt: now,
+                  result: typeof data.gameResult === 'string' ? data.gameResult : activeMatch.result,
+                  events: nextEvents.length > MAX_MATCH_EVENTS ? nextEvents.slice(nextEvents.length - MAX_MATCH_EVENTS) : nextEvents,
+                };
+
+                const completedMatches = [...prev.completedMatches, completed];
+                return {
+                  ...prev,
+                  liveEndCount: prev.liveEndCount + 1,
+                  latestLiveEndPayload: data,
+                  activeMatch: null,
+                  completedMatches: completedMatches.length > MAX_COMPLETED_MATCHES
+                    ? completedMatches.slice(completedMatches.length - MAX_COMPLETED_MATCHES)
+                    : completedMatches,
+                  nextMatchId,
+                };
+              });
               // Ensure next champ-select session can emit the same champion/skin.
               if (champSelectSeenSinceLastLiveGame.current) {
                 liveGameAutoNavDone.current = false;

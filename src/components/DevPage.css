@@ -487,6 +487,11 @@
   color: var(--lol-gold-light);
 }
 
+.dev-log-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .dev-log-btn--primary {
   background: rgba(80, 170, 255, 0.12);
   border-color: rgba(80, 170, 255, 0.4);

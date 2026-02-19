@@ -23,6 +23,9 @@ export interface CompanionLiveDebug {
   latestLivePayload: unknown;
   latestLiveEndPayload: unknown;
   logs: CompanionLogEntry[];
+  activeMatch: CompanionMatchTrace | null;
+  completedMatches: CompanionMatchTrace[];
+  nextMatchId: number;
 }
 
 export interface CompanionLogEntry {
@@ -31,6 +34,21 @@ export interface CompanionLogEntry {
   source: string;
   message: string;
   payload?: unknown;
+}
+
+export interface CompanionMatchEvent {
+  ts: number;
+  source: string;
+  message: string;
+  payload?: unknown;
+}
+
+export interface CompanionMatchTrace {
+  id: number;
+  startedAt: number;
+  endedAt: number | null;
+  result?: string;
+  events: CompanionMatchEvent[];
 }
 
 interface Props {
@@ -72,6 +90,21 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
   const lastMsgAge = liveDebug.lastMessageAt ? now - liveDebug.lastMessageAt : null;
   const lastLiveAge = liveDebug.lastLiveUpdateAt ? now - liveDebug.lastLiveUpdateAt : null;
   const liveStatus = freshnessStatus(lastLiveAge);
+  const latestCompletedMatch = liveDebug.completedMatches.length > 0
+    ? liveDebug.completedMatches[liveDebug.completedMatches.length - 1]
+    : null;
+
+  const downloadJson = (filenamePrefix: string, payload: unknown) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filenamePrefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const handleDownloadLogs = () => {
     const report = {
@@ -81,15 +114,23 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
       accountInfo,
       liveDebug,
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `showmeskins-dev-log-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadJson('showmeskins-dev-log', report);
+  };
+
+  const handleDownloadActiveMatch = () => {
+    if (!liveDebug.activeMatch) return;
+    downloadJson(`showmeskins-match-${liveDebug.activeMatch.id}`, {
+      generatedAt: new Date().toISOString(),
+      match: liveDebug.activeMatch,
+    });
+  };
+
+  const handleDownloadLatestCompletedMatch = () => {
+    if (!latestCompletedMatch) return;
+    downloadJson(`showmeskins-match-${latestCompletedMatch.id}`, {
+      generatedAt: new Date().toISOString(),
+      match: latestCompletedMatch,
+    });
   };
 
   useEffect(() => {
@@ -276,8 +317,34 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
 
             <div className="dev-log-actions">
               <button className="dev-log-btn dev-log-btn--primary" onClick={handleDownloadLogs}>
-                Download Logs
+                Download Full Debug
               </button>
+              <button
+                className="dev-log-btn"
+                onClick={handleDownloadActiveMatch}
+                disabled={!liveDebug.activeMatch}
+              >
+                Download Active Match
+              </button>
+              <button
+                className="dev-log-btn"
+                onClick={handleDownloadLatestCompletedMatch}
+                disabled={!latestCompletedMatch}
+              >
+                Download Last Completed Match
+              </button>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Match Recorder</span>
+              <span className="dev-value">
+                {liveDebug.activeMatch
+                  ? `Recording match #${liveDebug.activeMatch.id} (${liveDebug.activeMatch.events.length} events)`
+                  : 'No active match recording'}
+              </span>
+              <span className="dev-value">
+                Completed recordings: {liveDebug.completedMatches.length}
+              </span>
             </div>
 
             <div className="dev-row">
@@ -298,6 +365,16 @@ export function DevPage({ accountInfo, liveDebug, onBack }: Props) {
             <div className="dev-row">
               <span className="dev-label">Runtime Logs ({liveDebug.logs.length})</span>
               <pre className="dev-json">{JSON.stringify(liveDebug.logs, null, 2)}</pre>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Active Match Timeline</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.activeMatch, null, 2)}</pre>
+            </div>
+
+            <div className="dev-row">
+              <span className="dev-label">Completed Match Timelines</span>
+              <pre className="dev-json">{JSON.stringify(liveDebug.completedMatches, null, 2)}</pre>
             </div>
           </div>
         </section>
