@@ -1,0 +1,151 @@
+.mh-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--lol-bg-primary);
+}
+
+.mh-content {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.mh-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.mh-back svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mh-title {
+  margin: 18px 0 6px;
+  font-family: var(--font-heading);
+  color: var(--lol-text-primary);
+  font-size: 30px;
+}
+
+.mh-subtitle {
+  margin: 0 0 18px;
+  color: var(--lol-text-secondary);
+}
+
+.mh-form {
+  display: grid;
+  grid-template-columns: 1fr 160px 120px;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.mh-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mh-field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--lol-text-muted);
+}
+
+.mh-field input,
+.mh-field select {
+  height: 38px;
+  border: 1px solid var(--lol-border-gold);
+  background: var(--lol-bg-panel);
+  color: var(--lol-text-primary);
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.mh-search-btn {
+  height: 38px;
+  border: 1px solid var(--lol-gold-dark);
+  background: rgba(200, 170, 110, 0.15);
+  color: var(--lol-gold-light);
+  cursor: pointer;
+}
+
+.mh-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mh-error {
+  color: #f19494;
+  margin: 8px 0 14px;
+}
+
+.mh-summary {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--lol-text-secondary);
+  margin-bottom: 12px;
+}
+
+.mh-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mh-card {
+  border: 1px solid var(--lol-border);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px;
+}
+
+.mh-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--lol-text-primary);
+}
+
+.mh-row--meta {
+  margin-top: 6px;
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+}
+
+.mh-result {
+  font-weight: 700;
+}
+
+.mh-result--win {
+  color: #83e1a3;
+}
+
+.mh-result--loss {
+  color: #ef9b9b;
+}
+
+.mh-id {
+  display: block;
+  margin-top: 8px;
+  color: var(--lol-text-muted);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+@media (max-width: 760px) {
+  .mh-form {
+    grid-template-columns: 1fr;
+  }
+}
+

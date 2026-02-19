@@ -5,6 +5,7 @@ import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
 import { DevPage, type AccountInfo, type CompanionLiveDebug } from './components/DevPage';
 import { LiveGamePage } from './components/LiveGamePage';
+import { MatchHistoryPage } from './components/MatchHistoryPage';
 import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
 import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
@@ -249,6 +250,11 @@ function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): Live
   };
 }
 
+function readHistoryRiotIdFromUrl(): string {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('riotId') ?? '';
+}
+
 function summarizeWsPayload(raw: unknown): string {
   if (!raw || typeof raw !== 'object') return '';
   const source = raw as Record<string, unknown>;
@@ -314,7 +320,8 @@ function App() {
   const [companionChromaId, setCompanionChromaId] = useState<number | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev' | 'history'>('select');
+  const [historyInitialRiotId, setHistoryInitialRiotId] = useState<string>('');
   const [stayOnDevDuringLive, setStayOnDevDuringLive] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('sms_stay_on_dev_during_live') === '1';
@@ -375,16 +382,20 @@ function App() {
   const seoTitle = 'Show Me Skins!';
   const seoDesc = viewMode === 'select'
     ? 'Browse and view all League of Legends champion skins in 3D. Free LoL skin viewer.'
+    : viewMode === 'history'
+      ? 'Search Riot ID and view recent League of Legends match history.'
+      : viewMode === 'companion'
+        ? 'Companion app for Show Me Skins – connect your League of Legends client.'
+        : selectedChampion && selectedSkin
+          ? `View ${selectedChampion.name} ${selectedSkin.name} skin in 3D. League of Legends skin viewer.`
+          : 'Browse and view League of Legends champion skins in 3D.';
+  const seoPath = viewMode === 'history'
+    ? '/history'
     : viewMode === 'companion'
-      ? 'Companion app for Show Me Skins – connect your League of Legends client.'
+      ? '/companion'
       : selectedChampion && selectedSkin
-        ? `View ${selectedChampion.name} ${selectedSkin.name} skin in 3D. League of Legends skin viewer.`
-        : 'Browse and view League of Legends champion skins in 3D.';
-  const seoPath = viewMode === 'companion'
-    ? '/companion'
-    : selectedChampion && selectedSkin
-      ? `/${selectedChampion.id}${selectedSkin.num ? `/${skinSlug(selectedSkin.name)}` : ''}`
-      : '/';
+        ? `/${selectedChampion.id}${selectedSkin.num ? `/${skinSlug(selectedSkin.name)}` : ''}`
+        : '/';
   useSeoHead({ title: seoTitle, description: seoDesc, path: seoPath });
 
   // Track whether we've already auto-navigated for this game session
@@ -471,6 +482,9 @@ function App() {
         const { championId, skinSlug: urlSkinSlug } = parseUrl();
         if (championId === 'companion') {
           setViewMode('companion');
+        } else if (championId === 'history') {
+          setViewMode('history');
+          setHistoryInitialRiotId(readHistoryRiotIdFromUrl());
         } else if (championId === 'dev') {
           if (import.meta.env.DEV) {
             setViewMode('dev');
@@ -545,6 +559,11 @@ function App() {
         setViewMode('companion');
         return;
       }
+      if (championId === 'history') {
+        setViewMode('history');
+        setHistoryInitialRiotId(readHistoryRiotIdFromUrl());
+        return;
+      }
       if (championId === 'dev') {
         if (import.meta.env.DEV) {
           setViewMode('dev');
@@ -611,6 +630,18 @@ function App() {
   const handleCompanion = useCallback(() => {
     setViewMode('companion');
     window.history.pushState(null, '', '/companion');
+  }, []);
+
+  const handleOpenMatchHistory = useCallback((riotId: string) => {
+    setViewMode('history');
+    setHistoryInitialRiotId(riotId);
+    const query = riotId.trim() ? `?riotId=${encodeURIComponent(riotId.trim())}` : '';
+    window.history.pushState(null, '', `/history${query}`);
+  }, []);
+
+  const handleHistoryBack = useCallback(() => {
+    setViewMode('select');
+    window.history.pushState(null, '', '/');
   }, []);
 
   const handleLiveGameNavigate = useCallback(() => {
@@ -1103,8 +1134,14 @@ function App() {
           version={version}
           onSelect={handleChampionSelect}
           onCompanion={handleCompanion}
+          onOpenMatchHistory={handleOpenMatchHistory}
           hasLiveGame={!!liveGameData}
           onLiveGame={handleLiveGameNavigate}
+        />
+      ) : viewMode === 'history' ? (
+        <MatchHistoryPage
+          initialRiotId={historyInitialRiotId}
+          onBack={handleHistoryBack}
         />
       ) : viewMode === 'companion' ? (
         <CompanionPage
@@ -1142,3 +1179,4 @@ function App() {
 }
 
 export default App;
+

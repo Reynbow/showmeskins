@@ -8,14 +8,16 @@ interface Props {
   version: string;
   onSelect: (champion: ChampionBasic) => void;
   onCompanion: () => void;
+  onOpenMatchHistory: (riotId: string) => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
 }
 
 const ROLES = ['All', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'];
 
-export function ChampionSelect({ champions, version, onSelect, onCompanion, hasLiveGame, onLiveGame }: Props) {
+export function ChampionSelect({ champions, version, onSelect, onCompanion, onOpenMatchHistory, hasLiveGame, onLiveGame }: Props) {
   const [search, setSearch] = useState('');
+  const [riotIdSearch, setRiotIdSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('All');
   const [scrolled, setScrolled] = useState(false);
   const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
@@ -47,6 +49,12 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, hasL
     }
     return groups;
   }, [filtered]);
+
+  const submitRiotHistory = useCallback(() => {
+    const trimmed = riotIdSearch.trim();
+    if (!trimmed) return;
+    onOpenMatchHistory(trimmed);
+  }, [onOpenMatchHistory, riotIdSearch]);
 
   return (
     <div className="champion-select">
@@ -85,25 +93,51 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, hasL
       </div>
 
       <div className="champion-select-controls">
-        <div className="search-wrapper">
-          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search champions..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="search-clear" onClick={() => setSearch('')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+        <div className="search-row">
+          <div className="search-wrapper">
+            <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search champions..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="search-clear" onClick={() => setSearch('')}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="search-wrapper search-wrapper--riot">
+            <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21a8 8 0 1 0-16 0" />
+              <circle cx="12" cy="8" r="4" />
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Riot ID (Name#Tag)"
+              value={riotIdSearch}
+              onChange={e => setRiotIdSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitRiotHistory();
+              }}
+            />
+            <button
+              className="cs-history-btn"
+              onClick={submitRiotHistory}
+              disabled={!riotIdSearch.trim()}
+            >
+              History
             </button>
-          )}
+          </div>
         </div>
 
         <div className="role-filters">
