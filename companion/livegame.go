@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +17,8 @@ const (
 	liveClientURL               = "https://127.0.0.1:2999"
 	pollInterval                = 3 * time.Second
 	endAfterConsecutiveFailures = 6
-	forceEndAfterFailures       = 30
+	forceEndAfterFailures       = 200 // ~10 minutes at 3s intervals — only used when process check is unavailable
+	processCheckInterval        = 5   // check game process every N poll failures (avoids spawning tasklist every 3s)
 )
 
 // ── Messages sent to the website via the bridge ─────────────────────────
@@ -178,7 +180,11 @@ func NewLiveGameTracker(onStatus StatusCallback, onUpdate LiveGameUpdateCallback
 		client: &http.Client{
 			Timeout: 3 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+				DisableKeepAlives:     true,
+				ForceAttemptHTTP2:     false,
+				TLSHandshakeTimeout:   2 * time.Second,
+				ResponseHeaderTimeout: 2 * time.Second,
 			},
 		},
 		stopCh:       make(chan struct{}),
@@ -207,6 +213,17 @@ func (t *LiveGameTracker) isStopped() bool {
 	return t.stopped
 }
 
+func (t *LiveGameTracker) resetGameState() {
+	t.wasInGame = false
+	t.lastHash = ""
+	t.gameResult = ""
+	t.lastUpdate = nil
+	t.failCount = 0
+	t.seenEventIDs = make(map[int]bool)
+	t.accKillFeed = nil
+	t.accLiveEvents = nil
+}
+
 func (t *LiveGameTracker) pollLoop() {
 	t.poll()
 
@@ -232,37 +249,64 @@ func (t *LiveGameTracker) poll() {
 	if err != nil {
 		if t.wasInGame {
 			t.failCount++
+
+			// First few failures: just log and wait (transient network hiccup)
 			if t.failCount < endAfterConsecutiveFailures {
 				log.Printf("[livegame] Poll failed (%d/%d) while in game: %v", t.failCount, endAfterConsecutiveFailures, err)
 				return
 			}
-			if t.gameResult == "" && t.failCount < forceEndAfterFailures {
-				// Prefer explicit GameEnd events from Riot when available.
-				// If they never arrive, keep trying for a longer grace period.
-				if t.failCount == endAfterConsecutiveFailures || t.failCount%5 == 0 {
-					log.Printf("[livegame] Poll failed (%d/%d) and no GameEnd event yet; waiting before forced end", t.failCount, forceEndAfterFailures)
-				}
+
+			// If we have a confirmed GameEnd result from the Riot event stream,
+			// the game is definitely over — end immediately.
+			if t.gameResult != "" {
+				failures := t.failCount
+				result := t.gameResult
+				finalSnapshot := t.lastUpdate
+				t.resetGameState()
+				log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", failures, result)
+				t.onStatus("Connected – Waiting for Champion Select…")
+				t.onEnd(result, finalSnapshot)
 				return
 			}
 
-			failures := t.failCount
-			result := t.gameResult
-			finalSnapshot := t.lastUpdate
-			t.wasInGame = false
-			t.lastHash = ""
-			t.gameResult = ""
-			t.lastUpdate = nil
-			t.failCount = 0
-			t.seenEventIDs = make(map[int]bool)
-			t.accKillFeed = nil
-			t.accLiveEvents = nil
-			if result != "" {
-				log.Printf("[livegame] Game ended after %d consecutive failures (result: %q)", failures, result)
+			// No explicit GameEnd event — the API went away without a clean
+			// signal.  Before declaring the game over, check if the League of
+			// Legends game process is still running.  Only check every
+			// processCheckInterval failures to avoid spawning tasklist on
+			// every 3-second tick.
+			shouldCheckProcess := t.failCount%processCheckInterval == 0
+			if shouldCheckProcess {
+				if isGameProcessRunning() {
+					if t.failCount%20 == 0 {
+						log.Printf("[livegame] API unreachable for %d polls but game process still alive; waiting", t.failCount)
+					}
+					return
+				}
+				log.Printf("[livegame] API unreachable for %d polls and game process is gone", t.failCount)
+				// Fall through to end the game
+			} else if t.failCount < forceEndAfterFailures {
+				// Between process checks, keep waiting (up to forceEnd limit)
+				if t.failCount == endAfterConsecutiveFailures || t.failCount%10 == 0 {
+					log.Printf("[livegame] Poll failed (%d/%d) and no GameEnd event yet; waiting", t.failCount, forceEndAfterFailures)
+				}
+				return
 			} else {
-				log.Printf("[livegame] GameEnd event missing after %d consecutive failures; ending with unknown result", failures)
+				// Past forceEndAfterFailures on a non-check tick — do one
+				// final process check before giving up.
+				if isGameProcessRunning() {
+					if t.failCount%20 == 0 {
+						log.Printf("[livegame] API unreachable for %d polls; game process still alive, continuing to wait", t.failCount)
+					}
+					return
+				}
 			}
-			t.onStatus("Connected - Waiting for Champion Select...")
-			t.onEnd(result, finalSnapshot)
+
+			failures := t.failCount
+			finalSnapshot := t.lastUpdate
+			t.resetGameState()
+			log.Printf("[livegame] Game process exited after %d consecutive API failures; ending with unknown result", failures)
+			t.onStatus("Connected – Waiting for Champion Select…")
+			t.onEnd("", finalSnapshot)
 		}
 		return
 	}
@@ -408,6 +452,19 @@ type scoresData struct {
 type gameDataInfo struct {
 	GameTime float64 `json:"gameTime"`
 	GameMode string  `json:"gameMode"`
+}
+
+// isGameProcessRunning checks whether the "League of Legends.exe" game
+// process is alive.  As long as it is, the game hasn't ended — the Live
+// Client Data API is just temporarily unresponsive.
+func isGameProcessRunning() bool {
+	cmd := exec.Command("tasklist", "/FI", "IMAGENAME eq League of Legends.exe", "/NH")
+	cmd.SysProcAttr = hiddenProcAttr()
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(out)), "league of legends")
 }
 
 // ── API fetch ───────────────────────────────────────────────────────────
