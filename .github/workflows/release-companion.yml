@@ -65,9 +65,11 @@ jobs:
           choco install nsis -y --no-progress
           & "C:\Program Files (x86)\NSIS\makensis.exe" /DPRODUCT_VERSION=${{ steps.version.outputs.version }} installer.nsi
 
-      - name: Create stable-named download (always x9report.Companion.Setup.exe)
+      - name: Create stable-named downloads
         working-directory: companion/dist
-        run: copy "x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe" "x9report.Companion.Setup.exe"
+        run: |
+          copy "x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe" "x9report.Companion.Setup.exe"
+          copy "x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe" "Show.Me.Skins.Companion.Setup.exe"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -87,6 +89,7 @@ jobs:
           files: |
             companion/dist/x9report.Companion.Setup.exe
             companion/dist/x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe
+            companion/dist/Show.Me.Skins.Companion.Setup.exe
             companion/dist/x9report Companion.exe
           draft: false
           prerelease: false
