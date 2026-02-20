@@ -186,6 +186,7 @@ interface MatchSlot {
   status: 'loading' | 'ready' | 'failed';
   match?: MatchSummary;
   detail?: MatchDetailResponse['detail'];
+  detailStatus?: 'idle' | 'loading' | 'ready' | 'failed';
   killFeed?: MhKillEvent[];
   killFeedStatus?: 'idle' | 'loading' | 'ready' | 'failed';
 }
@@ -338,6 +339,56 @@ const TIER_COLORS: Record<string, string> = {
   CHALLENGER: '#f4c874',
 };
 
+type SpellInfoMap = Record<number, { name: string; description: string; cooldown: number; file: string }>;
+type ChampInfoMap = Record<string, { name: string; title: string; blurb: string; tags: string[] }>;
+type ChampKeyToIdMap = Record<number, string>;
+
+let _cachedSpellInfo: SpellInfoMap | null = null;
+let _cachedChampInfo: ChampInfoMap | null = null;
+let _cachedChampKeyToId: ChampKeyToIdMap | null = null;
+let _cachedDdragonVer: string | null = null;
+
+async function fetchDdragonData(version: string): Promise<{
+  spellInfo: SpellInfoMap;
+  champInfo: ChampInfoMap;
+  champKeyToId: ChampKeyToIdMap;
+}> {
+  if (_cachedDdragonVer === version && _cachedSpellInfo && _cachedChampInfo && _cachedChampKeyToId) {
+    return { spellInfo: _cachedSpellInfo, champInfo: _cachedChampInfo, champKeyToId: _cachedChampKeyToId };
+  }
+
+  const [spellRes, champRes] = await Promise.all([
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/summoner.json`),
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/championFull.json`),
+  ]);
+
+  const spellJson = await spellRes.json() as { data: Record<string, { key: string; id: string; name: string; description: string; cooldown: number[] }> };
+  const spellMap: SpellInfoMap = {};
+  for (const spell of Object.values(spellJson.data)) {
+    spellMap[Number(spell.key)] = {
+      name: spell.name,
+      description: spell.description,
+      cooldown: spell.cooldown?.[0] ?? 0,
+      file: spell.id,
+    };
+  }
+
+  const champJson = await champRes.json() as { data: Record<string, { key: string; id: string; name: string; title: string; lore: string; blurb: string; tags: string[] }> };
+  const champMap: ChampInfoMap = {};
+  const keyMap: ChampKeyToIdMap = {};
+  for (const c of Object.values(champJson.data)) {
+    champMap[c.id] = { name: c.name, title: c.title, blurb: c.lore || c.blurb, tags: c.tags };
+    keyMap[Number(c.key)] = c.id;
+  }
+
+  _cachedDdragonVer = version;
+  _cachedSpellInfo = spellMap;
+  _cachedChampInfo = champMap;
+  _cachedChampKeyToId = keyMap;
+
+  return { spellInfo: spellMap, champInfo: champMap, champKeyToId: keyMap };
+}
+
 const SPELL_DATA: Record<number, { file: string; name: string }> = {
   1: { file: 'SummonerBoost', name: 'Cleanse' },
   3: { file: 'SummonerExhaust', name: 'Exhaust' },
@@ -352,9 +403,10 @@ const SPELL_DATA: Record<number, { file: string; name: string }> = {
   32: { file: 'SummonerSnowball', name: 'Mark' },
 };
 
-function formatSummonerSpell(spellId: number): string {
+function formatSummonerSpell(spellId: number, version?: string): string {
   const file = SPELL_DATA[spellId]?.file ?? `Summoner${spellId}`;
-  return `https://ddragon.leagueoflegends.com/cdn/15.4.1/img/spell/${file}.png`;
+  const ver = version || _cachedDdragonVer || '15.4.1';
+  return `https://ddragon.leagueoflegends.com/cdn/${ver}/img/spell/${file}.png`;
 }
 
 function getSpellName(spellId: number): string {
@@ -649,31 +701,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       setItemData(items);
       setDdragonVersion(ver);
       try {
-        const [spellRes, champRes] = await Promise.all([
-          fetch(`https://ddragon.leagueoflegends.com/cdn/${ver}/data/en_US/summoner.json`),
-          fetch(`https://ddragon.leagueoflegends.com/cdn/${ver}/data/en_US/championFull.json`),
-        ]);
-        const spellJson = await spellRes.json() as { data: Record<string, { key: string; id: string; name: string; description: string; cooldown: number[] }> };
-        const spellMap: Record<number, { name: string; description: string; cooldown: number; file: string }> = {};
-        for (const spell of Object.values(spellJson.data)) {
-          spellMap[Number(spell.key)] = {
-            name: spell.name,
-            description: spell.description,
-            cooldown: spell.cooldown?.[0] ?? 0,
-            file: spell.id,
-          };
-        }
-        setSpellInfo(spellMap);
-
-        const champJson = await champRes.json() as { data: Record<string, { key: string; id: string; name: string; title: string; lore: string; blurb: string; tags: string[] }> };
-        const champMap: Record<string, { name: string; title: string; blurb: string; tags: string[] }> = {};
-        const keyMap: Record<number, string> = {};
-        for (const c of Object.values(champJson.data)) {
-          champMap[c.id] = { name: c.name, title: c.title, blurb: c.lore || c.blurb, tags: c.tags };
-          keyMap[Number(c.key)] = c.id;
-        }
-        setChampInfo(champMap);
-        setChampKeyToId(keyMap);
+        const data = await fetchDdragonData(ver);
+        setSpellInfo(data.spellInfo);
+        setChampInfo(data.champInfo);
+        setChampKeyToId(data.champKeyToId);
       } catch { /* supplementary data is optional */ }
     }).catch(() => {});
   }, []);
@@ -747,14 +778,25 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     try {
       const raw = localStorage.getItem(MATCH_CACHE_PREFIX + matchId);
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as { match: MatchSummary; detail: MatchDetailResponse['detail'] };
+      const parsed = JSON.parse(raw) as { match: MatchSummary; detail?: MatchDetailResponse['detail'] };
       if (!parsed.match) return null;
-      return { matchId, status: 'ready', match: parsed.match, detail: parsed.detail };
+      return {
+        matchId,
+        status: 'ready',
+        match: parsed.match,
+        detail: parsed.detail,
+        detailStatus: parsed.detail ? 'ready' : 'idle',
+      };
     } catch { return null; }
   }
 
-  function cacheMatch(matchId: string, match: MatchSummary, detail: MatchDetailResponse['detail']) {
+  function cacheMatch(matchId: string, match: MatchSummary, detail?: MatchDetailResponse['detail']) {
     try {
+      const existing = localStorage.getItem(MATCH_CACHE_PREFIX + matchId);
+      if (existing && !detail) {
+        const parsed = JSON.parse(existing) as { detail?: MatchDetailResponse['detail'] };
+        if (parsed.detail) return;
+      }
       localStorage.setItem(MATCH_CACHE_PREFIX + matchId, JSON.stringify({ match, detail }));
       pruneMatchCache();
     } catch { /* storage full or unavailable */ }
@@ -871,12 +913,13 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           region,
           puuid: initial.puuid,
           matchId: id,
+          brief: '1',
         });
         try {
           const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
           const detailBody = (await detailRes.json()) as MatchDetailResponse;
           const slot: MatchSlot = detailRes.ok && detailBody.match
-            ? { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail }
+            ? { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' }
             : { matchId: id, status: 'failed' };
           if (detailRes.ok && detailBody.match) {
             cacheMatch(id, detailBody.match, detailBody.detail);
@@ -900,6 +943,31 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       setError(err instanceof Error ? err.message : 'Failed to fetch match history');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMatchDetail = async (matchId: string) => {
+    if (!result?.puuid) return;
+    setMatchSlots((prev) => prev.map((s) =>
+      s.matchId === matchId ? { ...s, detailStatus: 'loading' } : s,
+    ));
+    try {
+      const params = new URLSearchParams({ region, puuid: result.puuid, matchId });
+      const res = await fetch(`/api/riot-id-history?${params.toString()}`);
+      if (!res.ok) throw new Error('Detail fetch failed');
+      const body = (await res.json()) as MatchDetailResponse;
+      if (body.match && body.detail) {
+        cacheMatch(matchId, body.match, body.detail);
+      }
+      setMatchSlots((prev) => prev.map((s) =>
+        s.matchId === matchId
+          ? { ...s, match: body.match ?? s.match, detail: body.detail, detailStatus: body.detail ? 'ready' : 'failed' }
+          : s,
+      ));
+    } catch {
+      setMatchSlots((prev) => prev.map((s) =>
+        s.matchId === matchId ? { ...s, detailStatus: 'failed' } : s,
+      ));
     }
   };
 
@@ -985,12 +1053,13 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           region,
           puuid: result.puuid,
           matchId: id,
+          brief: '1',
         });
         try {
           const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
           const detailBody = (await detailRes.json()) as MatchDetailResponse;
           const slot: MatchSlot = detailRes.ok && detailBody.match
-            ? { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail }
+            ? { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' }
             : { matchId: id, status: 'failed' };
           if (detailRes.ok && detailBody.match) {
             cacheMatch(id, detailBody.match, detailBody.detail);
@@ -1124,7 +1193,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             });
             continue;
           }
-          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id });
+          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id, brief: '1' });
           try {
             const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
             const detailBody = (await detailRes.json()) as MatchDetailResponse;
@@ -1133,7 +1202,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
               cacheMatch(id, detailBody.match, detailBody.detail);
               setMatchSlots((prev) => {
                 const next = [...prev];
-                if (i < next.length) next[i] = { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail };
+                if (i < next.length) next[i] = { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' };
                 return next;
               });
             } else {
@@ -1215,14 +1284,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             setMatchSlots((prev) => [cached, ...prev]);
             continue;
           }
-          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id });
+          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id, brief: '1' });
           try {
             const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
             const detailBody = (await detailRes.json()) as MatchDetailResponse;
             if (detailRes.ok && detailBody.match) {
               cacheMatch(id, detailBody.match, detailBody.detail);
               setMatchSlots((prev) => [
-                { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail },
+                { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' },
                 ...prev,
               ]);
             }
@@ -1257,6 +1326,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           region: result.platformRegion ?? region,
         });
         const res = await fetch(`/api/spectator?${params.toString()}`);
+        if (!res.ok) return;
         const body = await res.json();
         if (body && body.inGame) {
           setActiveGame(body as ActiveGameData);
@@ -1318,6 +1388,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           region: result.platformRegion ?? region,
         });
         const res = await fetch(`/api/spectator?${params.toString()}`);
+        if (!res.ok) return;
         const body = await res.json();
         if (body && body.inGame) {
           const fresh = body as ActiveGameData;
@@ -1941,7 +2012,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                     <div className="mh-card-accent" />
                     <div
                       className="mh-card-main mh-card-clickable"
-                      onClick={() => { setExpandedMatchId(isExpanded ? null : slot.matchId); setExpandedTab('scoreboard'); }}
+                      onClick={() => {
+                        const opening = !isExpanded;
+                        setExpandedMatchId(opening ? slot.matchId : null);
+                        setExpandedTab('scoreboard');
+                        if (opening && !slot.detail && slot.detailStatus !== 'loading') {
+                          fetchMatchDetail(slot.matchId);
+                        }
+                      }}
                     >
                       <TextTooltip className="mh-champion-face-wrap" variant="spell" content={(() => {
                         const ci = champInfo[slot.match.championName];
@@ -2022,6 +2100,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                       </div>
                       <span className={`mh-card-chevron ${isExpanded ? 'mh-card-chevron--open' : ''}`}>&#9662;</span>
                     </div>
+                    {isExpanded && slot.detailStatus === 'loading' && (
+                      <div className="mh-expanded-panel" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
+                        <div className="mh-detail-loading">
+                          <div className="skin-card-spinner" />
+                          <span style={{ marginLeft: '0.75rem', color: 'var(--mh-text-secondary, #999)', fontSize: '0.85rem' }}>Loading match details...</span>
+                        </div>
+                      </div>
+                    )}
                     {isExpanded && participants.length > 0 && (() => {
                       const maxDmg = Math.max(1, ...participants.map((p) => p.totalDamageDealtToChampions));
                       return (

@@ -269,6 +269,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const queue = typeof req.query.queue === 'string' && req.query.queue.trim() ? parseInt(req.query.queue.trim(), 10) : undefined;
   const summaryOnly = String(req.query.summaryOnly ?? '').trim() === '1';
   const wantTimeline = String(req.query.timeline ?? '').trim() === '1';
+  const brief = String(req.query.brief ?? '').trim() === '1';
 
   // Timeline mode: fetch kill events from match-v5 timeline.
   if (matchId && wantTimeline) {
@@ -385,6 +386,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         win: !!participant.win,
       };
 
+      if (brief) {
+        return res.status(200).json({ region: selectedRegion, routingRegion, matchId, match });
+      }
+
       const participants = detail.info.participants.map((p) => {
         const source = p as RiotParticipant & Record<string, unknown>;
         return {
@@ -420,26 +425,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } as MatchParticipantDetail;
       });
 
-      const rankedResults = await Promise.allSettled(
-        participants.map(async (p) => {
-          try {
-            const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
-            const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
-            if (!r.ok) return null;
-            const entries = await r.json() as RiotLeagueEntry[];
-            const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
-            return solo ? { puuid: p.puuid, tier: solo.tier, rank: solo.rank } : null;
-          } catch { return null; }
-        })
-      );
-      for (const r of rankedResults) {
-        if (r.status === 'fulfilled' && r.value) {
-          const p = participants.find((pp) => pp.puuid === r.value!.puuid);
-          if (p) {
-            p.rankedTier = r.value.tier;
-            p.rankedRank = r.value.rank;
+      let rankedRateLimited = false;
+      for (const p of participants) {
+        if (rankedRateLimited) break;
+        try {
+          const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
+          const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
+          if (r.status === 429) {
+            console.warn(`[riot-id-history] Ranked lookup rate-limited, skipping remaining participants`);
+            rankedRateLimited = true;
+            break;
           }
-        }
+          if (!r.ok) continue;
+          const entries = await r.json() as RiotLeagueEntry[];
+          const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
+          if (solo) {
+            p.rankedTier = solo.tier;
+            p.rankedRank = solo.rank;
+          }
+        } catch { /* skip */ }
       }
 
       const info = detail.info as Record<string, unknown>;

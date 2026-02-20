@@ -133,6 +133,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ inGame: false } satisfies SpectatorNotInGame);
     }
 
+    if (spectatorRes.status === 429) {
+      const retryAfter = spectatorRes.headers.get('Retry-After');
+      console.warn(`[spectator] Riot API rate-limited (429) for ${puuid}, retry-after: ${retryAfter ?? 'unknown'}`);
+      res.setHeader('Retry-After', retryAfter ?? '30');
+      return res.status(429).json({ error: 'Rate limited by Riot API' });
+    }
+
     if (!spectatorRes.ok) {
       console.warn(`[spectator] Riot API returned ${spectatorRes.status} for ${puuid}`);
       return res.status(200).json({ inGame: false } satisfies SpectatorNotInGame);
@@ -183,27 +190,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const rankedResults = await Promise.allSettled(
-      participants.map(async (p) => {
-        if (!p.puuid) return null;
-        try {
-          const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
-          const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
-          if (!r.ok) return null;
-          const entries = await r.json() as Array<{ queueType: string; tier: string; rank: string }>;
-          const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
-          return solo ? { puuid: p.puuid, tier: solo.tier, rank: solo.rank } : null;
-        } catch { return null; }
-      })
-    );
-    for (const r of rankedResults) {
-      if (r.status === 'fulfilled' && r.value) {
-        const p = participants.find((pp) => pp.puuid === r.value!.puuid);
-        if (p) {
-          p.rankedTier = r.value.tier;
-          p.rankedRank = r.value.rank;
+    let rateLimited = false;
+    for (const p of participants) {
+      if (!p.puuid || rateLimited) continue;
+      try {
+        const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
+        const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
+        if (r.status === 429) {
+          console.warn(`[spectator] Ranked lookup rate-limited, skipping remaining participants`);
+          rateLimited = true;
+          continue;
         }
-      }
+        if (!r.ok) continue;
+        const entries = await r.json() as Array<{ queueType: string; tier: string; rank: string }>;
+        const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
+        if (solo) {
+          p.rankedTier = solo.tier;
+          p.rankedRank = solo.rank;
+        }
+      } catch { /* skip this participant */ }
     }
 
     const response: SpectatorResponse = {
