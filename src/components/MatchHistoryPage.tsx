@@ -52,6 +52,8 @@ interface SpectatorParticipant {
     perkStyle: number;
     perkSubStyle: number;
   };
+  rankedTier?: string;
+  rankedRank?: string;
 }
 
 interface SpectatorBan {
@@ -407,6 +409,35 @@ const MH_KILL_STREAK_TOOLTIPS: Record<string, string> = {
 function mhMvpScore(p: MatchParticipant): number {
   const cs = p.totalMinionsKilled + p.neutralMinionsKilled;
   return p.kills * 3 + p.assists * 1.5 - p.deaths * 1.2 + cs * 0.012;
+}
+
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+const PLACEMENT_COLORS: Record<number, string> = {
+  1: '#f0b548',
+  2: '#b0b4ba',
+  3: '#cd7f32',
+};
+
+const PLACEMENT_MEDALS: Record<number, string> = {
+  1: '\u{1F947}',
+  2: '\u{1F948}',
+  3: '\u{1F949}',
+};
+
+function getPlacementMap(participants: MatchParticipant[]): Map<string, number> {
+  const sorted = [...participants].sort((a, b) => mhMvpScore(b) - mhMvpScore(a));
+  const map = new Map<string, number>();
+  sorted.forEach((p, i) => map.set(p.puuid, i + 1));
+  return map;
+}
+
+function liveMvpScore(kills: number, deaths: number, assists: number, cs: number): number {
+  return kills * 3 + assists * 1.5 - deaths * 1.2 + cs * 0.012;
 }
 
 function getMhMvpBreakdown(p: MatchParticipant) {
@@ -1274,6 +1305,32 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   }, [activeGame, companionLiveData, liveGameEnded]);
 
+  // Rank retry: if any live participants are missing rank data, re-fetch after 5s
+  useEffect(() => {
+    if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
+    const missingRanks = activeGame.participants.some((p) => !p.rankedTier);
+    if (!missingRanks) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          puuid: result.puuid,
+          region: result.platformRegion ?? region,
+        });
+        const res = await fetch(`/api/spectator?${params.toString()}`);
+        const body = await res.json();
+        if (body && body.inGame) {
+          const fresh = body as ActiveGameData;
+          const hasNewRanks = fresh.participants.some((p) => p.rankedTier);
+          if (hasNewRanks) {
+            setActiveGame(fresh);
+          }
+        }
+      } catch { /* silent */ }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region]);
+
   // Helper: resolve champion name from spectator championId
   const resolveChampionName = useCallback((champId: number): string => {
     return champKeyToId[champId] ?? `Champion${champId}`;
@@ -1565,6 +1622,18 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 const team2 = activeGame.participants.filter((p) => p.teamId === 200);
                 const searchedTeamId = searchedPlayer?.teamId ?? 100;
 
+                const livePlacementMap = new Map<string, number>();
+                if (companionLiveData?.players && companionLiveData.players.length > 0) {
+                  const scored = activeGame.participants.map((p) => {
+                    const cn = resolveChampionName(p.championId);
+                    const cp2 = getCompanionPlayer(cn);
+                    const score = cp2 ? liveMvpScore(cp2.kills, cp2.deaths, cp2.assists, cp2.creepScore) : -Infinity;
+                    return { puuid: p.puuid, score, hasData: !!cp2 };
+                  }).filter((s) => s.hasData);
+                  scored.sort((a, b) => b.score - a.score);
+                  scored.forEach((s, i) => livePlacementMap.set(s.puuid, i + 1));
+                }
+
                 return (
                   <div key="__live__" className="mh-card mh-card--live">
                     <div className="mh-card-accent mh-card-accent--live" />
@@ -1665,6 +1734,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 </div>
                                 <div className="mh-sb-header-row">
                                   <span className="mh-sb-col-champ">Champion</span>
+                                  <span className="mh-sb-col-rank">Rank</span>
                                   <span className="mh-sb-col-spells">Spells</span>
                                   <span className="mh-sb-col-kda">KDA</span>
                                   <span className="mh-sb-col-cs">CS</span>
@@ -1686,6 +1756,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                   });
                                   const isSearched = p.puuid === result.puuid;
                                   const displayName = p.riotId || p.summonerName || champName;
+                                  const liveRankLabel = formatRankShort(p.rankedTier, p.rankedRank);
+                                  const liveRankColor = p.rankedTier ? (TIER_COLORS[p.rankedTier.toUpperCase()] ?? '#888') : '#555';
 
                                   return (
                                     <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}`}>
@@ -1697,6 +1769,28 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         </div>
                                         {cp && (
                                           <span className="mh-sb-level-badge">Lv{cp.level}</span>
+                                        )}
+                                        {(() => {
+                                          const lp = livePlacementMap.get(p.puuid);
+                                          if (!lp) return null;
+                                          const lpColor = PLACEMENT_COLORS[lp] ?? '#666';
+                                          const lpMedal = PLACEMENT_MEDALS[lp];
+                                          return (
+                                            <span className={`mh-sb-placement${lp <= 3 ? ' mh-sb-placement--top' : ''}`} style={{ color: lpColor }}>
+                                              {lpMedal && <span className="mh-sb-placement-medal">{lpMedal}</span>}
+                                              {getOrdinal(lp)}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+                                      <div className="mh-sb-col-rank">
+                                        {p.rankedTier ? (
+                                          <>
+                                            <img className="mh-sb-rank-icon" src={formatRankMiniIcon(p.rankedTier)} alt={p.rankedTier} loading="lazy" />
+                                            <span className="mh-sb-rank-label" style={{ color: liveRankColor }}>{liveRankLabel}</span>
+                                          </>
+                                        ) : (
+                                          <span className="mh-sb-rank-label" style={{ color: '#555' }}>-</span>
                                         )}
                                       </div>
                                       <div className="mh-sb-col-spells">
@@ -1840,6 +1934,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   ? participants.reduce((best, p) => mhMvpScore(p) > mhMvpScore(best) ? p : best, participants[0])
                   : undefined;
                 const youAreMvp = mvpPlayer && mvpPlayer.puuid === result.puuid;
+                const placementMap = getPlacementMap(participants);
 
                 return (
                   <div key={slot.matchId} className={`mh-card ${slot.match.win ? 'mh-card--win' : 'mh-card--loss'}`}>
@@ -1978,6 +2073,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 const rankLabel = formatRankShort(p.rankedTier, p.rankedRank);
                                 const rankTierColor = p.rankedTier ? (TIER_COLORS[p.rankedTier.toUpperCase()] ?? '#888') : '#555';
                                 const isMvp = mvpPlayer?.puuid === p.puuid;
+                                const placement = placementMap.get(p.puuid) ?? 0;
+                                const placementColor = PLACEMENT_COLORS[placement] ?? '#666';
+                                const placementMedal = PLACEMENT_MEDALS[placement];
                                 return (
                                   <div key={p.puuid} className={`mh-sb-row ${isYou ? 'mh-sb-row--you' : ''}`}>
                                     <div className="mh-sb-col-champ">
@@ -2023,6 +2121,12 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         <TextTooltip content={getMhMvpBreakdown(p)} variant="mvp" className="mh-sb-mvp-wrap">
                                           <span className="mh-mvp-badge">MVP</span>
                                         </TextTooltip>
+                                      )}
+                                      {placement > 0 && (
+                                        <span className={`mh-sb-placement${placement <= 3 ? ' mh-sb-placement--top' : ''}`} style={{ color: placementColor }}>
+                                          {placementMedal && <span className="mh-sb-placement-medal">{placementMedal}</span>}
+                                          {getOrdinal(placement)}
+                                        </span>
                                       )}
                                     </div>
                                     <div className="mh-sb-col-rank">
