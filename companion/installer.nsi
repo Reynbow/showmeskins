@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════════════════════
-; Show Me Skins Companion — NSIS Installer
+; x9report Companion — NSIS Installer
 ; Standalone installer for the Go-based companion binary.
 ; ═══════════════════════════════════════════════════════════════════════════════
 
@@ -11,20 +11,20 @@
 ; PRODUCT_VERSION can be overridden: makensis /DPRODUCT_VERSION=0.3.0 installer.nsi
 
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "0.3.9"
+!define PRODUCT_VERSION "0.4.0"
 !endif
 
-!define PRODUCT_NAME "Show Me Skins Companion"
-!define PRODUCT_EXE  "Show Me Skins Companion.exe"
-!define PRODUCT_PUBLISHER "Show Me Skins"
-!define PRODUCT_URL "https://www.showmeskins.com"
+!define PRODUCT_NAME "x9report Companion"
+!define PRODUCT_EXE  "x9report Companion.exe"
+!define PRODUCT_PUBLISHER "x9report"
+!define PRODUCT_URL "https://x9report.com"
 
 Var CreateDesktopShortcut
 Var CreateStartMenuShortcut
 
 Name "${PRODUCT_NAME}"
 ; Use dotted filename to match GitHub release asset URL pattern
-OutFile "dist\Show.Me.Skins.Companion.Setup.${PRODUCT_VERSION}.exe"
+OutFile "dist\x9report.Companion.Setup.${PRODUCT_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
 InstallDirRegKey HKCU "Software\${PRODUCT_NAME}" "InstallDir"
 RequestExecutionLevel user
@@ -41,7 +41,7 @@ Page custom ShortcutsPageCreate ShortcutsPageLeave "Shortcuts"
 !insertmacro MUI_PAGE_INSTFILES
 
 ; Custom finish page
-!define MUI_FINISHPAGE_TEXT "${PRODUCT_NAME} has been installed!$\r$\n$\r$\nThis application runs in the system tray only — there is no application window.$\r$\n$\r$\nAfter launching, look for the hexagon icon in your system tray (bottom-right of your taskbar). Right-click it for options."
+!define MUI_FINISHPAGE_TEXT "${PRODUCT_NAME} has been installed!$\r$\n$\r$\nThis application runs in the system tray only — there is no application window.$\r$\n$\r$\nAfter launching, look for the hexagon icon in your system tray (bottom-right of your taskbar). Right-click it for options.$\r$\n$\r$\nKeep x9report.com open in your browser to see live game data."
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Launch ${PRODUCT_NAME}"
 !define MUI_FINISHPAGE_RUN_CHECKED
@@ -97,10 +97,12 @@ Section "Install"
 
   ; Kill any running instance before overwriting
   nsExec::ExecToLog 'taskkill /F /IM "${PRODUCT_EXE}"'
+  nsExec::ExecToLog 'taskkill /F /IM "Show Me Skins Companion.exe"'
   nsExec::ExecToLog 'taskkill /F /IM "Companion-Build.exe"'
 
-  ; Remove old exe and any leftover Companion-Build.exe from failed updates
+  ; Remove old exe and any leftover files from previous installs
   Delete "$INSTDIR\${PRODUCT_EXE}"
+  Delete "$INSTDIR\Show Me Skins Companion.exe"
   Delete "$INSTDIR\Companion-Build.exe"
 
   ; Extract directly as final exe name (avoids rename leaving old file on upgrade)
@@ -108,6 +110,7 @@ Section "Install"
 
   ; Remove any stale auto-start entry (re-added by finish page if checked)
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Show Me Skins Companion"
 
   ; Save install dir to registry
   WriteRegStr HKCU "Software\${PRODUCT_NAME}" "InstallDir" "$INSTDIR"

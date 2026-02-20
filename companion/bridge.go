@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// BridgeServer runs a local WebSocket server so the Show Me Skins website
+// BridgeServer runs a local WebSocket server so the x9report website
 // (or any local client) can connect and receive real-time champion-select updates.
 type BridgeServer struct {
 	port     string

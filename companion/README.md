@@ -1,6 +1,6 @@
-# Show Me Skins Companion
+# x9report Companion
 
-A lightweight system-tray app that connects to League of Legends and syncs with Show Me Skins for champion select, live game tracking, and post-game summaries.
+A lightweight system-tray app that connects to League of Legends and syncs with x9report.com for champion select, live game tracking, and post-game summaries.
 
 ## Features
 
@@ -22,7 +22,7 @@ Requires [Go](https://go.dev/dl/) 1.21+ and (optionally) [NSIS](https://nsis.sou
 
 ```bash
 # Build the binary only
-go build -ldflags="-s -w -H windowsgui" -o "dist\Show Me Skins Companion.exe" .
+go build -ldflags="-s -w -H windowsgui" -o "dist\x9report Companion.exe" .
 
 # Build binary + installer (Windows)
 build.bat
@@ -34,12 +34,12 @@ The NSIS installer compresses it further to ~2.5 MB.
 ## Usage
 
 1. Run the companion app. A hexagon icon will appear in your system tray
-2. Open the website (https://www.showmeskins.com)
+2. Open the website (https://x9report.com)
 3. Start a League of Legends game — the website syncs champion select, then live scoreboard and kill feed during the match, then post-game summary when it ends
 
 **Tray menu options:**
 - Status display (waiting / in champion select / in game)
-- Open Show Me Skins website
+- Open x9report.com
 - Start on Login toggle
 - Quit
 

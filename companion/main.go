@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	websiteURL   = "https://www.showmeskins.com"
+	websiteURL   = "https://x9report.com"
 	bridgePort   = "8234"
 	regKey       = `Software\Microsoft\Windows\CurrentVersion\Run`
-	regValueName = "Show Me Skins Companion"
+	regValueName = "x9report Companion"
 )
 
 // Version is set at build time via -ldflags "-X main.Version=0.3.1"
@@ -45,7 +45,7 @@ var (
 const errorAlreadyExists = 183
 
 func acquireSingleInstanceLock() bool {
-	name, _ := syscall.UTF16PtrFromString("Global\\ShowMeSkinsCompanion")
+	name, _ := syscall.UTF16PtrFromString("Global\\x9reportCompanion")
 	ret, _, _ := createMutexW.Call(0, 0, uintptr(unsafe.Pointer(name)))
 	if ret == 0 {
 		return false
@@ -135,7 +135,7 @@ func onReady() {
 	systray.SetTooltip(tooltipPrefix)
 
 	// Build menu
-	titleText := "Show Me Skins Companion (Beta)"
+	titleText := "x9report Companion (Beta)"
 	if Version != "0.0.0" {
 		titleText += " v" + Version
 	}
@@ -147,7 +147,7 @@ func onReady() {
 
 	systray.AddSeparator()
 
-	openItem := systray.AddMenuItem("Open Show Me Skins", "Open the website in your browser")
+	openItem := systray.AddMenuItem("Open x9report.com", "Open the website in your browser")
 
 	updateItem = systray.AddMenuItem("Check for Updates", "Check for a new version on GitHub")
 	updateReadyItem = systray.AddMenuItem("Update available – click to install", "")

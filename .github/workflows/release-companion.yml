@@ -57,7 +57,7 @@ jobs:
 
       - name: Copy portable exe
         working-directory: companion/dist
-        run: cmd /c copy Companion-Build.exe "Show Me Skins Companion.exe"
+        run: cmd /c copy Companion-Build.exe "x9report Companion.exe"
 
       - name: Build NSIS installer
         working-directory: companion
@@ -65,17 +65,17 @@ jobs:
           choco install nsis -y --no-progress
           & "C:\Program Files (x86)\NSIS\makensis.exe" /DPRODUCT_VERSION=${{ steps.version.outputs.version }} installer.nsi
 
-      - name: Create stable-named download (always Show.Me.Skins.Companion.Setup.exe)
+      - name: Create stable-named download (always x9report.Companion.Setup.exe)
         working-directory: companion/dist
-        run: copy "Show.Me.Skins.Companion.Setup.${{ steps.version.outputs.version }}.exe" "Show.Me.Skins.Companion.Setup.exe"
+        run: copy "x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe" "x9report.Companion.Setup.exe"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "Companion App v${{ steps.version.outputs.version }}"
+          name: "x9report Companion v${{ steps.version.outputs.version }}"
           body: |
-            ## Show Me Skins Companion v${{ steps.version.outputs.version }}
+            ## x9report Companion v${{ steps.version.outputs.version }}
 
             Download the installer below and run it. The app runs in the system tray — look for the hexagon icon after launching.
 
@@ -85,8 +85,8 @@ jobs:
             - **Kill Feed** — Real-time champion kills, turret/dragon/baron takedowns
             - **Post-Game Summary** — Win/loss result, final scoreboard, and MVP
           files: |
-            companion/dist/Show.Me.Skins.Companion.Setup.exe
-            companion/dist/Show.Me.Skins.Companion.Setup.${{ steps.version.outputs.version }}.exe
-            companion/dist/Show Me Skins Companion.exe
+            companion/dist/x9report.Companion.Setup.exe
+            companion/dist/x9report.Companion.Setup.${{ steps.version.outputs.version }}.exe
+            companion/dist/x9report Companion.exe
           draft: false
           prerelease: false

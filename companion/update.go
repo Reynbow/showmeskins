@@ -17,7 +17,7 @@ import (
 
 const (
 	ghReleasesURL = "https://api.github.com/repos/Reynbow/showmeskins/releases/latest"
-	updateAsset   = "Show.Me.Skins.Companion.Setup.exe"
+	updateAsset   = "x9report.Companion.Setup.exe"
 	checkInterval = 6 * time.Hour
 )
 
@@ -89,7 +89,7 @@ func fetchLatestRelease() (version string, downloadURL string, err error) {
 
 func downloadAndRunInstaller(url string) error {
 	tmpDir := os.TempDir()
-	path := filepath.Join(tmpDir, "Show.Me.Skins.Companion.Setup.exe")
+	path := filepath.Join(tmpDir, "x9report.Companion.Setup.exe")
 
 	log.Printf("[update] Downloading from %s", url)
 	resp, err := http.Get(url)

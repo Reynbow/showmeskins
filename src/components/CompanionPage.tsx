@@ -10,7 +10,7 @@ interface Props {
 }
 
 const DOWNLOAD_URL =
-  'https://github.com/Reynbow/showmeskins/releases/latest/download/Show.Me.Skins.Companion.Setup.exe';
+  'https://github.com/Reynbow/showmeskins/releases/latest/download/x9report.Companion.Setup.exe';
 
 export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, hasLiveGame, onLiveGame }: Props) {
   return (
@@ -66,7 +66,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
             </svg>
             Download for Windows
           </a>
-          <span className="companion-version">v0.3.9 Beta &middot; Windows 10/11</span>
+          <span className="companion-version">v0.4.0 Beta &middot; Windows 10/11</span>
           <p className="companion-download-tagline">Live and post-game information tracker</p>
         </div>
 
