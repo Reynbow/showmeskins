@@ -1036,7 +1036,7 @@
 .lg-kill-entry {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   padding: 8px 18px;
   transition: background 0.15s;
 }
@@ -1195,7 +1195,7 @@
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  min-width: 80px;
+  min-width: 100px;
 }
 
 .lg-kill-name--blue {
@@ -1369,7 +1369,7 @@
 }
 
 .lg-kill-tab-spacer {
-  width: 28px;
+  width: 36px;
   flex-shrink: 0;
 }
 
@@ -1465,7 +1465,7 @@
 .lg-kill-detail-columns {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 24px;
 }
 
 .lg-kill-detail-col {

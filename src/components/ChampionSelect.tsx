@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ChampionBasic } from '../types';
 import { getChampionIcon } from '../api';
 import './ChampionSelect.css';
@@ -14,13 +14,44 @@ interface Props {
 }
 
 const ROLES = ['All', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'];
+const PLAYER_SEARCH_NAME_KEY = 'sms_player_search_name';
+const PLAYER_SEARCH_TAG_KEY = 'sms_player_search_tag';
 
 export function ChampionSelect({ champions, version, onSelect, onCompanion, onOpenMatchHistory, hasLiveGame, onLiveGame }: Props) {
   const [search, setSearch] = useState('');
-  const [riotIdSearch, setRiotIdSearch] = useState('');
+  const [riotGameNameSearch, setRiotGameNameSearch] = useState(() => {
+    try {
+      return window.localStorage.getItem(PLAYER_SEARCH_NAME_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [riotTagSearch, setRiotTagSearch] = useState(() => {
+    try {
+      return window.localStorage.getItem(PLAYER_SEARCH_TAG_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [selectedRole, setSelectedRole] = useState('All');
   const [scrolled, setScrolled] = useState(false);
   const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PLAYER_SEARCH_NAME_KEY, riotGameNameSearch);
+    } catch {
+      // ignore storage errors
+    }
+  }, [riotGameNameSearch]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PLAYER_SEARCH_TAG_KEY, riotTagSearch);
+    } catch {
+      // ignore storage errors
+    }
+  }, [riotTagSearch]);
 
   const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrolled(e.currentTarget.scrollTop > 0);
@@ -51,10 +82,11 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
   }, [filtered]);
 
   const submitRiotHistory = useCallback(() => {
-    const trimmed = riotIdSearch.trim();
-    if (!trimmed) return;
-    onOpenMatchHistory(trimmed);
-  }, [onOpenMatchHistory, riotIdSearch]);
+    const gameName = riotGameNameSearch.trim();
+    const tagLine = riotTagSearch.trim();
+    if (!gameName || !tagLine) return;
+    onOpenMatchHistory(`${gameName}#${tagLine}`);
+  }, [onOpenMatchHistory, riotGameNameSearch, riotTagSearch]);
 
   return (
     <div className="champion-select">
@@ -120,22 +152,36 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
               <path d="M20 21a8 8 0 1 0-16 0" />
               <circle cx="12" cy="8" r="4" />
             </svg>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Riot ID (Name#Tag)"
-              value={riotIdSearch}
-              onChange={e => setRiotIdSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') submitRiotHistory();
-              }}
-            />
+            <div className="riot-id-inputs">
+              <input
+                type="text"
+                className="search-input riot-id-input riot-id-input--name"
+                placeholder="Search Players..."
+                value={riotGameNameSearch}
+                onChange={e => setRiotGameNameSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitRiotHistory();
+                }}
+              />
+              <span className="riot-id-separator" aria-hidden="true">#</span>
+              <input
+                type="text"
+                className="search-input riot-id-input riot-id-input--tag"
+                placeholder="Tag"
+                maxLength={4}
+                value={riotTagSearch}
+                onChange={e => setRiotTagSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitRiotHistory();
+                }}
+              />
+            </div>
             <button
               className="cs-history-btn"
               onClick={submitRiotHistory}
-              disabled={!riotIdSearch.trim()}
+              disabled={!riotGameNameSearch.trim() || !riotTagSearch.trim()}
             >
-              History
+              Search
             </button>
           </div>
         </div>

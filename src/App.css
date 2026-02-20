@@ -348,6 +348,13 @@
 .text-tooltip--execute::after { border-top-color: rgba(148, 163, 184, 0.65); }
 .text-tooltip--execute::before { border-top-color: rgba(14, 16, 20, 0.98); }
 
+.text-tooltip--spell {
+  white-space: normal;
+  max-width: 300px;
+  padding: 0;
+  text-align: left;
+}
+
 /* ── Summoner Spell tooltip content ──────────────────────────────────── */
 
 .spell-tooltip-content {

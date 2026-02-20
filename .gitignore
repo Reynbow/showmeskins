@@ -29,3 +29,4 @@ companion/*.exe
 *.njsproj
 *.sln
 *.sw?
+.vercel

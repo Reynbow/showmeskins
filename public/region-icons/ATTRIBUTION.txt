@@ -1,0 +1,19 @@
+Region icons in this folder are sourced from Flaticon.
+Author: Freepik
+Author page: https://www.flaticon.com/authors/freepik
+
+Files and source URLs:
+- australia.png: https://cdn-icons-png.flaticon.com/512/323/323315.png
+- brazil.png: https://cdn-icons-png.flaticon.com/512/18922/18922479.png
+- europe.png: https://cdn-icons-png.flaticon.com/512/6056/6056868.png
+- japan.png: https://cdn-icons-png.flaticon.com/512/6920/6920034.png
+- korea.png: https://cdn-icons-png.flaticon.com/512/10948/10948354.png
+- north-america.png: https://cdn-icons-png.flaticon.com/512/2072/2072574.png
+- philippines.png: https://cdn-icons-png.flaticon.com/512/1863/1863132.png
+- russia.png: https://cdn-icons-png.flaticon.com/512/1846/1846114.png
+- singapore.png: https://cdn-icons-png.flaticon.com/512/10948/10948393.png
+- south-america.png: https://cdn-icons-png.flaticon.com/512/2072/2072212.png
+- taiwan.png: https://cdn-icons-png.flaticon.com/512/10888/10888669.png
+- thailand.png: https://cdn-icons-png.flaticon.com/512/10948/10948391.png
+- turkey.png: https://cdn-icons-png.flaticon.com/512/10948/10948295.png
+- vietnam.png: https://cdn-icons-png.flaticon.com/512/3014/3014041.png

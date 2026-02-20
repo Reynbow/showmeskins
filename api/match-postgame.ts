@@ -1,4 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const PLATFORM_TO_REGION: Record<string, string> = {
   NA1: 'americas',
@@ -82,6 +84,41 @@ type RiotParticipant = {
   champLevel?: number;
   win?: boolean;
 };
+
+function readEnvFileKey(filePath: string, key: string): string | undefined {
+  if (!existsSync(filePath)) return undefined;
+  const raw = readFileSync(filePath, 'utf8');
+  const lines = raw.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed.startsWith(`${key}=`)) continue;
+    const value = trimmed.slice(key.length + 1).trim();
+    if (!value) return undefined;
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1).trim() || undefined;
+    }
+    return value;
+  }
+  return undefined;
+}
+
+function resolveRiotApiKey(): string | undefined {
+  const direct = process.env.RIOT_API_KEY?.trim();
+  if (direct) return direct;
+
+  const cwd = process.cwd();
+  const candidates = [
+    join(cwd, '.vercel', '.env.development.local'),
+    join(cwd, '.env.local'),
+    join(cwd, '.env'),
+  ];
+  for (const filePath of candidates) {
+    const key = readEnvFileKey(filePath, 'RIOT_API_KEY');
+    if (key) return key;
+  }
+  return undefined;
+}
 
 function normalizePosition(value: string | undefined): 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | '' {
   if (!value) return '';
@@ -195,7 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.RIOT_API_KEY;
+  const apiKey = resolveRiotApiKey();
   if (!apiKey) {
     return res.status(500).json({
       error: 'RIOT_API_KEY not configured. Add it in Vercel Environment Variables or .env.local for local dev.',
@@ -267,4 +304,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to fetch postgame data from Riot API' });
   }
 }
-

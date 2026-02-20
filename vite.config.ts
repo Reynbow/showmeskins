@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Forward serverless function requests during local Vite dev.
+      // Set VITE_API_PROXY_TARGET if your API server runs elsewhere.
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
       // Proxy 3D model requests to cdn.modelviewer.lol to avoid CORS issues
       '/model-cdn': {
         target: 'https://cdn.modelviewer.lol',
