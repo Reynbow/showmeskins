@@ -101,7 +101,7 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
             <path d="M20 8L31 14v12L20 32 9 26V14L20 8z" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
           </svg>
         </div>
-        <h1 className="champion-select-title">Show me skins!</h1>
+        <h1 className="champion-select-title">x9report.com</h1>
         <div className="cs-companion-wrap">
           {hasLiveGame && onLiveGame && (
             <button className="cs-live-game-btn" onClick={onLiveGame} title="View live game">

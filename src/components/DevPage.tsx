@@ -122,12 +122,12 @@ export function DevPage({
       accountInfo,
       liveDebug,
     };
-    downloadJson('showmeskins-dev-log', report);
+    downloadJson('x9report-dev-log', report);
   };
 
   const handleDownloadActiveMatch = () => {
     if (!liveDebug.activeMatch) return;
-    downloadJson(`showmeskins-match-${liveDebug.activeMatch.id}`, {
+    downloadJson(`x9report-match-${liveDebug.activeMatch.id}`, {
       generatedAt: new Date().toISOString(),
       match: liveDebug.activeMatch,
     });
@@ -135,7 +135,7 @@ export function DevPage({
 
   const handleDownloadLatestCompletedMatch = () => {
     if (!latestCompletedMatch) return;
-    downloadJson(`showmeskins-match-${latestCompletedMatch.id}`, {
+    downloadJson(`x9report-match-${latestCompletedMatch.id}`, {
       generatedAt: new Date().toISOString(),
       match: latestCompletedMatch,
     });

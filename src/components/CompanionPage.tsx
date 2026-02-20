@@ -48,7 +48,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
           </div>
           <h1 className="companion-title">Companion App <span className="companion-beta-badge">Beta</span></h1>
           <p className="companion-subtitle">
-            Automatically sync your champion select with Show Me Skins
+            Automatically sync your champion select with x9report.com
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
               <div className="companion-step-number">2</div>
               <div className="companion-step-content">
                 <h3>Open the website</h3>
-                <p>Keep <strong>showmeskins.com</strong> open in your browser. The website connects to the companion automatically.</p>
+                <p>Keep <strong>x9report.com</strong> open in your browser. The website connects to the companion automatically.</p>
               </div>
             </div>
             <div className="companion-step">

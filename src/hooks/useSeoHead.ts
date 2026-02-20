@@ -4,7 +4,7 @@
  */
 import { useEffect } from 'react';
 
-const SITE_NAME = 'Show Me Skins';
+const SITE_NAME = 'x9report.com';
 const BASE_DESCRIPTION = 'Browse and view League of Legends champion skins in 3D.';
 
 function setMeta(name: string, content: string, isProperty = false) {

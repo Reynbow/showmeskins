@@ -379,13 +379,13 @@ function App() {
   }, []);
 
   // SEO: update document head (invisible to users; for search engines)
-  const seoTitle = 'Show Me Skins!';
+  const seoTitle = 'x9report.com';
   const seoDesc = viewMode === 'select'
     ? 'Browse and view all League of Legends champion skins in 3D. Free LoL skin viewer.'
     : viewMode === 'history'
       ? 'Search Riot ID and view recent League of Legends match history.'
       : viewMode === 'companion'
-        ? 'Companion app for Show Me Skins – connect your League of Legends client.'
+        ? 'Companion app for x9report.com – connect your League of Legends client.'
         : selectedChampion && selectedSkin
           ? `View ${selectedChampion.name} ${selectedSkin.name} skin in 3D. League of Legends skin viewer.`
           : 'Browse and view League of Legends champion skins in 3D.';
