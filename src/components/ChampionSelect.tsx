@@ -101,7 +101,7 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
             <path d="M20 8L31 14v12L20 32 9 26V14L20 8z" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
           </svg>
         </div>
-        <h1 className="champion-select-title">x9report.com</h1>
+        <h1 className="champion-select-title"><span className="cs-title-x">x</span>9report.com</h1>
         <div className="cs-companion-wrap">
           {hasLiveGame && onLiveGame && (
             <button className="cs-live-game-btn" onClick={onLiveGame} title="View live game">
@@ -152,7 +152,7 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
               <path d="M20 21a8 8 0 1 0-16 0" />
               <circle cx="12" cy="8" r="4" />
             </svg>
-            <div className="riot-id-inputs">
+            <div className={`riot-id-inputs${!riotGameNameSearch && !riotTagSearch ? ' riot-id-inputs--empty' : ''}`}>
               <input
                 type="text"
                 className="search-input riot-id-input riot-id-input--name"
