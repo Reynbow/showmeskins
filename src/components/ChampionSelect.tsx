@@ -160,7 +160,6 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
                 type="text"
                 className="search-input riot-id-input riot-id-input--tag"
                 placeholder="Tag"
-                maxLength={4}
                 value={riotTagSearch}
                 onChange={e => setRiotTagSearch(e.target.value)}
                 onKeyDown={(e) => {

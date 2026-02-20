@@ -1296,45 +1296,39 @@
   box-shadow: 0 0 8px rgba(200, 170, 110, 0.7), 0 0 16px rgba(200, 170, 110, 0.35);
 }
 
-/* ── Expanded panel tabs ── */
+/* ── Expanded panel tabs (button style) ── */
 .mh-expanded-tabs {
   display: flex;
-  gap: 0;
+  gap: 24px;
   margin-top: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(200, 170, 110, 0.15);
+  padding: 0 0 12px;
 }
 
 .mh-expanded-tab {
   flex: 1;
-  padding: 11px 24px;
-  background: rgba(200, 170, 110, 0.04);
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-right: 1px solid rgba(200, 170, 110, 0.1);
+  height: 32px;
+  padding: 0 24px;
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  background: rgba(200, 170, 110, 0.05);
   color: var(--lol-text-secondary);
   font-family: var(--font-heading);
-  font-size: 12px;
-  letter-spacing: 1.5px;
+  font-size: 13px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.mh-expanded-tab:last-child {
-  border-right: none;
-}
-
 .mh-expanded-tab:hover {
+  border-color: var(--lol-gold-dark);
+  background: rgba(200, 170, 110, 0.12);
   color: var(--lol-gold-light);
-  background: rgba(200, 170, 110, 0.1);
 }
 
 .mh-expanded-tab--active {
-  color: var(--lol-gold);
+  border-color: var(--lol-gold-dark);
   background: rgba(200, 170, 110, 0.12);
-  border-bottom-color: var(--lol-gold);
-  box-shadow: inset 0 -1px 8px rgba(200, 170, 110, 0.08);
+  color: var(--lol-gold-light);
 }
 
 /* ── Kill Feed ── */
