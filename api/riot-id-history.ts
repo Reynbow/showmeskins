@@ -266,6 +266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const accountRoutingRegion: AccountRoutingRegion = routingRegion === 'sea' ? 'asia' : routingRegion;
   const count = Math.min(20, Math.max(1, parseInt(String(req.query.count ?? '10'), 10) || 10));
   const start = Math.max(0, parseInt(String(req.query.start ?? '0'), 10) || 0);
+  const queue = typeof req.query.queue === 'string' && req.query.queue.trim() ? parseInt(req.query.queue.trim(), 10) : undefined;
   const summaryOnly = String(req.query.summaryOnly ?? '').trim() === '1';
   const wantTimeline = String(req.query.timeline ?? '').trim() === '1';
 
@@ -605,16 +606,93 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const idsUrl = new URL(`https://${routingRegion}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids`);
     idsUrl.searchParams.set('start', String(start));
     idsUrl.searchParams.set('count', String(count));
+    if (queue && Number.isFinite(queue)) {
+      idsUrl.searchParams.set('queue', String(queue));
+    }
 
-    const idsRes = await fetch(idsUrl.toString(), {
-      headers: { 'X-Riot-Token': apiKey },
-    });
+    // Fetch match IDs and spectator data in parallel
+    const spectatorUrl = platformRegion
+      ? `https://${platformRegion}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${encodeURIComponent(account.puuid)}`
+      : null;
+
+    const [idsRes, spectatorResult] = await Promise.all([
+      fetch(idsUrl.toString(), { headers: { 'X-Riot-Token': apiKey } }),
+      spectatorUrl
+        ? fetch(spectatorUrl, { headers: { 'X-Riot-Token': apiKey } })
+            .then(async (r) => {
+              if (!r.ok) return null;
+              return await r.json() as Record<string, unknown>;
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
     if (!idsRes.ok) {
       const text = await idsRes.text();
       return res.status(idsRes.status).json({
         error: `Riot match ids lookup failed: ${idsRes.status}`,
         details: text.slice(0, 500),
       });
+    }
+
+    // Normalize spectator data if player is in-game
+    let activeGame: Record<string, unknown> | null = null;
+    if (spectatorResult && typeof spectatorResult === 'object') {
+      const raw = spectatorResult;
+      const rawParticipants = Array.isArray(raw.participants) ? raw.participants : [];
+      const participants = rawParticipants
+        .filter((p: unknown) => p && typeof p === 'object')
+        .map((p: unknown) => {
+          const src = p as Record<string, unknown>;
+          let perks: { perkIds: number[]; perkStyle: number; perkSubStyle: number } | undefined;
+          if (src.perks && typeof src.perks === 'object') {
+            const rawPerks = src.perks as Record<string, unknown>;
+            perks = {
+              perkIds: Array.isArray(rawPerks.perkIds)
+                ? (rawPerks.perkIds as unknown[]).filter((id): id is number => typeof id === 'number')
+                : [],
+              perkStyle: typeof rawPerks.perkStyle === 'number' ? rawPerks.perkStyle : 0,
+              perkSubStyle: typeof rawPerks.perkSubStyle === 'number' ? rawPerks.perkSubStyle : 0,
+            };
+          }
+          return {
+            puuid: typeof src.puuid === 'string' ? src.puuid : '',
+            summonerId: typeof src.summonerId === 'string' ? src.summonerId : '',
+            summonerName: typeof src.summonerName === 'string' ? src.summonerName : '',
+            riotId: typeof src.riotId === 'string' ? src.riotId : undefined,
+            championId: typeof src.championId === 'number' ? src.championId : 0,
+            teamId: typeof src.teamId === 'number' ? src.teamId : 0,
+            spell1Id: typeof src.spell1Id === 'number' ? src.spell1Id : 0,
+            spell2Id: typeof src.spell2Id === 'number' ? src.spell2Id : 0,
+            perks,
+          };
+        });
+
+      const rawBans = Array.isArray(raw.bannedChampions) ? raw.bannedChampions : [];
+      const bannedChampions = rawBans
+        .filter((b: unknown) => b && typeof b === 'object')
+        .map((b: unknown) => {
+          const src = b as Record<string, unknown>;
+          return {
+            championId: typeof src.championId === 'number' ? src.championId : 0,
+            teamId: typeof src.teamId === 'number' ? src.teamId : 0,
+            pickTurn: typeof src.pickTurn === 'number' ? src.pickTurn : 0,
+          };
+        });
+
+      activeGame = {
+        inGame: true,
+        gameId: typeof raw.gameId === 'number' ? raw.gameId : 0,
+        gameMode: typeof raw.gameMode === 'string' ? raw.gameMode : '',
+        gameType: typeof raw.gameType === 'string' ? raw.gameType : '',
+        gameQueueConfigId: typeof raw.gameQueueConfigId === 'number' ? raw.gameQueueConfigId : 0,
+        mapId: typeof raw.mapId === 'number' ? raw.mapId : 0,
+        gameStartTime: typeof raw.gameStartTime === 'number' ? raw.gameStartTime : 0,
+        gameLength: typeof raw.gameLength === 'number' ? raw.gameLength : 0,
+        platformId: typeof raw.platformId === 'string' ? raw.platformId : '',
+        participants,
+        bannedChampions,
+      };
     }
 
     const matchIds = await idsRes.json() as string[];
@@ -628,6 +706,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         gameName: account.gameName,
         tagLine: account.tagLine,
         profile,
+        activeGame,
         matchIds,
         matches: [],
       });

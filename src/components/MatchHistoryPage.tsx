@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ItemInfo } from '../types';
+import type { ItemInfo, LiveGameData, LiveGamePlayer } from '../types';
 import { getItems, getLatestVersion } from '../api';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
@@ -38,6 +38,42 @@ interface MatchSummary {
   win: boolean;
 }
 
+interface SpectatorParticipant {
+  puuid: string;
+  summonerId: string;
+  summonerName: string;
+  riotId?: string;
+  championId: number;
+  teamId: number;
+  spell1Id: number;
+  spell2Id: number;
+  perks?: {
+    perkIds: number[];
+    perkStyle: number;
+    perkSubStyle: number;
+  };
+}
+
+interface SpectatorBan {
+  championId: number;
+  teamId: number;
+  pickTurn: number;
+}
+
+interface ActiveGameData {
+  inGame: true;
+  gameId: number;
+  gameMode: string;
+  gameType: string;
+  gameQueueConfigId: number;
+  mapId: number;
+  gameStartTime: number;
+  gameLength: number;
+  platformId: string;
+  participants: SpectatorParticipant[];
+  bannedChampions: SpectatorBan[];
+}
+
 interface HistoryResponse {
   region: Region;
   routingRegion?: 'americas' | 'europe' | 'asia' | 'sea';
@@ -64,6 +100,7 @@ interface HistoryResponse {
       championPoints: number;
     }>;
   } | null;
+  activeGame?: ActiveGameData | null;
   matchIds?: string[];
   matches: MatchSummary[];
 }
@@ -154,6 +191,8 @@ interface MatchSlot {
 interface Props {
   initialRiotId?: string;
   onBack: () => void;
+  companionLiveData?: LiveGameData | null;
+  companionConnected?: boolean;
 }
 
 interface RegionOption {
@@ -180,6 +219,31 @@ const REGION_OPTIONS: RegionOption[] = [
   { value: 'tw2', label: 'Taiwan', flag: '\u{1F1F9}\u{1F1FC}' },
   { value: 'vn2', label: 'Vietnam', flag: '\u{1F1FB}\u{1F1F3}' },
 ];
+
+interface QueueFilterOption {
+  label: string;
+  value: number | null;
+}
+
+const QUEUE_FILTERS: QueueFilterOption[] = [
+  { label: 'All', value: null },
+  { label: 'Ranked Solo/Duo', value: 420 },
+  { label: 'Ranked Flex', value: 440 },
+  { label: 'Swiftplay', value: 480 },
+  { label: 'Draft', value: 400 },
+  { label: 'ARAM', value: 450 },
+  { label: 'Arena', value: 1700 },
+  { label: 'URF', value: 1900 },
+];
+
+const QUEUE_ID_GROUPS: Record<number, number[]> = {
+  1900: [900, 1900],
+  1700: [1700, 1710],
+};
+
+function getQueueIds(primary: number): number[] {
+  return QUEUE_ID_GROUPS[primary] ?? [primary];
+}
 
 function splitRiotId(input: string): { gameName: string; tagLine: string } {
   const trimmed = input.trim();
@@ -219,12 +283,18 @@ function formatRelative(ts: number): string {
 
 function formatQueue(queueId: number | undefined, gameMode: string): string {
   const map: Record<number, string> = {
-    420: 'Ranked Solo/Duo',
-    440: 'Ranked Flex',
     400: 'Normal Draft',
+    420: 'Ranked Solo/Duo',
     430: 'Normal Blind',
+    440: 'Ranked Flex',
     450: 'ARAM',
+    480: 'Swiftplay',
+    490: 'Quickplay',
+    900: 'URF',
     1700: 'Arena',
+    1710: 'Arena',
+    1900: 'URF',
+    2400: 'ARAM: Mayhem',
   };
   return (queueId ? map[queueId] : undefined) || gameMode || 'Match';
 }
@@ -501,7 +571,7 @@ function formatMasteryPoints(points: number): string {
   return String(points);
 }
 
-export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
+export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionConnected }: Props) {
   const initialParsed = splitRiotId(initialRiotId);
   const [gameName, setGameName] = useState(initialParsed.gameName);
   const [tagLine, setTagLine] = useState(initialParsed.tagLine);
@@ -522,7 +592,13 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
   const [spellInfo, setSpellInfo] = useState<Record<number, { name: string; description: string; cooldown: number; file: string }>>({});
   const [champInfo, setChampInfo] = useState<Record<string, { name: string; title: string; blurb: string; tags: string[] }>>({});
+  const [champKeyToId, setChampKeyToId] = useState<Record<number, string>>({});
   const [ddragonVersion, setDdragonVersion] = useState('16.4.1');
+  const [activeGame, setActiveGame] = useState<ActiveGameData | null>(null);
+  const [liveGameEnded, setLiveGameEnded] = useState(false);
+  const spectatorPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [liveElapsed, setLiveElapsed] = useState(0);
+  const [queueFilter, setQueueFilter] = useState<number | null>(null);
   const regionPickerRef = useRef<HTMLDivElement | null>(null);
   const lastAutoSearchKeyRef = useRef<string>('');
   const searchRequestIdRef = useRef(0);
@@ -558,12 +634,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
         }
         setSpellInfo(spellMap);
 
-        const champJson = await champRes.json() as { data: Record<string, { id: string; name: string; title: string; lore: string; blurb: string; tags: string[] }> };
+        const champJson = await champRes.json() as { data: Record<string, { key: string; id: string; name: string; title: string; lore: string; blurb: string; tags: string[] }> };
         const champMap: Record<string, { name: string; title: string; blurb: string; tags: string[] }> = {};
+        const keyMap: Record<number, string> = {};
         for (const c of Object.values(champJson.data)) {
           champMap[c.id] = { name: c.name, title: c.title, blurb: c.lore || c.blurb, tags: c.tags };
+          keyMap[Number(c.key)] = c.id;
         }
         setChampInfo(champMap);
+        setChampKeyToId(keyMap);
       } catch { /* supplementary data is optional */ }
     }).catch(() => {});
   }, []);
@@ -676,10 +755,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
 
     setLoading(true);
     setError(null);
-    setResult(null);
     setMatchSlots([]);
     setExpandedMatchId(null);
     setHasMore(false);
+    setActiveGame(null);
+    setLiveGameEnded(false);
+    if (spectatorPollRef.current) {
+      clearInterval(spectatorPollRef.current);
+      spectatorPollRef.current = null;
+    }
     const requestId = searchRequestIdRef.current + 1;
     searchRequestIdRef.current = requestId;
 
@@ -698,6 +782,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
         }
         if (trimmedGameName) params.set('gameName', trimmedGameName);
         if (trimmedTagLine) params.set('tagLine', trimmedTagLine);
+        if (queueFilter !== null) {
+          const ids = getQueueIds(queueFilter);
+          if (ids.length === 1) params.set('queue', String(ids[0]));
+        }
         const res = await fetch(`/api/riot-id-history?${params.toString()}`);
         const body = await res.json();
         if (!res.ok) {
@@ -719,6 +807,12 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
         if (window.location.pathname + window.location.search !== newUrl) {
           window.history.pushState(null, '', newUrl);
         }
+      }
+
+      // Capture active game from initial response
+      if (initial.activeGame && initial.activeGame.inGame) {
+        setActiveGame(initial.activeGame);
+        setLiveGameEnded(false);
       }
 
       const matchIds = Array.isArray(initial.matchIds) ? initial.matchIds : [];
@@ -805,19 +899,34 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
     const currentCount = matchSlots.length;
 
     try {
-      const params = new URLSearchParams({
-        gameName: result.gameName,
-        tagLine: result.tagLine,
-        region,
-        count: '5',
-        start: String(currentCount),
-        summaryOnly: '1',
-      });
-      const res = await fetch(`/api/riot-id-history?${params.toString()}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error ?? 'Failed to load more matches');
+      const queueIds = queueFilter !== null ? getQueueIds(queueFilter) : [];
+      let moreIds: string[];
 
-      const moreIds: string[] = Array.isArray(body.matchIds) ? body.matchIds : [];
+      if (queueIds.length > 1) {
+        const allResults = await Promise.all(queueIds.map(async (qid) => {
+          const p = new URLSearchParams({
+            gameName: result.gameName, tagLine: result.tagLine,
+            region, count: '5', start: String(currentCount), summaryOnly: '1',
+          });
+          p.set('queue', String(qid));
+          const r = await fetch(`/api/riot-id-history?${p.toString()}`);
+          if (!r.ok) return [] as string[];
+          const b = await r.json();
+          return Array.isArray(b.matchIds) ? b.matchIds as string[] : [];
+        }));
+        moreIds = [...new Set(allResults.flat())];
+      } else {
+        const params = new URLSearchParams({
+          gameName: result.gameName, tagLine: result.tagLine,
+          region, count: '5', start: String(currentCount), summaryOnly: '1',
+        });
+        if (queueIds.length === 1) params.set('queue', String(queueIds[0]));
+        const res = await fetch(`/api/riot-id-history?${params.toString()}`);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body?.error ?? 'Failed to load more matches');
+        moreIds = Array.isArray(body.matchIds) ? body.matchIds : [];
+      }
+
       if (moreIds.length === 0) {
         setHasMore(false);
         return;
@@ -920,6 +1029,185 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
     if (pendingSearch > 0) runSearch();
   }, [pendingSearch]);
 
+  // Re-fetch match list when queue filter changes (preserves profile card)
+  const prevQueueFilterRef = useRef<number | null>(queueFilter);
+  useEffect(() => {
+    if (prevQueueFilterRef.current === queueFilter) return;
+    prevQueueFilterRef.current = queueFilter;
+    if (!result) return;
+
+    const refetchMatches = async () => {
+      setExpandedMatchId(null);
+      setHasMore(false);
+      setMatchSlots(
+        Array.from({ length: 5 }, (_, i) => ({ matchId: `__filter_skel_${i}`, status: 'loading' as const }))
+      );
+      const requestId = searchRequestIdRef.current + 1;
+      searchRequestIdRef.current = requestId;
+
+      try {
+        const queueIds = queueFilter !== null ? getQueueIds(queueFilter) : [];
+
+        let matchIds: string[];
+        if (queueIds.length > 1) {
+          const allResults = await Promise.all(queueIds.map(async (qid) => {
+            const p = new URLSearchParams({
+              region, count: '10', summaryOnly: '1', puuid: result.puuid,
+            });
+            if (result.gameName) p.set('gameName', result.gameName);
+            if (result.tagLine) p.set('tagLine', result.tagLine);
+            p.set('queue', String(qid));
+            const r = await fetch(`/api/riot-id-history?${p.toString()}`);
+            if (!r.ok) return [] as string[];
+            const b = await r.json();
+            return Array.isArray(b.matchIds) ? b.matchIds as string[] : [];
+          }));
+          if (searchRequestIdRef.current !== requestId) return;
+          matchIds = [...new Set(allResults.flat())];
+        } else {
+          const params = new URLSearchParams({
+            region, count: '10', summaryOnly: '1', puuid: result.puuid,
+          });
+          if (result.gameName) params.set('gameName', result.gameName);
+          if (result.tagLine) params.set('tagLine', result.tagLine);
+          if (queueIds.length === 1) params.set('queue', String(queueIds[0]));
+          const res = await fetch(`/api/riot-id-history?${params.toString()}`);
+          const body = await res.json();
+          if (!res.ok) return;
+          if (searchRequestIdRef.current !== requestId) return;
+          matchIds = Array.isArray(body.matchIds) ? body.matchIds : [];
+        }
+
+        setMatchSlots(matchIds.map((id: string) => ({ matchId: id, status: 'loading' as const })));
+        setHasMore(matchIds.length >= 10);
+
+        for (let i = 0; i < matchIds.length; i++) {
+          const id = matchIds[i];
+          const cached = getCachedMatch(id);
+          if (cached) {
+            if (searchRequestIdRef.current !== requestId) return;
+            setMatchSlots((prev) => {
+              const next = [...prev];
+              if (i < next.length) next[i] = cached;
+              return next;
+            });
+            continue;
+          }
+          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id });
+          try {
+            const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
+            const detailBody = (await detailRes.json()) as MatchDetailResponse;
+            if (searchRequestIdRef.current !== requestId) return;
+            if (detailRes.ok && detailBody.match) {
+              cacheMatch(id, detailBody.match, detailBody.detail);
+              setMatchSlots((prev) => {
+                const next = [...prev];
+                if (i < next.length) next[i] = { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail };
+                return next;
+              });
+            } else {
+              setMatchSlots((prev) => {
+                const next = [...prev];
+                if (i < next.length) next[i] = { matchId: id, status: 'failed' };
+                return next;
+              });
+            }
+          } catch {
+            if (searchRequestIdRef.current !== requestId) return;
+            setMatchSlots((prev) => {
+              const next = [...prev];
+              if (i < next.length) next[i] = { matchId: id, status: 'failed' };
+              return next;
+            });
+          }
+        }
+      } catch { /* ignore */ }
+    };
+
+    refetchMatches();
+  }, [queueFilter, result, region]);
+
+  // Spectator polling: when an active game is detected, poll every 15s
+  useEffect(() => {
+    if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) {
+      if (spectatorPollRef.current) {
+        clearInterval(spectatorPollRef.current);
+        spectatorPollRef.current = null;
+      }
+      return;
+    }
+
+    const pollSpectator = async () => {
+      try {
+        const params = new URLSearchParams({
+          puuid: result.puuid,
+          region: result.platformRegion ?? region,
+        });
+        const res = await fetch(`/api/spectator?${params.toString()}`);
+        const body = await res.json();
+        if (body && body.inGame) {
+          setActiveGame(body as ActiveGameData);
+        } else {
+          setActiveGame((prev) => prev);
+          setLiveGameEnded(true);
+        }
+      } catch {
+        // Fail silently -- keep current state
+      }
+    };
+
+    spectatorPollRef.current = setInterval(pollSpectator, 15_000);
+    return () => {
+      if (spectatorPollRef.current) {
+        clearInterval(spectatorPollRef.current);
+        spectatorPollRef.current = null;
+      }
+    };
+  }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region]);
+
+  // Live game elapsed timer: tick every second while game is active
+  useEffect(() => {
+    if (!activeGame || liveGameEnded) {
+      setLiveElapsed(0);
+      return;
+    }
+
+    const computeElapsed = () => {
+      if (activeGame.gameStartTime > 0) {
+        return Math.max(0, Math.floor((Date.now() - activeGame.gameStartTime) / 1000));
+      }
+      return activeGame.gameLength;
+    };
+
+    setLiveElapsed(computeElapsed());
+    const timer = setInterval(() => setLiveElapsed(computeElapsed()), 1000);
+    return () => clearInterval(timer);
+  }, [activeGame, liveGameEnded]);
+
+  // Detect game end from companion
+  useEffect(() => {
+    if (activeGame && !companionLiveData && liveGameEnded) {
+      // Game ended -- transition to completed match
+      // The spectator polling already set liveGameEnded=true
+    }
+  }, [activeGame, companionLiveData, liveGameEnded]);
+
+  // Helper: resolve champion name from spectator championId
+  const resolveChampionName = useCallback((champId: number): string => {
+    return champKeyToId[champId] ?? `Champion${champId}`;
+  }, [champKeyToId]);
+
+  // Merge companion data with spectator data for a given player
+  const getCompanionPlayer = useCallback((championName: string): LiveGamePlayer | undefined => {
+    if (!companionLiveData?.players) return undefined;
+    return companionLiveData.players.find(
+      (p) => p.championName === championName || p.championName.toLowerCase() === championName.toLowerCase()
+    );
+  }, [companionLiveData]);
+
+  // Computed live game time: prefer companion's gameTime when available
+  const liveGameTime = companionLiveData?.gameTime ?? liveElapsed;
+
   return (
     <div className="mh-page">
       <div className="mh-bg-glow" />
@@ -932,18 +1220,23 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
           Back
         </button>
 
-        <h1 className="mh-title">Match History</h1>
-        <p className="mh-subtitle">Search any Riot ID to view recent matches</p>
-
-        <div className="mh-form">
-          <div className="mh-field">
-            <label>Riot ID</label>
-            <div className="mh-riot-id-inputs">
+        <div className="mh-header-row">
+          <div className="mh-header-text">
+            <h1 className="mh-title">Match History</h1>
+            <p className="mh-subtitle">Search any Riot ID to view recent matches</p>
+          </div>
+          <div className="mh-form">
+            <div className="mh-field mh-field--search">
+              <svg className="mh-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21a8 8 0 1 0-16 0" />
+                <circle cx="12" cy="8" r="4" />
+              </svg>
+              <div className="mh-riot-id-inputs">
               <input
                 type="text"
                 value={gameName}
                 onChange={(e) => setGameName(e.target.value)}
-                placeholder="Game Name"
+                placeholder="Search Players..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') runSearch();
                 }}
@@ -961,7 +1254,6 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
             </div>
           </div>
           <div className="mh-field mh-field--region">
-            <label>Region</label>
             <div className="mh-region-picker" ref={regionPickerRef}>
               <button
                 type="button"
@@ -1001,6 +1293,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
           <button className="mh-search-btn" onClick={runSearch} disabled={loading}>
             {loading ? 'Loading...' : 'Search'}
           </button>
+          </div>
         </div>
 
         {error && <p className="mh-error">{error}</p>}
@@ -1152,7 +1445,272 @@ export function MatchHistoryPage({ initialRiotId = '', onBack }: Props) {
             </div>
 
 
+            <div className="mh-queue-filters">
+              {QUEUE_FILTERS.map((opt) => (
+                <button
+                  key={opt.label}
+                  className={`mh-queue-filter${queueFilter === opt.value ? ' mh-queue-filter--active' : ''}`}
+                  onClick={() => setQueueFilter(opt.value)}
+                  disabled={loading}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             <div className="mh-list">
+              {activeGame && !liveGameEnded && (() => {
+                const searchedPlayer = activeGame.participants.find((p) => p.puuid === result.puuid);
+                const searchedChampName = searchedPlayer ? resolveChampionName(searchedPlayer.championId) : '';
+                const companionPlayer = searchedChampName ? getCompanionPlayer(searchedChampName) : undefined;
+
+                const kills = companionPlayer?.kills ?? 0;
+                const deaths = companionPlayer?.deaths ?? 0;
+                const assists = companionPlayer?.assists ?? 0;
+                const kdaRatio = deaths > 0 ? ((kills + assists) / deaths).toFixed(2) : (kills + assists > 0 ? 'Perfect' : '-');
+                const cs = companionPlayer?.creepScore ?? 0;
+                const csPerMin = liveGameTime > 60 ? cs / (liveGameTime / 60) : 0;
+
+                const companionItems = companionPlayer?.items ?? [];
+                const build = [0, 1, 2, 3, 4, 5, 6].map((slot) => {
+                  const item = companionItems.find((it) => it.slot === slot);
+                  return item?.itemID ?? 0;
+                });
+
+                const queueLabel = formatQueue(activeGame.gameQueueConfigId, activeGame.gameMode);
+                const isExpanded = expandedMatchId === '__live__';
+                const team1 = activeGame.participants.filter((p) => p.teamId === 100);
+                const team2 = activeGame.participants.filter((p) => p.teamId === 200);
+                const searchedTeamId = searchedPlayer?.teamId ?? 100;
+
+                return (
+                  <div key="__live__" className="mh-card mh-card--live">
+                    <div className="mh-card-accent mh-card-accent--live" />
+                    <div className="mh-live-indicator">
+                      <span className="mh-live-dot" />
+                      <span className="mh-live-label">LIVE</span>
+                    </div>
+                    <div
+                      className="mh-card-main mh-card-clickable"
+                      onClick={() => { setExpandedMatchId(isExpanded ? null : '__live__'); setExpandedTab('scoreboard'); }}
+                    >
+                      <div className="mh-champion-face-wrap">
+                        {searchedChampName && (
+                          <img
+                            className="mh-champion-face"
+                            src={formatChampionFaceIcon(searchedChampName, ddragonVersion)}
+                            alt={searchedChampName}
+                            loading="lazy"
+                            onError={handleImgError}
+                          />
+                        )}
+                      </div>
+                      <div className="mh-card-body">
+                        <div className="mh-card-topline">
+                          <span className="mh-result mh-result--live">In Game</span>
+                          <span className="mh-card-sep">&middot;</span>
+                          <span className="mh-card-meta">{queueLabel}</span>
+                          <span className="mh-card-sep">&middot;</span>
+                          <span className="mh-card-meta mh-live-time">{formatDuration(liveGameTime)}</span>
+                          {companionConnected && <span className="mh-companion-badge">Companion</span>}
+                        </div>
+                        <div className="mh-card-midline">
+                          {companionPlayer ? (
+                            <>
+                              <div className="mh-card-stat">
+                                <span className="mh-card-stat-value">{kdaRatio} KDA</span>
+                                <span className="mh-card-stat-detail">{kills} / {deaths} / {assists}</span>
+                              </div>
+                              <div className="mh-card-stat">
+                                <span className="mh-card-stat-value">{csPerMin.toFixed(1)} CS/Min.</span>
+                                <span className="mh-card-stat-detail">{cs} CS</span>
+                              </div>
+                              <div className="mh-build-inline">
+                                {build.map((item, idx) => {
+                                  if (!item) return <span key={`live-item-${idx}`} className="mh-icon mh-icon--empty" />;
+                                  const info = itemData[item];
+                                  return (
+                                    <ItemTooltip
+                                      key={`live-item-${idx}`}
+                                      itemId={item}
+                                      itemDisplayName={info?.name ?? ''}
+                                      itemPrice={info?.goldTotal ?? 0}
+                                      itemCount={1}
+                                      info={info}
+                                      version={ddragonVersion}
+                                      getItemIconUrl={getItemIconUrl}
+                                      className="mh-icon mh-icon--item"
+                                    >
+                                      <img src={getItemIconUrl(ddragonVersion, item)} alt={info?.name ?? ''} loading="lazy" />
+                                    </ItemTooltip>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="mh-card-stat">
+                              <span className="mh-card-stat-value mh-live-waiting">Awaiting live stats...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`mh-card-chevron ${isExpanded ? 'mh-card-chevron--open' : ''}`}>&#9662;</span>
+                    </div>
+                    {isExpanded && (
+                      <div className="mh-expanded-panel">
+                        <div className="mh-expanded-tabs">
+                          <button
+                            className={`mh-expanded-tab${expandedTab === 'scoreboard' ? ' mh-expanded-tab--active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); setExpandedTab('scoreboard'); }}
+                          >Scoreboard</button>
+                          {companionLiveData?.killFeed && companionLiveData.killFeed.length > 0 && (
+                            <button
+                              className={`mh-expanded-tab${expandedTab === 'killfeed' ? ' mh-expanded-tab--active' : ''}`}
+                              onClick={(e) => { e.stopPropagation(); setExpandedTab('killfeed'); }}
+                            >Kill Feed</button>
+                          )}
+                        </div>
+                        {expandedTab === 'scoreboard' && (
+                          <div className="mh-scoreboard">
+                            {[
+                              { teamParticipants: team1, teamId: 100, isPlayerTeam: searchedTeamId === 100 },
+                              { teamParticipants: team2, teamId: 200, isPlayerTeam: searchedTeamId === 200 },
+                            ].map(({ teamParticipants, teamId, isPlayerTeam }) => (
+                              <div key={`live-team-${teamId}`} className={`mh-sb-team mh-sb-team--live`}>
+                                <div className="mh-sb-team-header">
+                                  <span className="mh-sb-team-result mh-result--live">{teamId === 100 ? 'Blue Team' : 'Red Team'}</span>
+                                  {isPlayerTeam && <span className="mh-sb-team-you">Their Team</span>}
+                                </div>
+                                <div className="mh-sb-header-row">
+                                  <span className="mh-sb-col-champ">Champion</span>
+                                  <span className="mh-sb-col-spells">Spells</span>
+                                  <span className="mh-sb-col-kda">KDA</span>
+                                  <span className="mh-sb-col-cs">CS</span>
+                                  <span className="mh-sb-col-items">Items</span>
+                                </div>
+                                {teamParticipants.map((p) => {
+                                  const champName = resolveChampionName(p.championId);
+                                  const cp = getCompanionPlayer(champName);
+                                  const pKills = cp?.kills ?? 0;
+                                  const pDeaths = cp?.deaths ?? 0;
+                                  const pAssists = cp?.assists ?? 0;
+                                  const pKdaNum = pDeaths > 0 ? (pKills + pAssists) / pDeaths : pKills + pAssists;
+                                  const pKdaLabel = cp ? (pDeaths > 0 ? pKdaNum.toFixed(1) : 'Perfect') : '-';
+                                  const pCs = cp?.creepScore ?? 0;
+                                  const pItems = cp?.items ?? [];
+                                  const pBuild = [0, 1, 2, 3, 4, 5, 6].map((s) => {
+                                    const it = pItems.find((i) => i.slot === s);
+                                    return it?.itemID ?? 0;
+                                  });
+                                  const isSearched = p.puuid === result.puuid;
+                                  const displayName = p.riotId || p.summonerName || champName;
+
+                                  return (
+                                    <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}`}>
+                                      <div className="mh-sb-col-champ">
+                                        <img className="mh-sb-champ-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                                        <div className="mh-sb-player-info">
+                                          <span className="mh-sb-player-name-text">{displayName}</span>
+                                          <span className="mh-sb-champ-name">{champInfo[champName]?.name ?? champName}</span>
+                                        </div>
+                                        {cp && (
+                                          <span className="mh-sb-level-badge">Lv{cp.level}</span>
+                                        )}
+                                      </div>
+                                      <div className="mh-sb-col-spells">
+                                        {[p.spell1Id, p.spell2Id].filter((id) => id > 0).map((spellId) => {
+                                          const si = spellInfo[spellId];
+                                          return (
+                                            <TextTooltip key={spellId} className="mh-sb-spell-wrap" variant="spell" content={
+                                              <>
+                                                <div className="item-tooltip-header">
+                                                  <img className="item-tooltip-icon" src={formatSummonerSpell(spellId)} alt="" />
+                                                  <div className="item-tooltip-title">
+                                                    <span className="item-tooltip-name">{si?.name ?? getSpellName(spellId)}</span>
+                                                  </div>
+                                                  {si && si.cooldown > 0 && (
+                                                    <span className="item-tooltip-gold">{si.cooldown}s CD</span>
+                                                  )}
+                                                </div>
+                                                {si?.description && <div className="item-tooltip-body">{si.description}</div>}
+                                              </>
+                                            }>
+                                              <img className="mh-sb-spell" src={formatSummonerSpell(spellId)} alt={si?.name ?? ''} loading="lazy" />
+                                            </TextTooltip>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="mh-sb-col-kda">
+                                        {cp ? (
+                                          <>
+                                            <span className="mh-sb-kda-score">{pKills} / {pDeaths} / {pAssists}</span>
+                                            <span className="mh-sb-kda-ratio" style={{ color: kdaColor(pKdaNum) }}>{pKdaLabel} KDA</span>
+                                          </>
+                                        ) : (
+                                          <span className="mh-sb-kda-score mh-live-waiting">-</span>
+                                        )}
+                                      </div>
+                                      <div className="mh-sb-col-cs">{cp ? pCs : '-'}</div>
+                                      <div className="mh-sb-col-items">
+                                        {cp ? pBuild.map((it, i) => {
+                                          if (it <= 0) return <span key={i} className="mh-sb-item mh-sb-item--empty" />;
+                                          const itInfo = itemData[it];
+                                          return (
+                                            <ItemTooltip
+                                              key={i}
+                                              itemId={it}
+                                              itemDisplayName={itInfo?.name ?? ''}
+                                              itemPrice={itInfo?.goldTotal ?? 0}
+                                              itemCount={1}
+                                              info={itInfo}
+                                              version={ddragonVersion}
+                                              getItemIconUrl={getItemIconUrl}
+                                              className="mh-sb-item"
+                                            >
+                                              <img src={getItemIconUrl(ddragonVersion, it)} alt={itInfo?.name ?? ''} loading="lazy" />
+                                            </ItemTooltip>
+                                          );
+                                        }) : <span className="mh-live-waiting">-</span>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {expandedTab === 'killfeed' && companionLiveData?.killFeed && (
+                          <div className="mh-killfeed">
+                            <div className="mh-killfeed-header">
+                              <span className="mh-killfeed-title">Live Kill Feed</span>
+                              <span className="mh-killfeed-count">{companionLiveData.killFeed.length} kills</span>
+                            </div>
+                            <div className="mh-killfeed-list">
+                              {companionLiveData.killFeed.map((kill, ki) => {
+                                const mins = Math.floor(kill.eventTime / 60);
+                                const secs = Math.floor(kill.eventTime % 60);
+                                const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                return (
+                                  <div key={ki} className="mh-kf-entry">
+                                    <span className="mh-kf-time">{timeStr}</span>
+                                    <img className="mh-kf-portrait" src={formatChampionFaceIcon(kill.killerChamp, ddragonVersion)} alt={kill.killerChamp} onError={handleImgError} />
+                                    <span className="mh-kf-name">{kill.killerChamp}</span>
+                                    <svg className="mh-kf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M5 12h14M13 5l6 7-6 7" />
+                                    </svg>
+                                    <img className="mh-kf-portrait" src={formatChampionFaceIcon(kill.victimChamp, ddragonVersion)} alt={kill.victimChamp} onError={handleImgError} />
+                                    <span className="mh-kf-name">{kill.victimChamp}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {matchSlots.map((slot) => {
                 if (slot.status !== 'ready' || !slot.match) {
                   return (

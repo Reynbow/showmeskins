@@ -924,11 +924,15 @@ function App() {
               });
 
               // Auto-navigate to the live game page on first detection
+              // (suppressed when user is on history or dev page)
               const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
-              if (!liveGameAutoNavDone.current && !shouldStayOnDev) {
+              const isOnHistory = viewModeRef.current === 'history';
+              if (!liveGameAutoNavDone.current && !shouldStayOnDev && !isOnHistory) {
                 liveGameAutoNavDone.current = true;
                 setViewMode('livegame');
                 window.history.pushState(null, '', '/live');
+              } else if (isOnHistory) {
+                // Don't navigate away -- MatchHistoryPage consumes liveGameData directly
               } else if (shouldStayOnDev) {
                 appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /live (Stay On Dev enabled)');
               }
@@ -998,9 +1002,12 @@ function App() {
               if (fallbackPostgame) {
                 setPostGameData(fallbackPostgame);
                 const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
-                if (!shouldStayOnDev) {
+                const isOnHistory = viewModeRef.current === 'history';
+                if (!shouldStayOnDev && !isOnHistory) {
                   setViewMode('postgame');
                   window.history.pushState(null, '', '/postgame');
+                } else if (isOnHistory) {
+                  // Don't navigate away -- MatchHistoryPage handles the transition
                 } else {
                   appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /postgame (Stay On Dev enabled)');
                 }
@@ -1142,6 +1149,8 @@ function App() {
         <MatchHistoryPage
           initialRiotId={historyInitialRiotId}
           onBack={handleHistoryBack}
+          companionLiveData={liveGameData}
+          companionConnected={liveDebug.companionConnected}
         />
       ) : viewMode === 'companion' ? (
         <CompanionPage

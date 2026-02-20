@@ -178,13 +178,16 @@ func NewLiveGameTracker(onStatus StatusCallback, onUpdate LiveGameUpdateCallback
 		onEnd:    onEnd,
 		onStatus: onStatus,
 		client: &http.Client{
-			Timeout: 3 * time.Second,
+			Timeout: 5 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-				DisableKeepAlives:     true,
+				DisableKeepAlives:     false,
 				ForceAttemptHTTP2:     false,
-				TLSHandshakeTimeout:   2 * time.Second,
-				ResponseHeaderTimeout: 2 * time.Second,
+				TLSHandshakeTimeout:   3 * time.Second,
+				ResponseHeaderTimeout: 3 * time.Second,
+				IdleConnTimeout:       30 * time.Second,
+				MaxIdleConns:          2,
+				MaxIdleConnsPerHost:   2,
 			},
 		},
 		stopCh:       make(chan struct{}),
@@ -246,6 +249,11 @@ func (t *LiveGameTracker) poll() {
 	}
 
 	data, err := t.fetchAllGameData()
+	if err != nil && t.wasInGame {
+		// Single retry after a short delay to absorb transient hiccups
+		time.Sleep(500 * time.Millisecond)
+		data, err = t.fetchAllGameData()
+	}
 	if err != nil {
 		if t.wasInGame {
 			t.failCount++
