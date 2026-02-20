@@ -1127,6 +1127,88 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     refetchMatches();
   }, [queueFilter, result, region]);
 
+  // Background spectator check: periodically check if player entered a game
+  useEffect(() => {
+    if (activeGame || !result?.puuid || !result?.platformRegion) return;
+
+    const checkForLiveGame = async () => {
+      try {
+        const params = new URLSearchParams({
+          puuid: result.puuid,
+          region: result.platformRegion ?? region,
+        });
+        const res = await fetch(`/api/spectator?${params.toString()}`);
+        const body = await res.json();
+        if (body && body.inGame) {
+          setActiveGame(body as ActiveGameData);
+          setLiveGameEnded(false);
+        }
+      } catch { /* silent */ }
+    };
+
+    checkForLiveGame();
+    const interval = setInterval(checkForLiveGame, 60_000);
+    return () => clearInterval(interval);
+  }, [activeGame, result?.puuid, result?.platformRegion, region]);
+
+  // New match check: poll every 60s for newly completed matches and prepend them
+  useEffect(() => {
+    if (!result?.puuid || !result?.gameName || !result?.tagLine) return;
+
+    const checkNewMatches = async () => {
+      try {
+        const params = new URLSearchParams({
+          region,
+          count: '1',
+          summaryOnly: '1',
+          puuid: result.puuid,
+        });
+        if (result.gameName) params.set('gameName', result.gameName);
+        if (result.tagLine) params.set('tagLine', result.tagLine);
+        if (queueFilter !== null) {
+          const ids = getQueueIds(queueFilter);
+          if (ids.length === 1) params.set('queue', String(ids[0]));
+        }
+        const res = await fetch(`/api/riot-id-history?${params.toString()}`);
+        if (!res.ok) return;
+        const body = await res.json();
+        const latestIds: string[] = Array.isArray(body.matchIds) ? body.matchIds : [];
+        if (latestIds.length === 0) return;
+
+        const newIds = latestIds.filter((id) => !matchSlots.some((s) => s.matchId === id));
+        if (newIds.length === 0) return;
+
+        for (const id of newIds) {
+          const cached = getCachedMatch(id);
+          if (cached) {
+            setMatchSlots((prev) => [cached, ...prev]);
+            continue;
+          }
+          const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id });
+          try {
+            const detailRes = await fetch(`/api/riot-id-history?${detailParams.toString()}`);
+            const detailBody = (await detailRes.json()) as MatchDetailResponse;
+            if (detailRes.ok && detailBody.match) {
+              cacheMatch(id, detailBody.match, detailBody.detail);
+              setMatchSlots((prev) => [
+                { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail },
+                ...prev,
+              ]);
+            }
+          } catch { /* silent */ }
+        }
+
+        if (liveGameEnded) {
+          setActiveGame(null);
+          setLiveGameEnded(false);
+        }
+      } catch { /* silent */ }
+    };
+
+    const interval = setInterval(checkNewMatches, 60_000);
+    return () => clearInterval(interval);
+  }, [result?.puuid, result?.gameName, result?.tagLine, region, queueFilter, matchSlots, liveGameEnded]);
+
   // Spectator polling: when an active game is detected, poll every 15s
   useEffect(() => {
     if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) {
@@ -1579,7 +1661,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               <div key={`live-team-${teamId}`} className={`mh-sb-team mh-sb-team--live`}>
                                 <div className="mh-sb-team-header">
                                   <span className="mh-sb-team-result mh-result--live">{teamId === 100 ? 'Blue Team' : 'Red Team'}</span>
-                                  {isPlayerTeam && <span className="mh-sb-team-you">Their Team</span>}
+                                  {isPlayerTeam && <span className="mh-sb-team-you">Your Team</span>}
                                 </div>
                                 <div className="mh-sb-header-row">
                                   <span className="mh-sb-col-champ">Champion</span>

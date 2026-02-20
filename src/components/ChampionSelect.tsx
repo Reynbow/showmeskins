@@ -112,15 +112,7 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
               Live Game
             </button>
           )}
-          <button className="cs-companion-btn" onClick={onCompanion}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-companion-icon">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Companion App
-          </button>
-          <p className="cs-companion-tagline">Live and post-game information tracker</p>
+          
         </div>
       </div>
 
