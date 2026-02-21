@@ -60,6 +60,8 @@ interface MatchSummary {
   deaths: number;
   assists: number;
   totalDamageDealtToChampions?: number;
+  totalMinionsKilled?: number;
+  neutralMinionsKilled?: number;
   items?: number[];
   lpChange?: number | null;
   win: boolean;
@@ -369,6 +371,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         assists: participant.assists ?? 0,
         totalDamageDealtToChampions: typeof (participant as Record<string, unknown>).totalDamageDealtToChampions === 'number'
           ? ((participant as Record<string, unknown>).totalDamageDealtToChampions as number)
+          : 0,
+        totalMinionsKilled: typeof (participant as Record<string, unknown>).totalMinionsKilled === 'number'
+          ? ((participant as Record<string, unknown>).totalMinionsKilled as number)
+          : 0,
+        neutralMinionsKilled: typeof (participant as Record<string, unknown>).neutralMinionsKilled === 'number'
+          ? ((participant as Record<string, unknown>).neutralMinionsKilled as number)
           : 0,
         items: [
           'item0',
@@ -740,6 +748,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deaths: participant.deaths ?? 0,
         assists: participant.assists ?? 0,
         totalDamageDealtToChampions: typeof source.totalDamageDealtToChampions === 'number' ? source.totalDamageDealtToChampions : 0,
+        totalMinionsKilled: typeof source.totalMinionsKilled === 'number' ? source.totalMinionsKilled : 0,
+        neutralMinionsKilled: typeof source.neutralMinionsKilled === 'number' ? source.neutralMinionsKilled : 0,
         items: [
           source.item0,
           source.item1,

@@ -34,6 +34,8 @@ interface MatchSummary {
   deaths: number;
   assists: number;
   totalDamageDealtToChampions?: number;
+  totalMinionsKilled?: number;
+  neutralMinionsKilled?: number;
   items?: number[];
   win: boolean;
 }
@@ -1995,10 +1997,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   ? [player.item0, player.item1, player.item2, player.item3, player.item4, player.item5, player.item6]
                   : (slot.match.items ?? []);
 
-                const csPerMin = slot.match.gameDuration > 0
-                  ? ((player?.totalMinionsKilled ?? 0) + (player?.neutralMinionsKilled ?? 0)) / (slot.match.gameDuration / 60)
-                  : 0;
-                const totalCs = (player?.totalMinionsKilled ?? 0) + (player?.neutralMinionsKilled ?? 0);
+                const totalCs = (player?.totalMinionsKilled ?? slot.match.totalMinionsKilled ?? 0)
+                  + (player?.neutralMinionsKilled ?? slot.match.neutralMinionsKilled ?? 0);
+                const csPerMin = slot.match.gameDuration > 0 ? totalCs / (slot.match.gameDuration / 60) : 0;
                 const queueLabel = formatQueue(slot.detail?.queueId ?? slot.match.queueId, slot.match.gameMode);
 
                 const isExpanded = expandedMatchId === slot.matchId;
