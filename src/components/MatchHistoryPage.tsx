@@ -314,8 +314,12 @@ function getItemIconUrl(version: string, itemId: number): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
 }
 
+function normalizeChampName(name: string): string {
+  return _champNameNormalize[name.toLowerCase()] ?? name;
+}
+
 function formatChampionFaceIcon(championName: string, version: string): string {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`;
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${normalizeChampName(championName)}.png`;
 }
 
 function formatRankIcon(tier: string): string {
@@ -347,6 +351,7 @@ let _cachedSpellInfo: SpellInfoMap | null = null;
 let _cachedChampInfo: ChampInfoMap | null = null;
 let _cachedChampKeyToId: ChampKeyToIdMap | null = null;
 let _cachedDdragonVer: string | null = null;
+let _champNameNormalize: Record<string, string> = {};
 
 async function fetchDdragonData(version: string): Promise<{
   spellInfo: SpellInfoMap;
@@ -376,10 +381,13 @@ async function fetchDdragonData(version: string): Promise<{
   const champJson = await champRes.json() as { data: Record<string, { key: string; id: string; name: string; title: string; lore: string; blurb: string; tags: string[] }> };
   const champMap: ChampInfoMap = {};
   const keyMap: ChampKeyToIdMap = {};
+  const normalizeMap: Record<string, string> = {};
   for (const c of Object.values(champJson.data)) {
     champMap[c.id] = { name: c.name, title: c.title, blurb: c.lore || c.blurb, tags: c.tags };
     keyMap[Number(c.key)] = c.id;
+    normalizeMap[c.id.toLowerCase()] = c.id;
   }
+  _champNameNormalize = normalizeMap;
 
   _cachedDdragonVer = version;
   _cachedSpellInfo = spellMap;
@@ -440,7 +448,7 @@ function kdaColor(kda: number): string {
 }
 
 function formatChampionSplash(championName: string): string {
-  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_0.jpg`;
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${normalizeChampName(championName)}_0.jpg`;
 }
 
 const MH_MULTI_KILL_TOOLTIPS: Record<string, string> = {
@@ -1836,7 +1844,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         <img className="mh-sb-champ-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
                                         <div className="mh-sb-player-info">
                                           <span className="mh-sb-player-name-text">{displayName}</span>
-                                          <span className="mh-sb-champ-name">{champInfo[champName]?.name ?? champName}</span>
+                                          <span className="mh-sb-champ-name">{champInfo[normalizeChampName(champName)]?.name ?? champName}</span>
                                         </div>
                                         {cp && (
                                           <span className="mh-sb-level-badge">Lv{cp.level}</span>
@@ -2022,7 +2030,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                       }}
                     >
                       <TextTooltip className="mh-champion-face-wrap" variant="spell" content={(() => {
-                        const ci = champInfo[slot.match.championName];
+                        const ci = champInfo[normalizeChampName(slot.match.championName)];
                         return (
                           <>
                             <div className="item-tooltip-header">
@@ -2166,7 +2174,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                   <div key={p.puuid} className={`mh-sb-row ${isYou ? 'mh-sb-row--you' : ''}`}>
                                     <div className="mh-sb-col-champ">
                                       <TextTooltip className={`mh-sb-champ-wrap${isMvp ? ' mh-sb-champ-wrap--mvp' : ''}`} variant="spell" content={(() => {
-                                        const ci = champInfo[p.championName];
+                                        const ci = champInfo[normalizeChampName(p.championName)];
                                         return (
                                           <>
                                             <div className="item-tooltip-header">
