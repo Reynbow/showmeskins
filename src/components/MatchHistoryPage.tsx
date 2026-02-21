@@ -1261,6 +1261,40 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     return () => clearInterval(interval);
   }, [activeGame, result?.puuid, result?.platformRegion, region]);
 
+  // Profile refresh: poll every 60s to keep ranked, mastery, level, and active game up to date
+  useEffect(() => {
+    if (!result?.puuid || !result?.gameName || !result?.tagLine) return;
+
+    const refreshProfile = async () => {
+      try {
+        const params = new URLSearchParams({
+          region,
+          count: '1',
+          summaryOnly: '1',
+          puuid: result.puuid,
+        });
+        if (result.gameName) params.set('gameName', result.gameName);
+        if (result.tagLine) params.set('tagLine', result.tagLine);
+        const res = await fetch(`/api/riot-id-history?${params.toString()}`);
+        if (!res.ok) return;
+        const body = await res.json() as HistoryResponse;
+        if (!body.profile) return;
+
+        setResult((prev) => {
+          if (!prev) return prev;
+          return { ...prev, profile: body.profile };
+        });
+
+        if (body.activeGame?.inGame) {
+          setActiveGame(body.activeGame);
+        }
+      } catch { /* silent */ }
+    };
+
+    const interval = setInterval(refreshProfile, 60_000);
+    return () => clearInterval(interval);
+  }, [result?.puuid, result?.gameName, result?.tagLine, region]);
+
   // New match check: poll every 60s for newly completed matches and prepend them
   useEffect(() => {
     if (!result?.puuid || !result?.gameName || !result?.tagLine) return;
