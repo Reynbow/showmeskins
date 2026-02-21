@@ -1999,7 +1999,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   ? ((player?.totalMinionsKilled ?? 0) + (player?.neutralMinionsKilled ?? 0)) / (slot.match.gameDuration / 60)
                   : 0;
                 const totalCs = (player?.totalMinionsKilled ?? 0) + (player?.neutralMinionsKilled ?? 0);
-                const queueLabel = slot.detail ? formatQueue(slot.detail.queueId, slot.match.gameMode) : slot.match.gameMode;
+                const queueLabel = formatQueue(slot.detail?.queueId ?? slot.match.queueId, slot.match.gameMode);
 
                 const isExpanded = expandedMatchId === slot.matchId;
                 const participants = slot.detail?.participants ?? [];
