@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ItemInfo, LiveGameData, LiveGamePlayer } from '../types';
+import type { AccountInfo } from './DevPage';
 import { getItems, getLatestVersion } from '../api';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
@@ -198,6 +199,7 @@ interface Props {
   onBack: () => void;
   companionLiveData?: LiveGameData | null;
   companionConnected?: boolean;
+  companionAccount?: AccountInfo | null;
 }
 
 interface RegionOption {
@@ -677,7 +679,7 @@ function formatMasteryPoints(points: number): string {
   return String(points);
 }
 
-export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionConnected }: Props) {
+export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionConnected, companionAccount }: Props) {
   const initialParsed = splitRiotId(initialRiotId);
   const [gameName, setGameName] = useState(initialParsed.gameName);
   const [tagLine, setTagLine] = useState(initialParsed.tagLine);
@@ -1148,6 +1150,29 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     runSearch();
   }, [initialRiotId, region]);
 
+  // Auto-search using companion account when no initialRiotId was provided
+  const companionAutoSearchDone = useRef(false);
+  useEffect(() => {
+    if (companionAutoSearchDone.current) return;
+    if (initialRiotId.trim()) return;
+    if (!companionAccount?.puuid) return;
+    if (result) return;
+    companionAutoSearchDone.current = true;
+
+    if (companionAccount.platformId) {
+      const platformLower = companionAccount.platformId.toLowerCase() as Region;
+      if (REGION_OPTIONS.some((opt) => opt.value === platformLower)) {
+        setRegion(platformLower);
+      }
+    }
+    if (companionAccount.displayName) {
+      setGameName(companionAccount.displayName);
+    }
+    searchPuuidRef.current = companionAccount.puuid;
+    // Defer search to next tick so region/gameName state updates are applied
+    setTimeout(() => setPendingSearch((n) => n + 1), 0);
+  }, [companionAccount, initialRiotId, result]);
+
   useEffect(() => {
     if (pendingSearch > 0) runSearch();
   }, [pendingSearch]);
@@ -1529,6 +1554,19 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     };
   }, [activeGame, companionLiveData, result?.puuid, result?.gameName, champNameToKey]);
 
+  // Auto-expand the live game card when a live game is first detected
+  const liveAutoExpandedRef = useRef(false);
+  useEffect(() => {
+    if (effectiveActiveGame && !liveGameEnded && !liveAutoExpandedRef.current) {
+      liveAutoExpandedRef.current = true;
+      setExpandedMatchId('__live__');
+      setExpandedTab('scoreboard');
+    }
+    if (!effectiveActiveGame) {
+      liveAutoExpandedRef.current = false;
+    }
+  }, [effectiveActiveGame, liveGameEnded]);
+
   // Computed live game time: prefer companion's gameTime when available
   const liveGameTime = companionLiveData?.gameTime ?? liveElapsed;
 
@@ -1820,7 +1858,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 }
 
                 return (
-                  <div key="__live__" className="mh-card mh-card--live">
+                  <div key="__live__" className={`mh-card mh-card--live${isExpanded ? ' mh-card--live-expanded' : ''}`}>
                     <div className="mh-card-accent mh-card-accent--live" />
                     <div className="mh-live-indicator">
                       <span className="mh-live-dot" />
@@ -1848,7 +1886,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                           <span className="mh-card-meta">{queueLabel}</span>
                           <span className="mh-card-sep">&middot;</span>
                           <span className="mh-card-meta mh-live-time">{formatDuration(liveGameTime)}</span>
-                          {companionConnected && <span className="mh-companion-badge">Companion</span>}
+                          {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
                         </div>
                         <div className="mh-card-midline">
                           {companionPlayer ? (

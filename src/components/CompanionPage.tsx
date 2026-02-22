@@ -64,7 +64,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Download for Windows
+            Download
           </a>
           <span className="companion-version">v0.4.0 Beta &middot; Windows 10/11</span>
           <p className="companion-download-tagline">Live and post-game information tracker</p>

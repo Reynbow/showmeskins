@@ -642,8 +642,8 @@ function App() {
   }, []);
 
   const handleLiveGameNavigate = useCallback(() => {
-    setViewMode('livegame');
-    window.history.pushState(null, '', '/live');
+    setViewMode('history');
+    window.history.pushState(null, '', '/history');
   }, []);
 
   const handleCompanionBack = useCallback(() => {
@@ -920,9 +920,14 @@ function App() {
                 return next;
               });
 
-              // Live game detected — history page consumes liveGameData directly;
-              // standalone /live screen is disabled.
-              liveGameAutoNavDone.current = true;
+              // Auto-navigate to history page on first live game detection
+              if (!liveGameAutoNavDone.current) {
+                liveGameAutoNavDone.current = true;
+                if (viewModeRef.current !== 'history') {
+                  setViewMode('history');
+                  window.history.pushState(null, '', '/history');
+                }
+              }
             }
 
             // ── Game ended ── transition to post-game summary
@@ -1129,6 +1134,7 @@ function App() {
           onBack={handleHistoryBack}
           companionLiveData={liveGameData}
           companionConnected={liveDebug.companionConnected}
+          companionAccount={accountInfo}
         />
       ) : viewMode === 'companion' ? (
         <CompanionPage
