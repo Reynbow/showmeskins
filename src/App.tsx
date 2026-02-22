@@ -525,16 +525,13 @@ function App() {
     load();
   }, []);
 
-  // Redirect to home if on /live or /postgame without session data
+  // Redirect /live and /postgame to history page (those standalone screens are disabled)
   useEffect(() => {
-    if (viewMode === 'livegame' && !liveGameData) {
-      setViewMode('select');
-      window.history.replaceState(null, '', '/');
-    } else if (viewMode === 'postgame' && !postGameData) {
-      setViewMode('select');
-      window.history.replaceState(null, '', '/');
+    if (viewMode === 'livegame' || viewMode === 'postgame') {
+      setViewMode('history');
+      window.history.replaceState(null, '', '/history');
     }
-  }, [viewMode, liveGameData, postGameData]);
+  }, [viewMode]);
 
   // Dev page is development-only; redirect /dev to companion in production
   useEffect(() => {
@@ -923,19 +920,9 @@ function App() {
                 return next;
               });
 
-              // Auto-navigate to the live game page on first detection
-              // (suppressed when user is on history or dev page)
-              const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
-              const isOnHistory = viewModeRef.current === 'history';
-              if (!liveGameAutoNavDone.current && !shouldStayOnDev && !isOnHistory) {
-                liveGameAutoNavDone.current = true;
-                setViewMode('livegame');
-                window.history.pushState(null, '', '/live');
-              } else if (isOnHistory) {
-                // Don't navigate away -- MatchHistoryPage consumes liveGameData directly
-              } else if (shouldStayOnDev) {
-                appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /live (Stay On Dev enabled)');
-              }
+              // Live game detected — history page consumes liveGameData directly;
+              // standalone /live screen is disabled.
+              liveGameAutoNavDone.current = true;
             }
 
             // ── Game ended ── transition to post-game summary
@@ -999,18 +986,9 @@ function App() {
                   gameResult: endResult || baseSnapshot.gameResult,
                 }
                 : null;
+              // Standalone postgame screen is disabled; history page handles transitions.
               if (fallbackPostgame) {
                 setPostGameData(fallbackPostgame);
-                const shouldStayOnDev = stayOnDevDuringLiveRef.current && viewModeRef.current === 'dev';
-                const isOnHistory = viewModeRef.current === 'history';
-                if (!shouldStayOnDev && !isOnHistory) {
-                  setViewMode('postgame');
-                  window.history.pushState(null, '', '/postgame');
-                } else if (isOnHistory) {
-                  // Don't navigate away -- MatchHistoryPage handles the transition
-                } else {
-                  appendDebugLog('info', 'nav', 'Suppressed auto-navigation to /postgame (Stay On Dev enabled)');
-                }
               }
               setLiveGameData(null);
               liveGameDataRef.current = null;

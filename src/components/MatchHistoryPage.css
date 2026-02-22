@@ -1980,6 +1980,11 @@
   border-bottom-color: rgba(74, 222, 128, 0.2);
 }
 
+.mh-sb-team--live .mh-sb-header-row,
+.mh-sb-team--live .mh-sb-row {
+  grid-template-columns: 2fr 55px 60px 90px 50px 1.8fr;
+}
+
 .mh-sb-level-badge {
   font-size: 10px;
   font-weight: 600;
@@ -2021,4 +2026,36 @@
 .mh-sb-placement-medal {
   font-size: 12px;
   line-height: 1;
+}
+
+.mh-sb-row--dead {
+  opacity: 0.5;
+}
+
+.mh-sb-dead-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+
+.mh-sb-role-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.mh-sb-ward-score {
+  display: block;
+  font-size: 9px;
+  color: #94a3b8;
+  line-height: 1.1;
 }

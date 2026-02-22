@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ItemInfo, LiveGameData, LiveGamePlayer } from '../types';
 import { getItems, getLatestVersion } from '../api';
 import { ItemTooltip } from './ItemTooltip';
@@ -345,6 +345,14 @@ const TIER_COLORS: Record<string, string> = {
   CHALLENGER: '#f4c874',
 };
 
+const POSITION_LABELS: Record<string, string> = {
+  TOP: 'Top',
+  JUNGLE: 'Jng',
+  MIDDLE: 'Mid',
+  BOTTOM: 'Bot',
+  UTILITY: 'Sup',
+};
+
 type SpellInfoMap = Record<number, { name: string; description: string; cooldown: number; file: string }>;
 type ChampInfoMap = Record<string, { name: string; title: string; blurb: string; tags: string[] }>;
 type ChampKeyToIdMap = Record<number, string>;
@@ -412,6 +420,11 @@ const SPELL_DATA: Record<number, { file: string; name: string }> = {
   21: { file: 'SummonerBarrier', name: 'Barrier' },
   32: { file: 'SummonerSnowball', name: 'Mark' },
 };
+
+const SPELL_FILE_TO_ID: Record<string, number> = {};
+for (const [id, data] of Object.entries(SPELL_DATA)) {
+  SPELL_FILE_TO_ID[data.file] = Number(id);
+}
 
 function formatSummonerSpell(spellId: number, version?: string): string {
   const file = SPELL_DATA[spellId]?.file ?? `Summoner${spellId}`;
@@ -1459,6 +1472,63 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     );
   }, [companionLiveData]);
 
+  // Reverse map: champion name (lowercase) → numeric champion key
+  const champNameToKey = useMemo(() => {
+    const byId: Record<string, number> = {};
+    const byDisplayName: Record<string, number> = {};
+    for (const [key, id] of Object.entries(champKeyToId)) {
+      byId[id.toLowerCase()] = Number(key);
+    }
+    for (const [id, info] of Object.entries(champInfo)) {
+      if (info.name) byDisplayName[info.name.toLowerCase()] = byId[id.toLowerCase()] ?? 0;
+    }
+    return { byId, byDisplayName };
+  }, [champKeyToId, champInfo]);
+
+  // Synthetic activeGame from companion data when Riot API doesn't detect the game
+  const effectiveActiveGame = useMemo((): ActiveGameData | null => {
+    if (activeGame) return activeGame;
+    if (!companionLiveData?.players?.length || !result?.puuid) return null;
+
+    const searchedLower = (result.gameName ?? '').toLowerCase();
+    const isSearchedInGame = companionLiveData.players.some(
+      (p) => p.summonerName.toLowerCase() === searchedLower
+    );
+    if (!isSearchedInGame) return null;
+
+    const participants: SpectatorParticipant[] = companionLiveData.players.map((p) => {
+      const nameLower = p.championName.toLowerCase();
+      const champKey = champNameToKey.byId[nameLower] ?? champNameToKey.byDisplayName[nameLower] ?? 0;
+      const spell1 = p.spellD?.id ? (SPELL_FILE_TO_ID[p.spellD.id] ?? 0) : 0;
+      const spell2 = p.spellF?.id ? (SPELL_FILE_TO_ID[p.spellF.id] ?? 0) : 0;
+      const isSearched = p.summonerName.toLowerCase() === searchedLower;
+
+      return {
+        puuid: isSearched ? result.puuid : `companion-${p.summonerName}`,
+        summonerId: '',
+        summonerName: p.summonerName,
+        championId: champKey,
+        teamId: p.team === 'ORDER' ? 100 : 200,
+        spell1Id: spell1,
+        spell2Id: spell2,
+      };
+    });
+
+    return {
+      inGame: true,
+      gameId: 0,
+      gameMode: companionLiveData.gameMode || 'CLASSIC',
+      gameType: 'MATCHED_GAME',
+      gameQueueConfigId: 0,
+      mapId: 11,
+      gameStartTime: Date.now() - (companionLiveData.gameTime * 1000),
+      gameLength: companionLiveData.gameTime,
+      platformId: '',
+      participants,
+      bannedChampions: [],
+    };
+  }, [activeGame, companionLiveData, result?.puuid, result?.gameName, champNameToKey]);
+
   // Computed live game time: prefer companion's gameTime when available
   const liveGameTime = companionLiveData?.gameTime ?? liveElapsed;
 
@@ -1713,8 +1783,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             </div>
 
             <div className="mh-list">
-              {activeGame && !liveGameEnded && (() => {
-                const searchedPlayer = activeGame.participants.find((p) => p.puuid === result.puuid);
+              {effectiveActiveGame && !liveGameEnded && (() => {
+                const searchedPlayer = effectiveActiveGame.participants.find((p) => p.puuid === result.puuid);
                 const searchedChampName = searchedPlayer ? resolveChampionName(searchedPlayer.championId) : '';
                 const companionPlayer = searchedChampName ? getCompanionPlayer(searchedChampName) : undefined;
 
@@ -1731,15 +1801,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   return item?.itemID ?? 0;
                 });
 
-                const queueLabel = formatQueue(activeGame.gameQueueConfigId, activeGame.gameMode);
+                const queueLabel = formatQueue(effectiveActiveGame.gameQueueConfigId, effectiveActiveGame.gameMode);
                 const isExpanded = expandedMatchId === '__live__';
-                const team1 = activeGame.participants.filter((p) => p.teamId === 100);
-                const team2 = activeGame.participants.filter((p) => p.teamId === 200);
+                const team1 = effectiveActiveGame.participants.filter((p) => p.teamId === 100);
+                const team2 = effectiveActiveGame.participants.filter((p) => p.teamId === 200);
                 const searchedTeamId = searchedPlayer?.teamId ?? 100;
 
                 const livePlacementMap = new Map<string, number>();
                 if (companionLiveData?.players && companionLiveData.players.length > 0) {
-                  const scored = activeGame.participants.map((p) => {
+                  const scored = effectiveActiveGame.participants.map((p) => {
                     const cn = resolveChampionName(p.championId);
                     const cp2 = getCompanionPlayer(cn);
                     const score = cp2 ? liveMvpScore(cp2.kills, cp2.deaths, cp2.assists, cp2.creepScore) : -Infinity;
@@ -1874,16 +1944,32 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                   const liveRankLabel = formatRankShort(p.rankedTier, p.rankedRank);
                                   const liveRankColor = p.rankedTier ? (TIER_COLORS[p.rankedTier.toUpperCase()] ?? '#888') : '#555';
 
+                                  const riotSpells = [p.spell1Id, p.spell2Id].filter((id) => id > 0);
+                                  const resolvedSpells = riotSpells.length > 0
+                                    ? riotSpells
+                                    : [
+                                        cp?.spellD?.id ? (SPELL_FILE_TO_ID[cp.spellD.id] ?? 0) : 0,
+                                        cp?.spellF?.id ? (SPELL_FILE_TO_ID[cp.spellF.id] ?? 0) : 0,
+                                      ].filter((id) => id > 0);
+
+                                  const posLabel = cp?.position ? (POSITION_LABELS[cp.position] ?? '') : '';
+
                                   return (
-                                    <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}`}>
+                                    <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}${cp?.isDead ? ' mh-sb-row--dead' : ''}`}>
                                       <div className="mh-sb-col-champ">
                                         <img className="mh-sb-champ-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
                                         <div className="mh-sb-player-info">
                                           <span className="mh-sb-player-name-text">{displayName}</span>
-                                          <span className="mh-sb-champ-name">{champInfo[normalizeChampName(champName)]?.name ?? champName}</span>
+                                          <span className="mh-sb-champ-name">
+                                            {champInfo[normalizeChampName(champName)]?.name ?? champName}
+                                            {posLabel && <span className="mh-sb-role-badge">{posLabel}</span>}
+                                          </span>
                                         </div>
                                         {cp && (
                                           <span className="mh-sb-level-badge">Lv{cp.level}</span>
+                                        )}
+                                        {cp?.isDead && cp.respawnTimer > 0 && (
+                                          <span className="mh-sb-dead-badge">{Math.ceil(cp.respawnTimer)}s</span>
                                         )}
                                         {(() => {
                                           const lp = livePlacementMap.get(p.puuid);
@@ -1909,7 +1995,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         )}
                                       </div>
                                       <div className="mh-sb-col-spells">
-                                        {[p.spell1Id, p.spell2Id].filter((id) => id > 0).map((spellId) => {
+                                        {resolvedSpells.map((spellId) => {
                                           const si = spellInfo[spellId];
                                           return (
                                             <TextTooltip key={spellId} className="mh-sb-spell-wrap" variant="spell" content={
@@ -1941,7 +2027,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                           <span className="mh-sb-kda-score mh-live-waiting">-</span>
                                         )}
                                       </div>
-                                      <div className="mh-sb-col-cs">{cp ? pCs : '-'}</div>
+                                      <div className="mh-sb-col-cs">
+                                        {cp ? (
+                                          <>
+                                            <span>{pCs}</span>
+                                            {cp.wardScore > 0 && <span className="mh-sb-ward-score" title="Ward Score">{cp.wardScore.toFixed(0)} WS</span>}
+                                          </>
+                                        ) : '-'}
+                                      </div>
                                       <div className="mh-sb-col-items">
                                         {cp ? pBuild.map((it, i) => {
                                           if (it <= 0) return <span key={i} className="mh-sb-item mh-sb-item--empty" />;
