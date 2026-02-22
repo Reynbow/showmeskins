@@ -413,14 +413,47 @@
   min-height: 80px;
 }
 
+.mh-profile-export-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lol-gold-dark);
+  background: rgba(200, 170, 110, 0.12);
+  color: var(--lol-gold-light);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.mh-profile-card:hover .mh-profile-export-btn {
+  opacity: 1;
+}
+
+.mh-profile-export-btn:hover {
+  border-color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.2);
+}
+
+.mh-profile-export-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .mh-profile-bg {
   position: absolute;
   top: 0;
   right: 0;
   width: 65%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 30%;
+  background-size: cover;
+  background-position: center 30%;
   pointer-events: none;
   opacity: 0.35;
 }
@@ -513,12 +546,12 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(calc(-51% - 30px), -50%) scale(0.5);
+  transform: translate(calc(-51% - 30px), -49%) scale(0.5);
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
 
 .mh-rank-emblem--oversized {
-  transform: translate(calc(-51% - 30px), -50%) scale(0.25);
+  transform: translate(calc(-51% - 30px), -49%) scale(0.25);
 }
 
 .mh-rank-details {

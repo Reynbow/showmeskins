@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ItemInfo, LiveGameData, LiveGamePlayer } from '../types';
 import type { AccountInfo } from './DevPage';
+import html2canvas from 'html2canvas';
 import { getItems, getLatestVersion } from '../api';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
@@ -705,6 +706,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const [activeGame, setActiveGame] = useState<ActiveGameData | null>(null);
   const [liveGameEnded, setLiveGameEnded] = useState(false);
   const spectatorPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const profileCardRef = useRef<HTMLDivElement | null>(null);
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [queueFilter, setQueueFilter] = useState<number | null>(null);
   const regionPickerRef = useRef<HTMLDivElement | null>(null);
@@ -1484,6 +1486,35 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     return () => clearTimeout(timer);
   }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region]);
 
+  const handleExportProfileCard = useCallback(async () => {
+    const node = profileCardRef.current;
+    if (!node) return;
+    const btn = node.querySelector('.mh-profile-export-btn') as HTMLElement | null;
+    if (btn) btn.style.display = 'none';
+    try {
+      const canvas = await html2canvas(node, {
+        useCORS: true,
+        scale: 2,
+        backgroundColor: '#0a0e16',
+      });
+      if (btn) btn.style.display = '';
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `${result?.gameName ?? 'profile'}-${result?.tagLine ?? ''}.png`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    } catch (err) {
+      if (btn) btn.style.display = '';
+      console.error('[profile-export] Failed:', err);
+    }
+  }, [result?.gameName, result?.tagLine]);
+
   // Helper: resolve champion name from spectator championId
   const resolveChampionName = useCallback((champId: number): string => {
     return champKeyToId[champId] ?? `Champion${champId}`;
@@ -1709,14 +1740,22 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
         {result && (
           <>
-            <div className="mh-profile-card">
+            <div className="mh-profile-card" ref={profileCardRef}>
+              <button
+                className="mh-profile-export-btn"
+                onClick={handleExportProfileCard}
+                title="Save as image"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
               {profileBgChampion && (
-                <img
+                <div
                   className="mh-profile-bg"
-                  src={formatChampionSplash(profileBgChampion)}
-                  alt=""
-                  loading="lazy"
-                  onError={handleImgError}
+                  style={{ backgroundImage: `url(${formatChampionSplash(profileBgChampion)})` }}
                 />
               )}
               <div className="mh-profile-bg-fade" />
@@ -1726,6 +1765,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   src={formatProfileIcon(result.profile?.profileIconId ?? 29)}
                   alt={`${result.gameName} profile icon`}
                   loading="lazy"
+                  crossOrigin="anonymous"
                   onError={handleImgError}
                 />
                 <div className="mh-profile-info">
@@ -1746,6 +1786,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               src={formatChampionFaceIcon(m.championName, ddragonVersion)}
                               alt={m.championName}
                               loading="lazy"
+                              crossOrigin="anonymous"
                               onError={handleImgError}
                             />
                             <span className="mh-mastery-level-badge">{m.championLevel}</span>
@@ -1769,6 +1810,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                             src={formatRankIcon(primaryRank.tier)}
                             alt={`${primaryRank.tier} emblem`}
                             loading="lazy"
+                            crossOrigin="anonymous"
                           />
                         </div>
                         <div className="mh-rank-details">
@@ -1795,6 +1837,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                           src={formatRankIcon('unranked')}
                           alt="Unranked emblem"
                           loading="lazy"
+                          crossOrigin="anonymous"
                         />
                       </div>
                       <div className="mh-rank-details">
