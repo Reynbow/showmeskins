@@ -299,6 +299,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               timestamp: number;
               killerId?: number;
               victimId?: number;
+              participantId?: number;
+              itemId?: number;
+              afterId?: number;
+              beforeId?: number;
               assistingParticipantIds?: number[];
               bounty?: number;
               shutdownBounty?: number;
@@ -314,8 +318,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         puuidByParticipantId[p.participantId] = p.puuid;
       }
 
-      const killEvents = timeline.info.frames
-        .flatMap((f) => f.events)
+      const allEvents = timeline.info.frames.flatMap((f) => f.events);
+
+      const killEvents = allEvents
         .filter((e) => e.type === 'CHAMPION_KILL')
         .map((e) => ({
           timestamp: e.timestamp,
@@ -328,10 +333,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           killStreakLength: e.killStreakLength ?? 0,
         }));
 
+      const ITEM_EVENT_TYPES = new Set(['ITEM_PURCHASED', 'ITEM_SOLD', 'ITEM_UNDO', 'ITEM_DESTROYED']);
+      const itemEvents = allEvents
+        .filter((e) => ITEM_EVENT_TYPES.has(e.type))
+        .map((e) => ({
+          type: e.type as 'ITEM_PURCHASED' | 'ITEM_SOLD' | 'ITEM_UNDO' | 'ITEM_DESTROYED',
+          timestamp: e.timestamp,
+          participantId: e.participantId ?? 0,
+          itemId: e.itemId ?? 0,
+          afterId: e.afterId,
+          beforeId: e.beforeId,
+        }));
+
       return res.status(200).json({
         matchId,
         puuidByParticipantId,
         killEvents,
+        itemEvents,
       });
     } catch (err) {
       console.error('[riot-id-history:timeline]', err);

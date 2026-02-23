@@ -125,12 +125,13 @@ export async function getItems(): Promise<Record<number, ItemInfo>> {
   const data = await res.json();
   const items: Record<number, ItemInfo> = {};
   for (const [id, raw] of Object.entries(data.data)) {
-    const item = raw as { name: string; description: string; plaintext: string; gold: { total: number } };
+    const item = raw as { name: string; description: string; plaintext: string; gold: { total: number }; tags: string[] };
     items[Number(id)] = {
       name: item.name,
       descriptionHtml: convertItemHtml(item.description),
       plaintext: item.plaintext || '',
       goldTotal: item.gold?.total ?? 0,
+      tags: item.tags ?? [],
     };
   }
   cachedItems = items;

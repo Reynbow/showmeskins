@@ -64,6 +64,7 @@ export interface ItemInfo {
   descriptionHtml: string;  // HTML with styled spans for rich rendering
   plaintext: string;        // one-line summary
   goldTotal: number;
+  tags: string[];
 }
 
 export type ViewMode = 'select' | 'viewer';

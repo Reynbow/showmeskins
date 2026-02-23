@@ -1538,6 +1538,218 @@
   font-size: 13px;
 }
 
+/* ── Item History ── */
+.mh-item-history {
+  padding: 0;
+}
+
+.mh-item-history-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.mh-item-history-teams {
+  display: flex;
+  gap: 10px;
+}
+
+.mh-item-history-team + .mh-item-history-team {
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mh-item-history-team {
+  display: flex;
+  gap: 2px;
+}
+
+.mh-item-player-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: border-color 0.15s, opacity 0.15s;
+  opacity: 0.5;
+  overflow: hidden;
+}
+
+.mh-item-player-btn:hover {
+  opacity: 0.8;
+}
+
+.mh-item-player-btn--active {
+  opacity: 1;
+}
+
+.mh-item-player-btn--active.mh-item-player-btn--blue {
+  border-color: #5b9bd5;
+}
+
+.mh-item-player-btn--active.mh-item-player-btn--red {
+  border-color: #e07070;
+}
+
+.mh-item-player-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mh-item-history-active-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.mh-item-history-active-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mh-item-history-active-stat {
+  font-size: 10px;
+  color: var(--lol-text-dim);
+}
+
+.mh-item-history-name--blue {
+  color: #5b9bd5;
+}
+
+.mh-item-history-name--red {
+  color: #e07070;
+}
+
+.mh-item-history-list {
+  max-height: 450px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 170, 110, 0.2) transparent;
+}
+
+.mh-item-history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.mh-item-history-list::-webkit-scrollbar-thumb {
+  background: rgba(200, 170, 110, 0.25);
+  border-radius: 2px;
+}
+
+.mh-item-history-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mh-item-history-group:last-child {
+  border-bottom: none;
+}
+
+.mh-item-history-time {
+  flex-shrink: 0;
+  width: 52px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lol-gold);
+  text-align: right;
+  border-right: 2px solid rgba(200, 170, 110, 0.15);
+  background: rgba(0, 0, 0, 0.15);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.mh-item-history-purchased {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+.mh-item-history-icon-wrap {
+  flex-shrink: 0;
+}
+
+.mh-item-history-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  border: 1px solid rgba(200, 170, 110, 0.15);
+  display: block;
+}
+
+.mh-item-history-inv-divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.mh-item-history-inventory {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.mh-item-history-inv-main {
+  display: flex;
+  gap: 3px;
+}
+
+.mh-item-history-inv-quest {
+  display: flex;
+  margin-left: 2px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(100, 180, 255, 0.2);
+}
+
+.mh-item-history-inv-trinket {
+  display: flex;
+  margin-left: 2px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mh-item-history-inv-icon--trinket {
+  border-radius: 50%;
+}
+
+.mh-item-history-inv-icon-wrap {
+  flex-shrink: 0;
+}
+
+.mh-item-history-inv-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: block;
+}
+
+.mh-item-history-inv-empty {
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
 .mh-killfeed-list {
   max-height: 400px;
   overflow-y: auto;

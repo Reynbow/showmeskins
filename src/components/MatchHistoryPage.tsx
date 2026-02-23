@@ -176,9 +176,27 @@ interface MhKillEvent {
   execute?: boolean;
 }
 
+interface MhItemEvent {
+  timestamp: number;
+  type: 'ITEM_PURCHASED' | 'ITEM_SOLD' | 'ITEM_UNDO' | 'ITEM_DESTROYED';
+  participantPuuid: string;
+  playerName: string;
+  championName: string;
+  teamId: number;
+  itemId: number;
+}
+
 interface TimelineResponse {
   matchId: string;
   puuidByParticipantId: Record<number, string>;
+  itemEvents?: Array<{
+    type: 'ITEM_PURCHASED' | 'ITEM_SOLD' | 'ITEM_UNDO' | 'ITEM_DESTROYED';
+    timestamp: number;
+    participantId: number;
+    itemId: number;
+    afterId?: number;
+    beforeId?: number;
+  }>;
   killEvents: Array<{
     timestamp: number;
     killerId: number;
@@ -199,6 +217,7 @@ interface MatchSlot {
   detailStatus?: 'idle' | 'loading' | 'ready' | 'failed';
   killFeed?: MhKillEvent[];
   killFeedStatus?: 'idle' | 'loading' | 'ready' | 'failed';
+  itemHistory?: MhItemEvent[];
 }
 
 interface Props {
@@ -686,6 +705,36 @@ function processTimeline(
   return events;
 }
 
+function processItemTimeline(
+  timeline: TimelineResponse,
+  participants: MatchParticipant[],
+): MhItemEvent[] {
+  if (!timeline.itemEvents?.length) return [];
+
+  const puuidToParticipant: Record<string, MatchParticipant> = {};
+  for (const p of participants) puuidToParticipant[p.puuid] = p;
+
+  const idToParticipant: Record<number, MatchParticipant | undefined> = {};
+  for (const [idStr, puuid] of Object.entries(timeline.puuidByParticipantId)) {
+    idToParticipant[Number(idStr)] = puuidToParticipant[puuid];
+  }
+
+  return timeline.itemEvents
+    .filter((e) => e.itemId > 0)
+    .map((e) => {
+      const p = idToParticipant[e.participantId];
+      return {
+        timestamp: e.timestamp,
+        type: e.type,
+        participantPuuid: p?.puuid ?? '',
+        playerName: p?.riotIdGameName ?? p?.summonerName ?? 'Unknown',
+        championName: p?.championName ?? '',
+        teamId: p?.teamId ?? 0,
+        itemId: e.itemId,
+      };
+    });
+}
+
 function formatMasteryPoints(points: number): string {
   if (points >= 1_000_000) return `${(points / 1_000_000).toFixed(1)}M`;
   if (points >= 1_000) return `${(points / 1_000).toFixed(0)}K`;
@@ -703,7 +752,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const [result, setResult] = useState<HistoryResponse | null>(null);
   const [matchSlots, setMatchSlots] = useState<MatchSlot[]>([]);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [expandedTab, setExpandedTab] = useState<'scoreboard' | 'killfeed'>('scoreboard');
+  const [expandedTab, setExpandedTab] = useState<'scoreboard' | 'killfeed' | 'items'>('scoreboard');
+  const [itemHistoryPuuid, setItemHistoryPuuid] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [pendingSearch, setPendingSearch] = useState(0);
@@ -1010,7 +1060,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   };
 
-  const fetchKillFeed = async (matchId: string) => {
+  const fetchTimeline = async (matchId: string) => {
     setMatchSlots((prev) => prev.map((s) =>
       s.matchId === matchId ? { ...s, killFeedStatus: 'loading' } : s,
     ));
@@ -1022,7 +1072,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       setMatchSlots((prev) => prev.map((s) => {
         if (s.matchId !== matchId || !s.detail) return s;
         const killFeed = processTimeline(body, s.detail.participants);
-        return { ...s, killFeed, killFeedStatus: 'ready' };
+        const itemHistory = processItemTimeline(body, s.detail.participants);
+        return { ...s, killFeed, killFeedStatus: 'ready', itemHistory };
       }));
     } catch {
       setMatchSlots((prev) => prev.map((s) =>
@@ -2315,6 +2366,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                         const opening = !isExpanded;
                         setExpandedMatchId(opening ? slot.matchId : null);
                         setExpandedTab('scoreboard');
+                        if (opening) setItemHistoryPuuid(null);
                         if (opening && !slot.detail && slot.detailStatus !== 'loading') {
                           fetchMatchDetail(slot.matchId);
                         }
@@ -2404,6 +2456,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                         <div className="mh-expanded-tabs">
                           <button className="mh-expanded-tab mh-expanded-tab--active" disabled>Scoreboard</button>
                           <button className="mh-expanded-tab" disabled>Kill Feed</button>
+                          <button className="mh-expanded-tab" disabled>Item History</button>
                         </div>
                         <div className="mh-scoreboard">
                           <div className="mh-sb-loading-overlay">
@@ -2469,10 +2522,20 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 e.stopPropagation();
                                 setExpandedTab('killfeed');
                                 if (!slot.killFeed && slot.killFeedStatus !== 'loading') {
-                                  fetchKillFeed(slot.matchId);
+                                  fetchTimeline(slot.matchId);
                                 }
                               }}
                             >Kill Feed</button>
+                            <button
+                              className={`mh-expanded-tab${expandedTab === 'items' ? ' mh-expanded-tab--active' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedTab('items');
+                                if (!slot.itemHistory && slot.killFeedStatus !== 'loading') {
+                                  fetchTimeline(slot.matchId);
+                                }
+                              }}
+                            >Item History</button>
                           </div>
                           {expandedTab === 'scoreboard' && (
                         <div className="mh-scoreboard">
@@ -2731,6 +2794,193 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               )}
                               {slot.killFeed && slot.killFeed.length === 0 && (
                                 <div className="mh-killfeed-loading">No kills recorded</div>
+                              )}
+                            </div>
+                          )}
+                          {expandedTab === 'items' && (
+                            <div className="mh-item-history">
+                              {slot.killFeedStatus === 'loading' && (
+                                <div className="mh-killfeed-loading">Loading item history...</div>
+                              )}
+                              {slot.killFeedStatus === 'failed' && (
+                                <div className="mh-killfeed-loading">Item history unavailable</div>
+                              )}
+                              {slot.itemHistory && slot.itemHistory.length > 0 && (() => {
+                                const allPurchases = slot.itemHistory.filter((e) => e.type === 'ITEM_PURCHASED');
+                                const detailParticipants = slot.detail?.participants ?? [];
+                                const players = new Map<string, { puuid: string; name: string; champ: string; teamId: number; position: string }>();
+                                for (const ev of allPurchases) {
+                                  if (!players.has(ev.participantPuuid)) {
+                                    const dp = detailParticipants.find((p) => p.puuid === ev.participantPuuid);
+                                    players.set(ev.participantPuuid, { puuid: ev.participantPuuid, name: ev.playerName, champ: ev.championName, teamId: ev.teamId, position: dp?.teamPosition ?? '' });
+                                  }
+                                }
+                                const playerList = Array.from(players.values());
+                                const team1Players = playerList.filter((p) => p.teamId === 100);
+                                const team2Players = playerList.filter((p) => p.teamId === 200);
+                                const activePuuid = itemHistoryPuuid ?? result.puuid;
+                                const activePlayer = players.get(activePuuid);
+
+                                const playerEvents = slot.itemHistory.filter((e) => e.participantPuuid === activePuuid);
+                                const purchaseOnly = playerEvents.filter((e) => e.type === 'ITEM_PURCHASED');
+
+                                const grouped: { minute: number; purchased: MhItemEvent[]; inventory: number[] }[] = [];
+                                const bag: number[] = [];
+                                let groupIdx = 0;
+                                for (const ev of playerEvents) {
+                                  const min = Math.floor(ev.timestamp / 60000);
+                                  if (ev.type === 'ITEM_PURCHASED') {
+                                    bag.push(ev.itemId);
+                                    const last = grouped[grouped.length - 1];
+                                    if (last && last.minute === min) {
+                                      last.purchased.push(ev);
+                                      last.inventory = [...bag];
+                                    } else {
+                                      grouped.push({ minute: min, purchased: [ev], inventory: [...bag] });
+                                    }
+                                  } else if (ev.type === 'ITEM_SOLD' || ev.type === 'ITEM_DESTROYED') {
+                                    const idx = bag.indexOf(ev.itemId);
+                                    if (idx !== -1) bag.splice(idx, 1);
+                                    if (grouped.length > 0) grouped[grouped.length - 1].inventory = [...bag];
+                                  } else if (ev.type === 'ITEM_UNDO') {
+                                    const idx = bag.lastIndexOf(ev.itemId);
+                                    if (idx !== -1) bag.splice(idx, 1);
+                                    if (grouped.length > 0) grouped[grouped.length - 1].inventory = [...bag];
+                                  }
+                                }
+
+                                let totalGold = 0;
+                                for (const ev of purchaseOnly) {
+                                  const info = itemData[ev.itemId];
+                                  if (info?.gold?.total) totalGold += info.gold.total;
+                                }
+
+                                return (
+                                  <>
+                                    <div className="mh-item-history-player-bar">
+                                      <div className="mh-item-history-teams">
+                                        {[{ team: team1Players, side: 'blue' }, { team: team2Players, side: 'red' }].map(({ team, side }) => (
+                                          <div key={side} className="mh-item-history-team">
+                                            {team.map((p) => (
+                                              <button
+                                                key={p.puuid}
+                                                className={`mh-item-player-btn${p.puuid === activePuuid ? ' mh-item-player-btn--active' : ''} mh-item-player-btn--${side}`}
+                                                onClick={(e) => { e.stopPropagation(); setItemHistoryPuuid(p.puuid); }}
+                                                title={p.name}
+                                              >
+                                                <img
+                                                  className="mh-item-player-icon"
+                                                  src={formatChampionFaceIcon(p.champ, ddragonVersion)}
+                                                  alt={p.champ}
+                                                  loading="lazy"
+                                                  onError={handleImgError}
+                                                />
+                                              </button>
+                                            ))}
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {activePlayer && (
+                                        <div className="mh-item-history-active-label">
+                                          <span className={`mh-item-history-active-name mh-item-history-name--${activePlayer.teamId === 100 ? 'blue' : 'red'}`}>{activePlayer.name}</span>
+                                          <span className="mh-item-history-active-stat">{purchaseOnly.length} items &middot; {totalGold.toLocaleString()}g</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="mh-item-history-list">
+                                      {grouped.map((g, gi) => (
+                                        <div key={gi} className="mh-item-history-group">
+                                          <div className="mh-item-history-time">{g.minute}:00</div>
+                                          <div className="mh-item-history-purchased">
+                                            {g.purchased.map((ev, ei) => {
+                                              const info = itemData[ev.itemId];
+                                              return (
+                                                <ItemTooltip
+                                                  key={ei}
+                                                  itemId={ev.itemId}
+                                                  itemDisplayName={info?.name ?? ''}
+                                                  itemPrice={info?.goldTotal ?? 0}
+                                                  itemCount={1}
+                                                  info={info}
+                                                  version={ddragonVersion}
+                                                  getItemIconUrl={getItemIconUrl}
+                                                  className="mh-item-history-icon-wrap"
+                                                >
+                                                  <img
+                                                    className="mh-item-history-icon"
+                                                    src={getItemIconUrl(ddragonVersion, ev.itemId)}
+                                                    alt={info?.name ?? `Item ${ev.itemId}`}
+                                                    loading="lazy"
+                                                  />
+                                                </ItemTooltip>
+                                              );
+                                            })}
+                                          </div>
+                                          <div className="mh-item-history-inv-divider" />
+                                          {(() => {
+                                            const pos = activePlayer?.position ?? '';
+                                            const isBot = pos === 'BOTTOM';
+                                            const isSupport = pos === 'UTILITY';
+                                            const regularItems: (number | null)[] = [];
+                                            let trinketItem: number | null = null;
+                                            let questSlotItem: number | null = null;
+                                            for (const id of g.inventory) {
+                                              const inf = itemData[id];
+                                              if (inf?.tags?.includes('Trinket')) {
+                                                trinketItem = id;
+                                              } else if (isBot && inf?.tags?.includes('Boots') && questSlotItem == null) {
+                                                questSlotItem = id;
+                                              } else if (isSupport && id === 2055 && questSlotItem == null) {
+                                                questSlotItem = id;
+                                              } else {
+                                                regularItems.push(id);
+                                              }
+                                            }
+                                            if (trinketItem == null) trinketItem = 3340;
+                                            while (regularItems.length < 6) regularItems.push(null);
+                                            const renderSlot = (id: number | null, key: string | number, cls: string) => {
+                                              if (id == null) return <div key={key} className="mh-item-history-inv-empty" />;
+                                              const info = itemData[id];
+                                              return (
+                                                <ItemTooltip
+                                                  key={key}
+                                                  itemId={id}
+                                                  itemDisplayName={info?.name ?? ''}
+                                                  itemPrice={info?.goldTotal ?? 0}
+                                                  itemCount={1}
+                                                  info={info}
+                                                  version={ddragonVersion}
+                                                  getItemIconUrl={getItemIconUrl}
+                                                  className="mh-item-history-inv-icon-wrap"
+                                                >
+                                                  <img className={cls} src={getItemIconUrl(ddragonVersion, id)} alt={info?.name ?? `Item ${id}`} loading="lazy" />
+                                                </ItemTooltip>
+                                              );
+                                            };
+                                            return (
+                                              <div className="mh-item-history-inventory">
+                                                <div className="mh-item-history-inv-main">
+                                                  {regularItems.slice(0, 6).map((id, i) => renderSlot(id, i, 'mh-item-history-inv-icon'))}
+                                                </div>
+                                                {(isBot || isSupport) && (
+                                                  <div className="mh-item-history-inv-quest" title={isBot ? 'Boot slot (Role Quest)' : 'Ward slot (Role Quest)'}>
+                                                    {renderSlot(questSlotItem, 'quest', 'mh-item-history-inv-icon')}
+                                                  </div>
+                                                )}
+                                                <div className="mh-item-history-inv-trinket">
+                                                  {renderSlot(trinketItem, 'trinket', 'mh-item-history-inv-icon mh-item-history-inv-icon--trinket')}
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                              {slot.itemHistory && slot.itemHistory.length === 0 && (
+                                <div className="mh-killfeed-loading">No item events recorded</div>
                               )}
                             </div>
                           )}
