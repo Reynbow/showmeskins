@@ -4,11 +4,8 @@ import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
 import { DevPage, type AccountInfo, type CompanionLiveDebug } from './components/DevPage';
-import { LiveGamePage } from './components/LiveGamePage';
 import { MatchHistoryPage } from './components/MatchHistoryPage';
-import { PostGamePage } from './components/PostGamePage';
 import { getChampions, getChampionDetail, getLatestVersion, getItems, resolveLcuSkinNum } from './api';
-import { sampleLiveGameData, samplePostGameData } from './mockLiveGameData';
 import type {
   ChampionBasic,
   ChampionDetail,
@@ -282,37 +279,6 @@ function normalizeErrorMessage(value: unknown): string {
   }
 }
 
-interface RiotPostgameResponse {
-  source: string;
-  region: string;
-  matchId: string;
-  data: unknown;
-}
-
-async function fetchRiotPostgameMaster(params: {
-  puuid: string;
-  platformId?: string;
-  expectedDurationSec?: number;
-  championName?: string;
-}): Promise<RiotPostgameResponse> {
-  const query = new URLSearchParams({ puuid: params.puuid });
-  if (params.platformId) query.set('platformId', params.platformId);
-  if (typeof params.expectedDurationSec === 'number' && Number.isFinite(params.expectedDurationSec)) {
-    query.set('expectedDurationSec', String(Math.max(0, Math.floor(params.expectedDurationSec))));
-  }
-  if (params.championName) query.set('championName', params.championName);
-
-  const res = await fetch(`/api/match-postgame?${query.toString()}`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string; details?: string };
-    const reason = body.error || `HTTP ${res.status}`;
-    const details = body.details ? ` (${body.details})` : '';
-    throw new Error(`${reason}${details}`);
-  }
-
-  return await res.json() as RiotPostgameResponse;
-}
-
 function App() {
   const [champions, setChampions] = useState<ChampionBasic[]>([]);
   const [selectedChampion, setSelectedChampion] = useState<ChampionDetail | null>(null);
@@ -320,7 +286,7 @@ function App() {
   const [companionChromaId, setCompanionChromaId] = useState<number | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'livegame' | 'postgame' | 'dev' | 'history'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history'>('select');
   const [historyInitialRiotId, setHistoryInitialRiotId] = useState<string>('');
   const [stayOnDevDuringLive, setStayOnDevDuringLive] = useState<boolean>(() => {
     try {
@@ -330,7 +296,6 @@ function App() {
     }
   });
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
-  const [postGameData, setPostGameData] = useState<LiveGameData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [liveDebug, setLiveDebug] = useState<CompanionLiveDebug>({
@@ -492,11 +457,6 @@ function App() {
             window.history.replaceState(null, '', '/companion');
             setViewMode('companion');
           }
-        } else if (championId === 'live' || championId === 'postgame') {
-          // /live and /postgame require active session data from the companion.
-          // If opened directly with no session, redirect to home.
-          setViewMode('select');
-          window.history.replaceState(null, '', '/');
         } else if (championId) {
           // Find the champion (case-insensitive match against id)
           const match = Object.values(champs).find(
@@ -524,14 +484,6 @@ function App() {
     }
     load();
   }, []);
-
-  // Redirect /live and /postgame to history page (those standalone screens are disabled)
-  useEffect(() => {
-    if (viewMode === 'livegame' || viewMode === 'postgame') {
-      setViewMode('history');
-      window.history.replaceState(null, '', '/history');
-    }
-  }, [viewMode]);
 
   // Dev page is development-only; redirect /dev to companion in production
   useEffect(() => {
@@ -568,14 +520,6 @@ function App() {
           window.history.replaceState(null, '', '/companion');
           setViewMode('companion');
         }
-        return;
-      }
-      if (championId === 'live') {
-        setViewMode('livegame');
-        return;
-      }
-      if (championId === 'postgame') {
-        setViewMode('postgame');
         return;
       }
       // Load the champion from the URL
@@ -659,46 +603,6 @@ function App() {
   const handleDevBack = useCallback(() => {
     setViewMode('companion');
     window.history.pushState(null, '', '/companion');
-  }, []);
-
-  const isSamplePreview = useRef(false);
-
-  const handleLiveGameBack = useCallback(() => {
-    setLiveGameData(null);
-    if (isSamplePreview.current) {
-      isSamplePreview.current = false;
-      setViewMode('companion');
-      window.history.pushState(null, '', '/companion');
-    } else {
-      setViewMode('select');
-      window.history.pushState(null, '', '/');
-    }
-  }, []);
-
-  const handlePostGameBack = useCallback(() => {
-    setPostGameData(null);
-    if (isSamplePreview.current) {
-      isSamplePreview.current = false;
-      setViewMode('companion');
-      window.history.pushState(null, '', '/companion');
-    } else {
-      setViewMode('select');
-      window.history.pushState(null, '', '/');
-    }
-  }, []);
-
-  const handleSampleLive = useCallback(() => {
-    isSamplePreview.current = true;
-    setLiveGameData(sampleLiveGameData);
-    setViewMode('livegame');
-    window.history.pushState(null, '', '/live');
-  }, []);
-
-  const handleSamplePostGame = useCallback(() => {
-    isSamplePreview.current = true;
-    setPostGameData(samplePostGameData);
-    setViewMode('postgame');
-    window.history.pushState(null, '', '/postgame');
   }, []);
 
   const handleSkinSelect = useCallback((skin: Skin) => {
@@ -981,72 +885,8 @@ function App() {
               }
               pendingChampSelectRef.current = null;
 
-              const endResult: string | undefined = data.gameResult || undefined;
-              const lastSnapshot = liveGameDataRef.current;
-              const endSnapshot = normalizeLiveGamePayload(data.finalUpdate, lastSnapshot);
-              const baseSnapshot = endSnapshot ?? lastSnapshot;
-              const fallbackPostgame = baseSnapshot
-                ? {
-                  ...baseSnapshot,
-                  gameResult: endResult || baseSnapshot.gameResult,
-                }
-                : null;
-              // Standalone postgame screen is disabled; history page handles transitions.
-              if (fallbackPostgame) {
-                setPostGameData(fallbackPostgame);
-              }
               setLiveGameData(null);
               liveGameDataRef.current = null;
-
-              const account = accountInfoRef.current;
-              if (fallbackPostgame && account?.puuid) {
-                void (async () => {
-                  const activeChampion = fallbackPostgame.players.find((p) => p.isActivePlayer)?.championName;
-                  try {
-                    appendDebugLog('info', 'postgame.riot', 'Fetching Riot Match-v5 postgame master record', {
-                      puuid: account.puuid,
-                      platformId: account.platformId,
-                      expectedDurationSec: fallbackPostgame.gameTime,
-                      championName: activeChampion,
-                    });
-
-                    const riot = await fetchRiotPostgameMaster({
-                      puuid: account.puuid,
-                      platformId: account.platformId,
-                      expectedDurationSec: fallbackPostgame.gameTime,
-                      championName: activeChampion,
-                    });
-
-                    const normalized = normalizeLiveGamePayload(riot.data, fallbackPostgame);
-                    if (!normalized) {
-                      appendDebugLog('warn', 'postgame.riot', 'Riot postgame payload was unusable; keeping fallback');
-                      return;
-                    }
-
-                    const merged: LiveGameData = {
-                      ...normalized,
-                      partyMembers: fallbackPostgame.partyMembers ?? normalized.partyMembers,
-                      killFeed: (normalized.killFeed && normalized.killFeed.length > 0)
-                        ? normalized.killFeed
-                        : (fallbackPostgame.killFeed ?? []),
-                      liveEvents: (normalized.liveEvents && normalized.liveEvents.length > 0)
-                        ? normalized.liveEvents
-                        : (fallbackPostgame.liveEvents ?? []),
-                      killFeedSnapshots: (normalized.killFeedSnapshots && Object.keys(normalized.killFeedSnapshots).length > 0)
-                        ? normalized.killFeedSnapshots
-                        : (fallbackPostgame.killFeedSnapshots ?? {}),
-                    };
-
-                    setPostGameData(merged);
-                    appendDebugLog('info', 'postgame.riot', `Applied Riot postgame master (${riot.matchId}, ${riot.region})`);
-                  } catch (err) {
-                    appendDebugLog('warn', 'postgame.riot', `Riot postgame unavailable; using fallback (${normalizeErrorMessage(err)})`);
-                  }
-                })();
-              } else if (!account?.puuid) {
-                appendDebugLog('warn', 'postgame.riot', 'Skipped Riot postgame fetch: missing account PUUID');
-              }
-
               liveGameAutoNavDone.current = false;
             }
           } catch {
@@ -1101,24 +941,7 @@ function App() {
         </div>
       )}
 
-      {viewMode === 'postgame' && postGameData ? (
-        <PostGamePage
-          data={postGameData}
-          champions={champions}
-          version={version}
-          itemData={itemData}
-          onBack={handlePostGameBack}
-          backLabel={isSamplePreview.current ? 'Back' : 'Continue'}
-        />
-      ) : viewMode === 'livegame' && liveGameData ? (
-        <LiveGamePage
-          data={liveGameData}
-          champions={champions}
-          version={version}
-          itemData={itemData}
-          onBack={handleLiveGameBack}
-        />
-      ) : viewMode === 'select' ? (
+      {viewMode === 'select' ? (
         <ChampionSelect
           champions={champions}
           version={version}
@@ -1139,8 +962,6 @@ function App() {
       ) : viewMode === 'companion' ? (
         <CompanionPage
           onBack={handleCompanionBack}
-          onSampleLive={handleSampleLive}
-          onSamplePostGame={handleSamplePostGame}
           onDev={import.meta.env.DEV ? handleDev : undefined}
           hasLiveGame={!!liveGameData}
           onLiveGame={handleLiveGameNavigate}

@@ -1679,7 +1679,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 <path d="M20 21a8 8 0 1 0-16 0" />
                 <circle cx="12" cy="8" r="4" />
               </svg>
-              <div className="mh-riot-id-inputs">
+              <div className={`mh-riot-id-inputs${!gameName && !tagLine ? ' mh-riot-id-inputs--empty' : ''}`}>
               <input
                 type="text"
                 value={gameName}
@@ -1791,6 +1791,24 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
               ))}
             </div>
           </>
+        )}
+
+        {!loading && !result && !error && (
+          <div className="mh-empty-state">
+            <svg className="mh-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <path d="M20 21a8 8 0 1 0-16 0" />
+              <circle cx="12" cy="8" r="4" />
+              <path d="M3 21h18" opacity="0.3" />
+            </svg>
+            <h2 className="mh-empty-title">Look up a player</h2>
+            <p className="mh-empty-text">
+              Enter a Riot ID above to view their match history, ranked stats, and live game status.
+            </p>
+            <div className="mh-empty-hint">
+              <span className="mh-empty-hint-label">Example</span>
+              <span className="mh-empty-hint-value">Faker#KR1</span>
+            </div>
+          </div>
         )}
 
         {result && (

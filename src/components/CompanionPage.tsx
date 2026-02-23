@@ -2,8 +2,6 @@ import './CompanionPage.css';
 
 interface Props {
   onBack: () => void;
-  onSampleLive: () => void;
-  onSamplePostGame: () => void;
   onDev?: () => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
@@ -12,10 +10,9 @@ interface Props {
 const DOWNLOAD_URL =
   'https://github.com/Reynbow/showmeskins/releases/latest/download/x9report.Companion.Setup.exe';
 
-export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, hasLiveGame, onLiveGame }: Props) {
+export function CompanionPage({ onBack, onDev, hasLiveGame, onLiveGame }: Props) {
   return (
     <div className="companion-page">
-      {/* Background decorations (same as champion select) */}
       <div className="cs-bg-glow" />
       <div className="cs-bg-lines" />
 
@@ -48,7 +45,7 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
           </div>
           <h1 className="companion-title">Companion App <span className="companion-beta-badge">Beta</span></h1>
           <p className="companion-subtitle">
-            Automatically sync your champion select with x9report.com
+            Enhance your match history with real-time game data
           </p>
         </div>
 
@@ -67,56 +64,36 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
             Download
           </a>
           <span className="companion-version">v0.4.0 Beta &middot; Windows 10/11</span>
-          <p className="companion-download-tagline">Live and post-game information tracker</p>
         </div>
 
         {/* What it does */}
         <div className="companion-section">
           <h2 className="companion-section-title">What does it do?</h2>
           <p className="companion-section-text">
-            The companion app is a small utility that runs in your system tray and connects 
-            to your League of Legends client. It provides three key features:
+            The companion app runs in your system tray and connects to your League of Legends 
+            client, feeding live data directly into your match history page on x9report.com.
           </p>
           <ul className="companion-feature-list">
             <li>
               <strong>Champion Select Sync:</strong> Detects your champion and skin pick in 
-              real time and opens the 3D model on this website automatically.
+              real time and opens the 3D model viewer automatically.
             </li>
             <li>
-              <strong>Live Game Scoreboard:</strong> Tracks all players&apos; KDA, items, 
-              levels, CS, and team gold while you play. Your champion&apos;s 3D model shows 
-              alongside the scoreboard.
+              <strong>Live Game Data:</strong> While you play, the companion streams real-time 
+              KDA, items, CS, levels, ward score, and summoner spells for all players directly 
+              into the match history scoreboard.
             </li>
             <li>
-              <strong>Post-Game Summary:</strong> Shows your stats, the match MVP, the full 
-              final scoreboard, and whether you won or lost.
+              <strong>Auto-detect &amp; Navigate:</strong> When a game starts, x9report.com 
+              automatically opens the match history page with your account loaded and the 
+              live scoreboard expanded.
+            </li>
+            <li>
+              <strong>Fill Missing Data:</strong> The Riot web API can&apos;t provide 
+              everything during a live game. The companion fills in player positions, items, 
+              CS, levels, kill/death status, and more that the API can&apos;t access.
             </li>
           </ul>
-        </div>
-
-        {/* Sample pages */}
-        <div className="companion-section">
-          <h2 className="companion-section-title">Preview</h2>
-          <p className="companion-section-text">
-            See what the live game and post-game screens look like with sample data.
-          </p>
-          <div className="companion-preview-buttons">
-            <button className="companion-preview-btn" onClick={onSampleLive}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
-              Sample Live Game
-            </button>
-            <button className="companion-preview-btn" onClick={onSamplePostGame}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 15l-3-3h6l-3 3z" />
-                <path d="M9 12V4h6v8" />
-                <path d="M4 20h16" />
-              </svg>
-              Sample Post-Game
-            </button>
-          </div>
         </div>
 
         {/* How it works */}
@@ -127,21 +104,21 @@ export function CompanionPage({ onBack, onSampleLive, onSamplePostGame, onDev, h
               <div className="companion-step-number">1</div>
               <div className="companion-step-content">
                 <h3>Install &amp; launch</h3>
-                <p>Run the installer and the app starts in your system tray. Look for the black and white hexagon icon.</p>
+                <p>Run the installer and the app starts in your system tray. Look for the hexagon icon.</p>
               </div>
             </div>
             <div className="companion-step">
               <div className="companion-step-number">2</div>
               <div className="companion-step-content">
-                <h3>Open the website</h3>
-                <p>Keep <strong>x9report.com</strong> open in your browser. The website connects to the companion automatically.</p>
+                <h3>Open x9report.com</h3>
+                <p>The website detects the companion automatically &mdash; no setup required. A connection indicator appears when linked.</p>
               </div>
             </div>
             <div className="companion-step">
               <div className="companion-step-number">3</div>
               <div className="companion-step-content">
-                <h3>Enter champion select</h3>
-                <p>Start a game in League of Legends. As you pick a champion and browse skins, the website updates live.</p>
+                <h3>Play a game</h3>
+                <p>Start a match in League of Legends. The website navigates to your match history and opens a live scoreboard with real-time stats powered by the companion.</p>
               </div>
             </div>
           </div>

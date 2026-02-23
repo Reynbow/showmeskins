@@ -174,13 +174,6 @@
   margin-bottom: 40px;
 }
 
-.companion-download-tagline {
-  margin: 8px 0 0 0;
-  font-size: 14px;
-  color: var(--lol-text-secondary);
-  letter-spacing: 1px;
-}
-
 .companion-download-btn {
   display: inline-flex;
   align-items: center;
@@ -359,53 +352,6 @@
   color: var(--lol-gold-light);
 }
 
-/* Preview buttons */
-.companion-preview-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 16px;
-  flex-wrap: wrap;
-}
-
-.companion-preview-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  background: rgba(200, 170, 110, 0.06);
-  border: 1px solid var(--lol-border-gold);
-  color: var(--lol-gold-light);
-  font-family: var(--font-heading);
-  font-size: 13px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-.companion-preview-btn svg {
-  width: 18px;
-  height: 18px;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.companion-preview-btn:hover {
-  background: rgba(200, 170, 110, 0.14);
-  border-color: var(--lol-gold);
-  box-shadow: 0 0 16px rgba(200, 170, 110, 0.12);
-  transform: translateY(-1px);
-}
-
-.companion-preview-btn:hover svg {
-  opacity: 1;
-}
-
-.companion-preview-btn:active {
-  transform: translateY(0);
-}
-
 /* Source code link */
 .companion-source {
   text-align: center;
@@ -473,13 +419,5 @@
   .companion-download-btn {
     padding: 12px 24px;
     font-size: 13px;
-  }
-
-  .companion-preview-buttons {
-    flex-direction: column;
-  }
-
-  .companion-preview-btn {
-    justify-content: center;
   }
 }
