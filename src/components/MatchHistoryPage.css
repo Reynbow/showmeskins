@@ -1031,18 +1031,64 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  position: relative;
 }
 
 .mh-sb-rank-icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 
 .mh-sb-rank-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.3px;
+}
+
+.mh-sb-rank-hover {
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mh-sb-rank-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 14, 22, 0.95);
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  border-radius: 4px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.mh-sb-rank-hover:hover .mh-sb-rank-tooltip {
+  display: block;
+}
+
+.mh-sb-rank-tooltip-tier {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.mh-sb-rank-tooltip-lp {
+  font-size: 11px;
+  color: #c8aa6e;
+  margin-bottom: 2px;
+}
+
+.mh-sb-rank-tooltip-record {
+  font-size: 10px;
+  color: #888;
 }
 
 .mh-sb-col-kda {
@@ -2044,7 +2090,7 @@
 }
 
 .mh-sb-placement {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.3px;
   margin-left: auto;
@@ -2052,6 +2098,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  line-height: 1;
   padding: 1px 5px;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.25);
@@ -2059,11 +2106,11 @@
 
 .mh-sb-placement--top {
   background: rgba(0, 0, 0, 0.35);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .mh-sb-placement-medal {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
 }
 

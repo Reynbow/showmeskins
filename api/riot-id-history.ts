@@ -156,6 +156,9 @@ interface MatchParticipantDetail {
   win: boolean;
   rankedTier?: string;
   rankedRank?: string;
+  rankedLP?: number;
+  rankedWins?: number;
+  rankedLosses?: number;
 }
 
 interface MatchTeamObjective {
@@ -450,6 +453,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (solo) {
             p.rankedTier = solo.tier;
             p.rankedRank = solo.rank;
+            p.rankedLP = solo.leaguePoints;
+            p.rankedWins = solo.wins;
+            p.rankedLosses = solo.losses;
           }
         } catch { /* skip */ }
       }

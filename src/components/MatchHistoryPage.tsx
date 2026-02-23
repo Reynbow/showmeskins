@@ -58,6 +58,9 @@ interface SpectatorParticipant {
   };
   rankedTier?: string;
   rankedRank?: string;
+  rankedLP?: number;
+  rankedWins?: number;
+  rankedLosses?: number;
 }
 
 interface SpectatorBan {
@@ -141,6 +144,9 @@ interface MatchParticipant {
   win: boolean;
   rankedTier?: string;
   rankedRank?: string;
+  rankedLP?: number;
+  rankedWins?: number;
+  rankedLosses?: number;
 }
 
 interface MatchDetailResponse {
@@ -457,6 +463,12 @@ function formatRankShort(tier?: string, rank?: string): string {
 
 function formatRankMiniIcon(tier: string): string {
   return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tier.toLowerCase()}.svg`;
+}
+
+function formatRankFull(tier?: string, rank?: string): string {
+  if (!tier) return '';
+  const t = tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+  return rank ? `${t} ${rank}` : t;
 }
 
 function kdaColor(kda: number): string {
@@ -1393,7 +1405,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     return () => clearInterval(interval);
   }, [result?.puuid, result?.gameName, result?.tagLine, region, queueFilter, matchSlots, liveGameEnded]);
 
-  // Spectator polling: when an active game is detected, poll every 15s
+  // Spectator polling: when an active game is detected, poll periodically.
+  // Skips ranked lookups on re-polls (ranks are static during a match).
+  // Polls less frequently when companion app is connected (only need game-end detection).
   useEffect(() => {
     if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) {
       if (spectatorPollRef.current) {
@@ -1408,12 +1422,36 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         const params = new URLSearchParams({
           puuid: result.puuid,
           region: result.platformRegion ?? region,
+          skipRanks: '1',
         });
         const res = await fetch(`/api/spectator?${params.toString()}`);
         if (!res.ok) return;
         const body = await res.json();
         if (body && body.inGame) {
-          setActiveGame(body as ActiveGameData);
+          const fresh = body as ActiveGameData;
+          setActiveGame((prev) => {
+            if (!prev) return fresh;
+            const rankMap = new Map<string, SpectatorParticipant>();
+            for (const p of prev.participants) {
+              if (p.puuid) rankMap.set(p.puuid, p);
+            }
+            fresh.participants = fresh.participants.map((p) => {
+              const cached = p.puuid ? rankMap.get(p.puuid) : undefined;
+              if (cached) {
+                if (!p.rankedTier && cached.rankedTier) {
+                  p.rankedTier = cached.rankedTier;
+                  p.rankedRank = cached.rankedRank;
+                  p.rankedLP = cached.rankedLP;
+                  p.rankedWins = cached.rankedWins;
+                  p.rankedLosses = cached.rankedLosses;
+                }
+                if (!p.spell1Id && cached.spell1Id) p.spell1Id = cached.spell1Id;
+                if (!p.spell2Id && cached.spell2Id) p.spell2Id = cached.spell2Id;
+              }
+              return p;
+            });
+            return fresh;
+          });
         } else {
           setActiveGame((prev) => prev);
           setLiveGameEnded(true);
@@ -1423,14 +1461,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       }
     };
 
-    spectatorPollRef.current = setInterval(pollSpectator, 15_000);
+    const interval = companionConnected ? 60_000 : 15_000;
+    spectatorPollRef.current = setInterval(pollSpectator, interval);
     return () => {
       if (spectatorPollRef.current) {
         clearInterval(spectatorPollRef.current);
         spectatorPollRef.current = null;
       }
     };
-  }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region]);
+  }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region, companionConnected]);
 
   // Live game elapsed timer: tick every second while game is active
   useEffect(() => {
@@ -1459,12 +1498,18 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   }, [activeGame, companionLiveData, liveGameEnded]);
 
-  // Rank retry: if any live participants are missing rank data, re-fetch after 5s
+  // Rank retry: if any live participants are missing rank data, re-fetch once after 5s
+  const rankRetryDoneRef = useRef(false);
   useEffect(() => {
-    if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
+    if (!activeGame) {
+      rankRetryDoneRef.current = false;
+      return;
+    }
+    if (rankRetryDoneRef.current || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
     const missingRanks = activeGame.participants.some((p) => !p.rankedTier);
     if (!missingRanks) return;
 
+    rankRetryDoneRef.current = true;
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({
@@ -1476,10 +1521,20 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         const body = await res.json();
         if (body && body.inGame) {
           const fresh = body as ActiveGameData;
-          const hasNewRanks = fresh.participants.some((p) => p.rankedTier);
-          if (hasNewRanks) {
-            setActiveGame(fresh);
-          }
+          setActiveGame((prev) => {
+            if (!prev) return fresh;
+            const oldMap = new Map<string, SpectatorParticipant>();
+            for (const p of prev.participants) {
+              if (p.puuid) oldMap.set(p.puuid, p);
+            }
+            fresh.participants = fresh.participants.map((p) => {
+              const cached = p.puuid ? oldMap.get(p.puuid) : undefined;
+              if (cached && !p.spell1Id && cached.spell1Id) p.spell1Id = cached.spell1Id;
+              if (cached && !p.spell2Id && cached.spell2Id) p.spell2Id = cached.spell2Id;
+              return p;
+            });
+            return fresh;
+          });
         }
       } catch { /* silent */ }
     }, 5000);
@@ -2067,10 +2122,19 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                       </div>
                                       <div className="mh-sb-col-rank">
                                         {p.rankedTier ? (
-                                          <>
+                                          <div className="mh-sb-rank-hover">
                                             <img className="mh-sb-rank-icon" src={formatRankMiniIcon(p.rankedTier)} alt={p.rankedTier} loading="lazy" />
                                             <span className="mh-sb-rank-label" style={{ color: liveRankColor }}>{liveRankLabel}</span>
-                                          </>
+                                            <div className="mh-sb-rank-tooltip">
+                                              <div className="mh-sb-rank-tooltip-tier" style={{ color: liveRankColor }}>{formatRankFull(p.rankedTier, p.rankedRank)}</div>
+                                              {p.rankedLP != null && <div className="mh-sb-rank-tooltip-lp">{p.rankedLP} LP</div>}
+                                              {p.rankedWins != null && p.rankedLosses != null && (
+                                                <div className="mh-sb-rank-tooltip-record">
+                                                  {p.rankedWins}W {p.rankedLosses}L &middot; {((p.rankedWins / Math.max(1, p.rankedWins + p.rankedLosses)) * 100).toFixed(1)}% WR
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
                                         ) : (
                                           <span className="mh-sb-rank-label" style={{ color: '#555' }}>-</span>
                                         )}
@@ -2434,10 +2498,19 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                     </div>
                                     <div className="mh-sb-col-rank">
                                       {p.rankedTier ? (
-                                        <>
+                                        <div className="mh-sb-rank-hover">
                                           <img className="mh-sb-rank-icon" src={formatRankMiniIcon(p.rankedTier)} alt={p.rankedTier} loading="lazy" />
                                           <span className="mh-sb-rank-label" style={{ color: rankTierColor }}>{rankLabel}</span>
-                                        </>
+                                          <div className="mh-sb-rank-tooltip">
+                                            <div className="mh-sb-rank-tooltip-tier" style={{ color: rankTierColor }}>{formatRankFull(p.rankedTier, p.rankedRank)}</div>
+                                            {p.rankedLP != null && <div className="mh-sb-rank-tooltip-lp">{p.rankedLP} LP</div>}
+                                            {p.rankedWins != null && p.rankedLosses != null && (
+                                              <div className="mh-sb-rank-tooltip-record">
+                                                {p.rankedWins}W {p.rankedLosses}L &middot; {((p.rankedWins / Math.max(1, p.rankedWins + p.rankedLosses)) * 100).toFixed(1)}% WR
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       ) : (
                                         <span className="mh-sb-rank-label" style={{ color: '#555' }}>-</span>
                                       )}

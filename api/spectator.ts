@@ -75,6 +75,9 @@ export interface SpectatorParticipant {
   };
   rankedTier?: string;
   rankedRank?: string;
+  rankedLP?: number;
+  rankedWins?: number;
+  rankedLosses?: number;
 }
 
 export interface SpectatorBan {
@@ -116,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const puuid = typeof req.query.puuid === 'string' ? req.query.puuid.trim() : '';
   const region = typeof req.query.region === 'string' ? req.query.region.trim().toLowerCase() : '';
+  const skipRanks = req.query.skipRanks === '1';
 
   if (!puuid) {
     return res.status(400).json({ error: 'Missing puuid query parameter' });
@@ -190,25 +194,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    let rateLimited = false;
-    for (const p of participants) {
-      if (!p.puuid || rateLimited) continue;
-      try {
-        const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
-        const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
-        if (r.status === 429) {
-          console.warn(`[spectator] Ranked lookup rate-limited, skipping remaining participants`);
-          rateLimited = true;
-          continue;
-        }
-        if (!r.ok) continue;
-        const entries = await r.json() as Array<{ queueType: string; tier: string; rank: string }>;
-        const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
-        if (solo) {
-          p.rankedTier = solo.tier;
-          p.rankedRank = solo.rank;
-        }
-      } catch { /* skip this participant */ }
+    if (!skipRanks) {
+      let rateLimited = false;
+      for (const p of participants) {
+        if (!p.puuid || rateLimited) continue;
+        try {
+          const url = `https://${platformRegion}.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(p.puuid)}`;
+          const r = await fetch(url, { headers: { 'X-Riot-Token': apiKey } });
+          if (r.status === 429) {
+            console.warn(`[spectator] Ranked lookup rate-limited, skipping remaining participants`);
+            rateLimited = true;
+            continue;
+          }
+          if (!r.ok) continue;
+          const entries = await r.json() as Array<{ queueType: string; tier: string; rank: string; leaguePoints: number; wins: number; losses: number }>;
+          const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5') ?? entries[0];
+          if (solo) {
+            p.rankedTier = solo.tier;
+            p.rankedRank = solo.rank;
+            p.rankedLP = solo.leaguePoints;
+            p.rankedWins = solo.wins;
+            p.rankedLosses = solo.losses;
+          }
+        } catch { /* skip this participant */ }
+      }
     }
 
     const response: SpectatorResponse = {
