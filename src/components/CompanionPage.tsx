@@ -111,7 +111,7 @@ export function CompanionPage({ onBack, onDev, hasLiveGame, onLiveGame }: Props)
               <div className="companion-step-number">2</div>
               <div className="companion-step-content">
                 <h3>Open x9report.com</h3>
-                <p>The website detects the companion automatically &mdash; no setup required. A connection indicator appears when linked.</p>
+                <p>The website detects the companion automatically - no setup required. A connection indicator appears when linked.</p>
               </div>
             </div>
             <div className="companion-step">
