@@ -2382,10 +2382,57 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                       <span className={`mh-card-chevron ${isExpanded ? 'mh-card-chevron--open' : ''}`}>&#9662;</span>
                     </div>
                     {isExpanded && slot.detailStatus === 'loading' && (
-                      <div className="mh-expanded-panel" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
-                        <div className="mh-detail-loading">
-                          <div className="skin-card-spinner" />
-                          <span style={{ marginLeft: '0.75rem', color: 'var(--mh-text-secondary, #999)', fontSize: '0.85rem' }}>Loading match details...</span>
+                      <div className="mh-expanded-panel">
+                        <div className="mh-expanded-tabs">
+                          <button className="mh-expanded-tab mh-expanded-tab--active" disabled>Scoreboard</button>
+                          <button className="mh-expanded-tab" disabled>Kill Feed</button>
+                        </div>
+                        <div className="mh-scoreboard">
+                          <div className="mh-sb-loading-overlay">
+                            <div className="skin-card-spinner" />
+                          </div>
+                          {[0, 1].map((teamIdx) => (
+                            <div key={teamIdx} className="mh-sb-team mh-sb-team--skeleton">
+                              <div className="mh-sb-team-header">
+                                <span className="mh-skeleton" style={{ width: 60, height: 14 }} />
+                              </div>
+                              <div className="mh-sb-header-row">
+                                <span className="mh-sb-col-champ">Champion</span>
+                                <span className="mh-sb-col-rank">Rank</span>
+                                <span className="mh-sb-col-spells">Spells</span>
+                                <span className="mh-sb-col-kda">KDA</span>
+                                <span className="mh-sb-col-cs">CS</span>
+                                <span className="mh-sb-col-dmg">Damage</span>
+                                <span className="mh-sb-col-gold">Gold</span>
+                                <span className="mh-sb-col-items">Items</span>
+                              </div>
+                              {Array.from({ length: 5 }, (_, i) => (
+                                <div key={i} className="mh-sb-row">
+                                  <div className="mh-sb-col-champ">
+                                    <span className="mh-skeleton" style={{ width: 28, height: 28, borderRadius: 4, flexShrink: 0 }} />
+                                    <div className="mh-sb-player-info">
+                                      <span className="mh-skeleton" style={{ width: 70 + (i % 3) * 20, height: 12 }} />
+                                      <span className="mh-skeleton" style={{ width: 50, height: 10, marginTop: 3 }} />
+                                    </div>
+                                  </div>
+                                  <div className="mh-sb-col-rank"><span className="mh-skeleton" style={{ width: 32, height: 14 }} /></div>
+                                  <div className="mh-sb-col-spells" style={{ display: 'flex', gap: 2 }}>
+                                    <span className="mh-skeleton" style={{ width: 16, height: 16, borderRadius: 2 }} />
+                                    <span className="mh-skeleton" style={{ width: 16, height: 16, borderRadius: 2 }} />
+                                  </div>
+                                  <div className="mh-sb-col-kda"><span className="mh-skeleton" style={{ width: 50, height: 12 }} /></div>
+                                  <div className="mh-sb-col-cs"><span className="mh-skeleton" style={{ width: 28, height: 12 }} /></div>
+                                  <div className="mh-sb-col-dmg"><span className="mh-skeleton" style={{ width: '80%', height: 10, borderRadius: 3 }} /></div>
+                                  <div className="mh-sb-col-gold"><span className="mh-skeleton" style={{ width: 36, height: 12 }} /></div>
+                                  <div className="mh-sb-col-items" style={{ display: 'flex', gap: 2 }}>
+                                    {Array.from({ length: 6 }, (_, j) => (
+                                      <span key={j} className="mh-skeleton" style={{ width: 22, height: 22, borderRadius: 2 }} />
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
