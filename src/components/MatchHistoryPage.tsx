@@ -2852,7 +2852,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 let totalGold = 0;
                                 for (const ev of purchaseOnly) {
                                   const info = itemData[ev.itemId];
-                                  if (info?.gold?.total) totalGold += info.gold.total;
+                                  if (info?.goldTotal) totalGold += info.goldTotal;
                                 }
 
                                 return (
