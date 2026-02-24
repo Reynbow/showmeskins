@@ -5,6 +5,16 @@ const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? '/model-cdn').replace(
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
 const CDRAGON_RAW = 'https://raw.communitydragon.org';
 
+const CHAMPION_ID_ALIASES: Record<string, string> = {
+  fiddlesticks: 'Fiddlesticks',
+};
+
+function normalizeChampionId(championId: string): string {
+  const trimmed = championId.trim();
+  if (!trimmed) return trimmed;
+  return CHAMPION_ID_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
 /**
  * Build a model CDN asset URL for a champion alias + skin ID.
  */
@@ -139,14 +149,15 @@ export async function getItems(): Promise<Record<number, ItemInfo>> {
 }
 
 export async function getChampionDetail(id: string): Promise<ChampionDetail> {
+  const normalizedId = normalizeChampionId(id);
   const version = await getLatestVersion();
-  const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/champion/${id}.json`);
+  const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/champion/${normalizedId}.json`);
   const data = await res.json();
-  const detail = data.data[id] as ChampionDetail;
+  const detail = data.data[normalizedId] as ChampionDetail;
 
   // Seraphine's launch ultimate skin ships as three progression variants in
   // Data Dragon. Treat them as one skin card and expose variants in-model.
-  if (id === 'Seraphine') {
+  if (normalizedId === 'Seraphine') {
     detail.skins = detail.skins
       .filter((skin) => skin.id !== '147002' && skin.id !== '147003')
       .map((skin) =>
@@ -160,25 +171,25 @@ export async function getChampionDetail(id: string): Promise<ChampionDetail> {
 }
 
 export function getChampionIcon(id: string, version: string): string {
-  return `${BASE_URL}/cdn/${version}/img/champion/${id}.png`;
+  return `${BASE_URL}/cdn/${version}/img/champion/${normalizeChampionId(id)}.png`;
 }
 
 export function getSplashArt(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/splash/${championId}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/splash/${normalizeChampionId(championId)}_${skinNum}.jpg`;
 }
 
 export function getLoadingArt(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /** Fallback for splash art – uses loading art from Data Dragon */
 export function getSplashArtFallback(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /** Direct Data Dragon loading art URL (always external, JPG) */
 export function getLoadingArtDdragon(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${championId}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /**
@@ -401,7 +412,7 @@ export const LEVEL_FORM_SKINS: Record<string, LevelFormChampion> = {
  * @param skinId     - Riot skin ID string (e.g. "266000" for base Aatrox)
  */
 export function getModelUrl(championId: string, skinId: string): string {
-  const alias = championId.toLowerCase();
+  const alias = normalizeChampionId(championId).toLowerCase();
   return getModelAssetUrl(alias, skinId);
 }
 

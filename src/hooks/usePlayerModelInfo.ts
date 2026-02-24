@@ -6,6 +6,10 @@ import {
   resolveChromaTextureUrl,
 } from '../api';
 
+function normalizeChampionToken(value: string | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 /**
  * Resolves model URL and chroma texture for a live game player.
  * Uses resolveLcuSkinNum to detect chromas and always loads the base skin's
@@ -32,9 +36,12 @@ export function usePlayerModelInfo(
       setResult(null);
       return;
     }
-    const match = champions.find(
-      (c) => c.name.toLowerCase() === player.championName.toLowerCase(),
-    );
+    const playerChampion = normalizeChampionToken(player.championName);
+    const match = champions.find((c) => {
+      const byId = normalizeChampionToken(c.id) === playerChampion;
+      const byName = normalizeChampionToken(c.name) === playerChampion;
+      return byId || byName;
+    });
     if (!match) {
       setResult(null);
       return;

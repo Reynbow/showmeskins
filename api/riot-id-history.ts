@@ -218,15 +218,29 @@ function readEnvFileKey(filePath: string, key: string): string | undefined {
 
 function resolveRiotApiKey(): string | undefined {
   const direct = process.env.RIOT_API_KEY?.trim();
-  if (direct) return direct;
-
-  // Local dev fallback when env injection is missing.
+  // Local dev fallback when env injection is missing or stale.
   const cwd = process.cwd();
   const candidates = [
     join(cwd, '.vercel', '.env.development.local'),
     join(cwd, '.env.local'),
     join(cwd, '.env'),
   ];
+  const localFileKey = (() => {
+    for (const filePath of candidates) {
+      const key = readEnvFileKey(filePath, 'RIOT_API_KEY');
+      if (key) return key;
+    }
+    return undefined;
+  })();
+
+  // In local dev, prefer the filesystem key so stale injected env vars
+  // from vercel dev do not override a freshly renewed API key.
+  if (process.env.VERCEL_ENV === 'development' && localFileKey) {
+    return localFileKey;
+  }
+
+  if (direct) return direct;
+
   for (const filePath of candidates) {
     const key = readEnvFileKey(filePath, 'RIOT_API_KEY');
     if (key) return key;

@@ -381,6 +381,36 @@ const POSITION_LABELS: Record<string, string> = {
   UTILITY: 'Sup',
 };
 
+const POSITION_SORT_INDEX: Record<string, number> = {
+  TOP: 0,
+  JUNGLE: 1,
+  MIDDLE: 2,
+  BOTTOM: 3,
+  UTILITY: 4,
+};
+
+function normalizePosition(position?: string): string {
+  const pos = (position ?? '').toUpperCase();
+  if (pos === 'MID') return 'MIDDLE';
+  if (pos === 'BOT') return 'BOTTOM';
+  if (pos === 'SUP' || pos === 'SUPPORT') return 'UTILITY';
+  return pos;
+}
+
+function getPositionSortIndex(position?: string): number {
+  const normalized = normalizePosition(position);
+  return POSITION_SORT_INDEX[normalized] ?? Number.MAX_SAFE_INTEGER;
+}
+
+function getPositionLabel(position?: string): string {
+  const normalized = normalizePosition(position);
+  return POSITION_LABELS[normalized] ?? '';
+}
+
+function sortTeamByPosition<T>(players: T[], getPosition: (player: T) => string | undefined): T[] {
+  return [...players].sort((a, b) => getPositionSortIndex(getPosition(a)) - getPositionSortIndex(getPosition(b)));
+}
+
 type SpellInfoMap = Record<number, { name: string; description: string; cooldown: number; file: string }>;
 type ChampInfoMap = Record<string, { name: string; title: string; blurb: string; tags: string[] }>;
 type ChampKeyToIdMap = Record<number, string>;
@@ -1524,10 +1554,11 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
   // Live game elapsed timer: tick every second while game is active
   useEffect(() => {
-    if (!activeGame || liveGameEnded) {
+    if (!activeGame) {
       setLiveElapsed(0);
       return;
     }
+    if (liveGameEnded) return;
 
     const computeElapsed = () => {
       if (activeGame.gameStartTime > 0) {
@@ -1626,13 +1657,22 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     return champKeyToId[champId] ?? `Champion${champId}`;
   }, [champKeyToId]);
 
-  // Merge companion data with spectator data for a given player
-  const getCompanionPlayer = useCallback((championName: string): LiveGamePlayer | undefined => {
-    if (!companionLiveData?.players) return undefined;
-    return companionLiveData.players.find(
-      (p) => p.championName === championName || p.championName.toLowerCase() === championName.toLowerCase()
+  // Merge companion data with spectator data for a given player.
+  // Name matching is primary (most reliable), champion is fallback.
+  const getCompanionPlayer = useCallback((participant?: SpectatorParticipant): LiveGamePlayer | undefined => {
+    if (!participant || !companionLiveData?.players) return undefined;
+    const normalizeName = (value?: string): string => (value ?? '').trim().toLowerCase();
+    const riotIdName = (participant.riotId ?? '').split('#')[0];
+    const nameCandidates = new Set(
+      [normalizeName(participant.summonerName), normalizeName(riotIdName)].filter((n) => n.length > 0)
     );
-  }, [companionLiveData]);
+
+    const byName = companionLiveData.players.find((p) => nameCandidates.has(normalizeName(p.summonerName)));
+    if (byName) return byName;
+
+    const championName = resolveChampionName(participant.championId);
+    return companionLiveData.players.find((p) => p.championName.toLowerCase() === championName.toLowerCase());
+  }, [companionLiveData, resolveChampionName]);
 
   // Reverse map: champion name (lowercase) → numeric champion key
   const champNameToKey = useMemo(() => {
@@ -1704,8 +1744,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   }, [effectiveActiveGame, liveGameEnded]);
 
-  // Computed live game time: prefer companion's gameTime when available
-  const liveGameTime = companionLiveData?.gameTime ?? liveElapsed;
+  // Computed live game time: prefer companion's gameTime while live; keep last known timer after end.
+  const liveGameTime = liveGameEnded
+    ? (activeGame?.gameLength ?? liveElapsed)
+    : (companionLiveData?.gameTime ?? liveElapsed);
 
   return (
     <div className="mh-page">
@@ -1988,10 +2030,11 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             </div>
 
             <div className="mh-list">
-              {effectiveActiveGame && !liveGameEnded && (() => {
+              {effectiveActiveGame && (() => {
                 const searchedPlayer = effectiveActiveGame.participants.find((p) => p.puuid === result.puuid);
                 const searchedChampName = searchedPlayer ? resolveChampionName(searchedPlayer.championId) : '';
-                const companionPlayer = searchedChampName ? getCompanionPlayer(searchedChampName) : undefined;
+                const companionPlayer = getCompanionPlayer(searchedPlayer);
+                const isFinalizing = liveGameEnded;
 
                 const kills = companionPlayer?.kills ?? 0;
                 const deaths = companionPlayer?.deaths ?? 0;
@@ -2008,15 +2051,20 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
                 const queueLabel = formatQueue(effectiveActiveGame.gameQueueConfigId, effectiveActiveGame.gameMode);
                 const isExpanded = expandedMatchId === '__live__';
-                const team1 = effectiveActiveGame.participants.filter((p) => p.teamId === 100);
-                const team2 = effectiveActiveGame.participants.filter((p) => p.teamId === 200);
+                const team1 = sortTeamByPosition(
+                  effectiveActiveGame.participants.filter((p) => p.teamId === 100),
+                  (p) => getCompanionPlayer(p)?.position
+                );
+                const team2 = sortTeamByPosition(
+                  effectiveActiveGame.participants.filter((p) => p.teamId === 200),
+                  (p) => getCompanionPlayer(p)?.position
+                );
                 const searchedTeamId = searchedPlayer?.teamId ?? 100;
 
                 const livePlacementMap = new Map<string, number>();
                 if (companionLiveData?.players && companionLiveData.players.length > 0) {
                   const scored = effectiveActiveGame.participants.map((p) => {
-                    const cn = resolveChampionName(p.championId);
-                    const cp2 = getCompanionPlayer(cn);
+                    const cp2 = getCompanionPlayer(p);
                     const score = cp2 ? liveMvpScore(cp2.kills, cp2.deaths, cp2.assists, cp2.creepScore) : -Infinity;
                     return { puuid: p.puuid, score, hasData: !!cp2 };
                   }).filter((s) => s.hasData);
@@ -2029,7 +2077,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                     <div className="mh-card-accent mh-card-accent--live" />
                     <div className="mh-live-indicator">
                       <span className="mh-live-dot" />
-                      <span className="mh-live-label">LIVE</span>
+                      <span className="mh-live-label">{isFinalizing ? 'FINALIZING' : 'LIVE'}</span>
                     </div>
                     <div
                       className="mh-card-main mh-card-clickable"
@@ -2048,13 +2096,21 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                       </div>
                       <div className="mh-card-body">
                         <div className="mh-card-topline">
-                          <span className="mh-result mh-result--live">In Game</span>
+                          <span className="mh-result mh-result--live">{isFinalizing ? 'Game Ended' : 'In Game'}</span>
                           <span className="mh-card-sep">&middot;</span>
                           <span className="mh-card-meta">{queueLabel}</span>
                           <span className="mh-card-sep">&middot;</span>
                           <span className="mh-card-meta mh-live-time">{formatDuration(liveGameTime)}</span>
-                          {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
+                          {companionConnected && !isFinalizing && <span className="mh-companion-badge">x9report app live</span>}
                         </div>
+                        {isFinalizing && (
+                          <div className="mh-card-midline">
+                            <div className="mh-card-stat">
+                              <span className="mh-card-stat-value">Waiting for Riot match data...</span>
+                              <span className="mh-card-stat-detail">This card will stay until the completed match is available.</span>
+                            </div>
+                          </div>
+                        )}
                         <div className="mh-card-midline">
                           {companionPlayer ? (
                             <>
@@ -2132,7 +2188,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 </div>
                                 {teamParticipants.map((p) => {
                                   const champName = resolveChampionName(p.championId);
-                                  const cp = getCompanionPlayer(champName);
+                                  const cp = getCompanionPlayer(p);
                                   const pKills = cp?.kills ?? 0;
                                   const pDeaths = cp?.deaths ?? 0;
                                   const pAssists = cp?.assists ?? 0;
@@ -2157,7 +2213,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         cp?.spellF?.id ? (SPELL_FILE_TO_ID[cp.spellF.id] ?? 0) : 0,
                                       ].filter((id) => id > 0);
 
-                                  const posLabel = cp?.position ? (POSITION_LABELS[cp.position] ?? '') : '';
+                                  const posLabel = getPositionLabel(cp?.position);
 
                                   return (
                                     <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}${cp?.isDead ? ' mh-sb-row--dead' : ''}`}>
@@ -2346,8 +2402,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 const isExpanded = expandedMatchId === slot.matchId;
                 const participants = slot.detail?.participants ?? [];
                 const playerTeamId = participants.find((p) => p.puuid === result.puuid)?.teamId ?? 100;
-                const team1 = participants.filter((p) => p.teamId === 100);
-                const team2 = participants.filter((p) => p.teamId === 200);
+                const team1 = sortTeamByPosition(participants.filter((p) => p.teamId === 100), (p) => p.teamPosition);
+                const team2 = sortTeamByPosition(participants.filter((p) => p.teamId === 200), (p) => p.teamPosition);
                 const team1Win = team1[0]?.win ?? false;
                 const team2Win = team2[0]?.win ?? false;
 
@@ -2571,6 +2627,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 const placement = placementMap.get(p.puuid) ?? 0;
                                 const placementColor = PLACEMENT_COLORS[placement] ?? '#666';
                                 const placementMedal = PLACEMENT_MEDALS[placement];
+                                const posLabel = getPositionLabel(p.teamPosition);
                                 return (
                                   <div key={p.puuid} className={`mh-sb-row ${isYou ? 'mh-sb-row--you' : ''}`}>
                                     <div className="mh-sb-col-champ">
@@ -2610,7 +2667,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         >
                                           {displayName}
                                         </button>
-                                        <span className="mh-sb-champ-name">{p.championName}</span>
+                                        <span className="mh-sb-champ-name">
+                                          {p.championName}
+                                          {posLabel && <span className="mh-sb-role-badge">{posLabel}</span>}
+                                        </span>
                                       </div>
                                       {isMvp && (
                                         <TextTooltip content={getMhMvpBreakdown(p)} variant="mvp" className="mh-sb-mvp-wrap">
