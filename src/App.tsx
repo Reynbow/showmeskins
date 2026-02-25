@@ -11,6 +11,7 @@ import type {
   ChampionDetail,
   Skin,
   LiveGameData,
+  LobbyData,
   LiveGamePlayer,
   LiveGameEvent,
   KillEvent,
@@ -247,6 +248,105 @@ function normalizeLiveGamePayload(raw: unknown, prev: LiveGameData | null): Live
   };
 }
 
+function normalizeLobbyPayload(raw: unknown): LobbyData | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const source = raw as Record<string, unknown>;
+  const lobbyRaw = (source.lobby && typeof source.lobby === 'object')
+    ? (source.lobby as Record<string, unknown>)
+    : source;
+
+  const normalizeTeam = (value: unknown): LobbyData['myTeam'][number]['team'] => {
+    if (typeof value !== 'string') return 'UNKNOWN';
+    const upper = value.toUpperCase();
+    if (upper === 'ORDER' || upper === 'CHAOS') return upper;
+    return 'UNKNOWN';
+  };
+
+  const localPlayerCellId = readNumericField(lobbyRaw, 'localPlayerCellId', 'LocalPlayerCellId');
+
+  const parseTeam = (value: unknown, fallbackTeam: 'ORDER' | 'CHAOS') => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const row = entry as Record<string, unknown>;
+        return {
+          cellId: readNumericField(row, 'cellId', 'CellId'),
+          team: normalizeTeam(row.team) === 'UNKNOWN' ? fallbackTeam : normalizeTeam(row.team),
+          championId: readNumericField(row, 'championId', 'ChampionId'),
+          championKey: readStringField(row, 'championKey', 'ChampionKey') || undefined,
+          championName: readStringField(row, 'championName', 'ChampionName') || undefined,
+          selectedSkinId: readNumericField(row, 'selectedSkinId', 'SelectedSkinId') || undefined,
+          isLocalPlayer: readNumericField(row, 'cellId', 'CellId') === localPlayerCellId,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry);
+  };
+
+  const parseActions = (value: unknown, expectedType: 'pick' | 'ban') => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const row = entry as Record<string, unknown>;
+        const rawType = readStringField(row, 'type', 'Type').toLowerCase();
+        if (rawType !== expectedType) return null;
+        return {
+          type: expectedType,
+          actorCellId: readNumericField(row, 'actorCellId', 'ActorCellId'),
+          team: normalizeTeam(readStringField(row, 'team', 'Team')),
+          championId: readNumericField(row, 'championId', 'ChampionId'),
+          championKey: readStringField(row, 'championKey', 'ChampionKey') || undefined,
+          championName: readStringField(row, 'championName', 'ChampionName') || undefined,
+          completed: !!(row.completed ?? row.Completed),
+          inProgress: !!(row.inProgress ?? row.InProgress),
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry);
+  };
+
+  const myTeam = parseTeam(lobbyRaw.myTeam, 'ORDER');
+  const theirTeam = parseTeam(lobbyRaw.theirTeam, 'CHAOS');
+  const picks = parseActions(lobbyRaw.picks, 'pick');
+  const bans = parseActions(lobbyRaw.bans, 'ban');
+
+  // Backward-compatibility: older companions only send local champion fields.
+  if (myTeam.length === 0 && theirTeam.length === 0 && picks.length === 0 && bans.length === 0) {
+    const championKey = readStringField(source, 'championKey', 'ChampionKey');
+    const championId = readNumericField(source, 'championId', 'ChampionId');
+    const championName = readStringField(source, 'championName', 'ChampionName') || undefined;
+    if (!championKey && championId <= 0) return null;
+    return {
+      phase: 'champ_select',
+      localPlayerCellId: 0,
+      myTeam: [],
+      theirTeam: [],
+      picks: [{
+        type: 'pick',
+        actorCellId: 0,
+        team: 'ORDER',
+        championId,
+        championKey: championKey || undefined,
+        championName,
+        completed: false,
+        inProgress: true,
+      }],
+      bans: [],
+      updatedAt: Date.now(),
+    };
+  }
+
+  return {
+    phase: 'champ_select',
+    localPlayerCellId,
+    myTeam,
+    theirTeam,
+    picks,
+    bans,
+    updatedAt: Date.now(),
+  };
+}
+
 function readHistoryRiotIdFromUrl(): string {
   const params = new URLSearchParams(window.location.search);
   return params.get('riotId') ?? '';
@@ -296,6 +396,7 @@ function App() {
     }
   });
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
+  const [lobbyData, setLobbyData] = useState<LobbyData | null>(null);
   const [itemData, setItemData] = useState<Record<number, ItemInfo>>({});
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [liveDebug, setLiveDebug] = useState<CompanionLiveDebug>({
@@ -390,6 +491,9 @@ function App() {
   championsRef.current = champions;
   const liveGameDataRef = useRef<LiveGameData | null>(liveGameData);
   liveGameDataRef.current = liveGameData;
+  const inChampSelectRef = useRef(false);
+  const lastLiveGameUpdateAtRef = useRef<number | null>(null);
+  const liveSessionEndedRef = useRef(true);
   const accountInfoRef = useRef<AccountInfo | null>(accountInfo);
   accountInfoRef.current = accountInfo;
   const pendingChampSelectRef = useRef<{ championId?: string; championKey?: string; skinNum: number } | null>(null);
@@ -670,8 +774,8 @@ function App() {
   useEffect(() => {
     const COMPANION_URL = 'ws://localhost:8234';
     let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout>;
-    let debounceTimer: ReturnType<typeof setTimeout>;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
 
     function connect() {
@@ -707,59 +811,45 @@ function App() {
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
+              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 90000;
+              if (hasRecentLive || !!liveGameDataRef.current) {
+                // Ignore stale champ-select end while an active live stream exists.
+                return;
+              }
               pendingChampSelectRef.current = null;
+              inChampSelectRef.current = false;
+              liveSessionEndedRef.current = true;
+              setLobbyData(null);
               return;
             }
 
             // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
-              const championId: string = data.championId ?? '';
-              const championKey: string = data.championKey ?? '';
-              const skinNum = data.skinNum ?? 0;
-              if (!championId && !championKey) return;
-
+              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 90000;
+              if (hasRecentLive || !!liveGameDataRef.current) {
+                // Ignore stale champ-select noise while live data is active/recent.
+                return;
+              }
+              // Ignore stale champ-select noise while a live session is active.
+              // Only allow lobby mode when no live data is active, or once liveGameEnd occurred.
+              if (!liveSessionEndedRef.current && !!liveGameDataRef.current) {
+                return;
+              }
               champSelectSeenSinceLastLiveGame.current = true;
+              inChampSelectRef.current = true;
+              setLiveGameData(null);
+              liveGameDataRef.current = null;
 
-              // Debounce: wait 300ms of no change before navigating
-              clearTimeout(debounceTimer);
-              debounceTimer = setTimeout(async () => {
-                const champs = championsRef.current;
-                if (champs.length === 0) {
-                  pendingChampSelectRef.current = { championId, championKey, skinNum };
-                  return;
-                }
+              const nextLobby = normalizeLobbyPayload(data);
+              if (nextLobby) {
+                setLobbyData(nextLobby);
+              }
 
-                const match = champs.find(
-                  (c) =>
-                    (championId && c.id.toLowerCase() === championId.toLowerCase()) ||
-                    (championKey && c.key === championKey),
-                );
-                if (!match) return;
-
-                try {
-                  const detail = await getChampionDetail(match.id);
-                  const resolution = await resolveLcuSkinNum(match.key, skinNum);
-                  let skin: Skin;
-                  let chromaId: number | null = null;
-                  if (resolution) {
-                    skin =
-                      detail.skins.find((s) => s.id === resolution.baseSkinId) ??
-                      detail.skins.find((s) => s.num === (parseInt(resolution.baseSkinId, 10) % 1000)) ??
-                      detail.skins[0];
-                    chromaId = resolution.chromaId;
-                  } else {
-                    skin = detail.skins.find((s) => s.num === skinNum) ?? detail.skins[0];
-                  }
-                  setSelectedChampion(detail);
-                  setSelectedSkin(skin);
-                  setCompanionChromaId(chromaId);
-                  setViewMode('viewer');
-                  const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
-                  window.history.replaceState(null, '', `/${match.id}${skinPath}`);
-                } catch (err) {
-                  console.error('[companion] Failed to load champion:', err);
-                }
-              }, 300);
+              // Show lobby/champ-select in match history instead of forcing model viewer.
+              if (viewModeRef.current !== 'history') {
+                setViewMode('history');
+                window.history.pushState(null, '', '/history');
+              }
             }
 
             // ── Account info (PUUID, etc. for match history) ──
@@ -775,6 +865,11 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
+              // Some clients miss champSelectEnd; a valid live update should
+              // always transition us out of champ-select mode.
+              inChampSelectRef.current = false;
+              lastLiveGameUpdateAtRef.current = now;
+              liveSessionEndedRef.current = false;
               setLiveDebug((prev) => {
                 let activeMatch = prev.activeMatch;
                 let nextMatchId = prev.nextMatchId;
@@ -823,6 +918,7 @@ function App() {
                 liveGameDataRef.current = next;
                 return next;
               });
+              setLobbyData(null);
 
               // Auto-navigate to history page on first live game detection
               if (!liveGameAutoNavDone.current) {
@@ -836,6 +932,8 @@ function App() {
 
             // ── Game ended ── transition to post-game summary
             if (data.type === 'liveGameEnd') {
+              liveSessionEndedRef.current = true;
+              lastLiveGameUpdateAtRef.current = null;
               setLiveDebug((prev) => {
                 let activeMatch = prev.activeMatch;
                 let nextMatchId = prev.nextMatchId;
@@ -884,9 +982,16 @@ function App() {
                 return;
               }
               pendingChampSelectRef.current = null;
-
-              setLiveGameData(null);
-              liveGameDataRef.current = null;
+              const finalUpdateRaw = (data && typeof data === 'object')
+                ? (data as Record<string, unknown>).finalUpdate
+                : undefined;
+              const finalizedSnapshot =
+                normalizeLiveGamePayload(finalUpdateRaw, liveGameDataRef.current) ?? liveGameDataRef.current;
+              if (finalizedSnapshot) {
+                setLiveGameData(finalizedSnapshot);
+                liveGameDataRef.current = finalizedSnapshot;
+              }
+              setLobbyData(null);
               liveGameAutoNavDone.current = false;
             }
           } catch {
@@ -956,6 +1061,7 @@ function App() {
           initialRiotId={historyInitialRiotId}
           onBack={handleHistoryBack}
           companionLiveData={liveGameData}
+          companionLobbyData={lobbyData}
           companionConnected={liveDebug.companionConnected}
           companionAccount={accountInfo}
         />

@@ -2425,13 +2425,83 @@
   opacity: 0.5;
 }
 
+@keyframes mh-team-wipe-heartbeat {
+  0% {
+    background: rgba(220, 38, 38, 0.08);
+    box-shadow: inset 0 0 0 0 rgba(248, 113, 113, 0.2);
+  }
+  38% {
+    background: rgba(220, 38, 38, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.4), 0 0 16px rgba(220, 38, 38, 0.22);
+  }
+  55% {
+    background: rgba(220, 38, 38, 0.1);
+    box-shadow: inset 0 0 0 0 rgba(248, 113, 113, 0.16);
+  }
+  78% {
+    background: rgba(220, 38, 38, 0.26);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5), 0 0 18px rgba(220, 38, 38, 0.28);
+  }
+  100% {
+    background: rgba(220, 38, 38, 0.08);
+    box-shadow: inset 0 0 0 0 rgba(248, 113, 113, 0.2);
+  }
+}
+
+.mh-sb-row--team-wipe-pulse {
+  animation: mh-team-wipe-heartbeat 1.5s ease-in-out infinite;
+}
+
+@keyframes mh-penta-shimmer {
+  0% {
+    background-position: -220px 0;
+    box-shadow: inset 0 0 0 1px rgba(245, 205, 108, 0.28), 0 0 0 rgba(245, 205, 108, 0);
+  }
+  45% {
+    box-shadow: inset 0 0 0 1px rgba(245, 205, 108, 0.5), 0 0 18px rgba(245, 205, 108, 0.2);
+  }
+  100% {
+    background-position: 220px 0;
+    box-shadow: inset 0 0 0 1px rgba(245, 205, 108, 0.28), 0 0 0 rgba(245, 205, 108, 0);
+  }
+}
+
+.mh-sb-row--penta {
+  background-image: linear-gradient(
+    110deg,
+    rgba(245, 205, 108, 0.1) 0%,
+    rgba(255, 238, 173, 0.34) 45%,
+    rgba(245, 205, 108, 0.1) 100%
+  );
+  background-size: 220px 100%;
+  animation: mh-penta-shimmer 1.25s linear infinite;
+}
+
+.mh-sb-penta-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffe9aa;
+  border: 1px solid rgba(245, 205, 108, 0.7);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: linear-gradient(180deg, rgba(168, 118, 34, 0.45), rgba(96, 70, 22, 0.75));
+  box-shadow: 0 0 14px rgba(245, 205, 108, 0.3);
+  flex-shrink: 0;
+}
+
 .mh-sb-dead-badge {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
-  border-radius: 3px;
-  padding: 1px 4px;
+  color: #ffe4e6;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.42), rgba(185, 28, 28, 0.52));
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  border-radius: 4px;
+  padding: 2px 7px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
   flex-shrink: 0;
 }
 
@@ -2451,4 +2521,85 @@
   font-size: 9px;
   color: #94a3b8;
   line-height: 1.1;
+}
+
+.mh-champion-face--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: var(--lol-gold-light);
+  background: radial-gradient(circle at 30% 30%, rgba(200, 170, 110, 0.28), rgba(10, 16, 26, 0.8));
+}
+
+.mh-lobby-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.mh-lobby-team {
+  border: 1px solid var(--lol-border);
+  background: rgba(10, 16, 26, 0.68);
+  padding: 10px;
+}
+
+.mh-lobby-team-header {
+  font-family: var(--font-heading);
+  letter-spacing: 1.5px;
+  color: var(--lol-gold-light);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.mh-lobby-section + .mh-lobby-section {
+  margin-top: 10px;
+}
+
+.mh-lobby-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--lol-text-dim);
+  margin-bottom: 6px;
+}
+
+.mh-lobby-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.mh-lobby-action-kind {
+  display: inline-flex;
+  min-width: 32px;
+  justify-content: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--lol-text-dim);
+  border: 1px solid var(--lol-border);
+  padding: 1px 5px;
+}
+
+.mh-lobby-action-champ {
+  font-size: 12px;
+  color: var(--lol-text-primary);
+}
+
+.mh-lobby-action-live {
+  font-size: 10px;
+  color: #7cc7ff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mh-lobby-empty {
+  display: inline-flex;
+  color: var(--lol-text-dim);
+  font-size: 12px;
 }

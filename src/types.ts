@@ -208,3 +208,36 @@ export interface LiveGameData {
   /** Frozen player state at the moment each kill happened, keyed by eventTime */
   killFeedSnapshots?: Record<number, KillEventPlayerSnapshot>;
 }
+
+export type LobbyTeam = 'ORDER' | 'CHAOS' | 'UNKNOWN';
+
+export interface LobbyTeamSlot {
+  cellId: number;
+  team: LobbyTeam;
+  championId: number;
+  championKey?: string;
+  championName?: string;
+  selectedSkinId?: number;
+  isLocalPlayer?: boolean;
+}
+
+export interface LobbyAction {
+  type: 'pick' | 'ban';
+  actorCellId: number;
+  team: LobbyTeam;
+  championId: number;
+  championKey?: string;
+  championName?: string;
+  completed: boolean;
+  inProgress: boolean;
+}
+
+export interface LobbyData {
+  phase: 'champ_select';
+  localPlayerCellId: number;
+  myTeam: LobbyTeamSlot[];
+  theirTeam: LobbyTeamSlot[];
+  picks: LobbyAction[];
+  bans: LobbyAction[];
+  updatedAt: number;
+}

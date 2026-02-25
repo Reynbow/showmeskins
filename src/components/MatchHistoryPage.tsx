@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ItemInfo, LiveGameData, LiveGamePlayer } from '../types';
+import type { ItemInfo, LiveGameData, LiveGamePlayer, LobbyData } from '../types';
 import type { AccountInfo } from './DevPage';
 import html2canvas from 'html2canvas';
 import { getItems, getLatestVersion } from '../api';
@@ -224,6 +224,7 @@ interface Props {
   initialRiotId?: string;
   onBack: () => void;
   companionLiveData?: LiveGameData | null;
+  companionLobbyData?: LobbyData | null;
   companionConnected?: boolean;
   companionAccount?: AccountInfo | null;
 }
@@ -569,6 +570,10 @@ const PLACEMENT_MEDALS: Record<number, string> = {
 };
 
 function getPlacementMap(participants: MatchParticipant[]): Map<string, number> {
+  // Hide placement badges for zero-action games/remakes.
+  if (!participants.some((p) => p.kills > 0)) {
+    return new Map<string, number>();
+  }
   const sorted = [...participants].sort((a, b) => mhMvpScore(b) - mhMvpScore(a));
   const map = new Map<string, number>();
   sorted.forEach((p, i) => map.set(p.puuid, i + 1));
@@ -771,7 +776,7 @@ function formatMasteryPoints(points: number): string {
   return String(points);
 }
 
-export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionConnected, companionAccount }: Props) {
+export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionLobbyData, companionConnected, companionAccount }: Props) {
   const initialParsed = splitRiotId(initialRiotId);
   const [gameName, setGameName] = useState(initialParsed.gameName);
   const [tagLine, setTagLine] = useState(initialParsed.tagLine);
@@ -797,6 +802,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const [ddragonVersion, setDdragonVersion] = useState('16.4.1');
   const [activeGame, setActiveGame] = useState<ActiveGameData | null>(null);
   const [liveGameEnded, setLiveGameEnded] = useState(false);
+  const [lastCompanionLiveData, setLastCompanionLiveData] = useState<LiveGameData | null>(null);
+  const [livePentaSpotlight, setLivePentaSpotlight] = useState<{ killerName: string; expiresAt: number } | null>(null);
+  const lastLivePentaKeyRef = useRef('');
   const spectatorPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const profileCardRef = useRef<HTMLDivElement | null>(null);
   const [liveElapsed, setLiveElapsed] = useState(0);
@@ -814,6 +822,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
   const topMastery = result?.profile?.topMastery ?? [];
   const profileBgChampion = topMastery.length > 0 ? topMastery[0].championName : null;
+  const liveCompanionData = companionLiveData ?? ((activeGame || liveGameEnded) ? lastCompanionLiveData : null);
 
   useEffect(() => {
     Promise.all([getItems(), getLatestVersion()]).then(async ([items, ver]) => {
@@ -827,6 +836,63 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       } catch { /* supplementary data is optional */ }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // Once the game has ended, freeze the cached companion snapshot so
+    // late/stale updates cannot overwrite the final in-game state.
+    if (companionLiveData && !liveGameEnded) {
+      setLastCompanionLiveData((prev) => {
+        if (!prev) return companionLiveData;
+        // Ignore out-of-order payloads that jump backwards in game time.
+        if (companionLiveData.gameTime + 5 < prev.gameTime) {
+          return prev;
+        }
+        return companionLiveData;
+      });
+    }
+  }, [companionLiveData, liveGameEnded]);
+
+  useEffect(() => {
+    const normalize = (value?: string): string => (value ?? '').trim().toLowerCase();
+    const candidates: Array<{ key: string; eventTime: number; killerName: string }> = [];
+
+    for (const ev of liveCompanionData?.liveEvents ?? []) {
+      if (ev.eventName === 'Multikill' && (ev.killStreak ?? 0) >= 5 && ev.killerName) {
+        candidates.push({
+          key: `event:${normalize(ev.killerName)}:${ev.eventTime}`,
+          eventTime: ev.eventTime,
+          killerName: ev.killerName,
+        });
+      }
+    }
+    for (const kill of liveCompanionData?.killFeed ?? []) {
+      if (kill.multiKill === 'penta' && kill.killerName) {
+        candidates.push({
+          key: `kill:${normalize(kill.killerName)}:${kill.eventTime}`,
+          eventTime: kill.eventTime,
+          killerName: kill.killerName,
+        });
+      }
+    }
+    if (candidates.length === 0) return;
+    candidates.sort((a, b) => b.eventTime - a.eventTime);
+    const newest = candidates[0];
+    if (newest.key !== lastLivePentaKeyRef.current) {
+      lastLivePentaKeyRef.current = newest.key;
+      setLivePentaSpotlight({ killerName: newest.killerName, expiresAt: Date.now() + 10_000 });
+    }
+  }, [liveCompanionData]);
+
+  useEffect(() => {
+    if (!livePentaSpotlight) return;
+    const remainingMs = livePentaSpotlight.expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      setLivePentaSpotlight(null);
+      return;
+    }
+    const timer = setTimeout(() => setLivePentaSpotlight(null), remainingMs);
+    return () => clearTimeout(timer);
+  }, [livePentaSpotlight]);
 
   useEffect(() => {
     const parsed = splitRiotId(initialRiotId);
@@ -952,6 +1018,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     setHasMore(false);
     setActiveGame(null);
     setLiveGameEnded(false);
+    setLastCompanionLiveData(null);
     if (spectatorPollRef.current) {
       clearInterval(spectatorPollRef.current);
       spectatorPollRef.current = null;
@@ -1455,6 +1522,13 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         const newIds = latestIds.filter((id) => !matchSlots.some((s) => s.matchId === id));
         if (newIds.length === 0) return;
 
+        // If a live card is finalizing, automatically open the newly arrived Riot match.
+        if (liveGameEnded) {
+          setExpandedMatchId(newIds[0]);
+          setExpandedTab('scoreboard');
+          setItemHistoryPuuid(null);
+        }
+
         for (const id of newIds) {
           const cached = getCachedMatch(id);
           if (cached) {
@@ -1580,19 +1654,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   }, [activeGame, companionLiveData, liveGameEnded]);
 
-  // Rank retry: if any live participants are missing rank data, re-fetch once after 5s
-  const rankRetryDoneRef = useRef(false);
+  // Rank retry: keep trying while live participants are missing rank data.
+  // Riot ranked lookups can be delayed/rate-limited, so a single retry is not enough.
   useEffect(() => {
-    if (!activeGame) {
-      rankRetryDoneRef.current = false;
-      return;
-    }
-    if (rankRetryDoneRef.current || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
+    if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
     const missingRanks = activeGame.participants.some((p) => !p.rankedTier);
     if (!missingRanks) return;
 
-    rankRetryDoneRef.current = true;
-    const timer = setTimeout(async () => {
+    const fetchRanks = async () => {
       try {
         const params = new URLSearchParams({
           puuid: result.puuid,
@@ -1619,8 +1688,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           });
         }
       } catch { /* silent */ }
-    }, 5000);
-    return () => clearTimeout(timer);
+    };
+
+    // First retry quickly, then continue periodic retries until ranks arrive.
+    const firstTimer = setTimeout(fetchRanks, 5000);
+    const interval = setInterval(fetchRanks, 45000);
+    return () => {
+      clearTimeout(firstTimer);
+      clearInterval(interval);
+    };
   }, [activeGame, liveGameEnded, result?.puuid, result?.platformRegion, region]);
 
   const handleExportProfileCard = useCallback(async () => {
@@ -1657,22 +1733,36 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     return champKeyToId[champId] ?? `Champion${champId}`;
   }, [champKeyToId]);
 
+  const resolveLobbyChampionName = useCallback((championName?: string, championKey?: string, championId?: number): string => {
+    if (championName && championName.trim()) return championName;
+    if (championKey && /^\d+$/.test(championKey)) {
+      const byKey = champKeyToId[Number(championKey)];
+      if (byKey) return byKey;
+    }
+    if (championId && championId > 0) {
+      const byId = champKeyToId[championId];
+      if (byId) return byId;
+      return `Champion${championId}`;
+    }
+    return 'Pending';
+  }, [champKeyToId]);
+
   // Merge companion data with spectator data for a given player.
   // Name matching is primary (most reliable), champion is fallback.
   const getCompanionPlayer = useCallback((participant?: SpectatorParticipant): LiveGamePlayer | undefined => {
-    if (!participant || !companionLiveData?.players) return undefined;
+    if (!participant || !liveCompanionData?.players) return undefined;
     const normalizeName = (value?: string): string => (value ?? '').trim().toLowerCase();
     const riotIdName = (participant.riotId ?? '').split('#')[0];
     const nameCandidates = new Set(
       [normalizeName(participant.summonerName), normalizeName(riotIdName)].filter((n) => n.length > 0)
     );
 
-    const byName = companionLiveData.players.find((p) => nameCandidates.has(normalizeName(p.summonerName)));
+    const byName = liveCompanionData.players.find((p) => nameCandidates.has(normalizeName(p.summonerName)));
     if (byName) return byName;
 
     const championName = resolveChampionName(participant.championId);
-    return companionLiveData.players.find((p) => p.championName.toLowerCase() === championName.toLowerCase());
-  }, [companionLiveData, resolveChampionName]);
+    return liveCompanionData.players.find((p) => p.championName.toLowerCase() === championName.toLowerCase());
+  }, [liveCompanionData, resolveChampionName]);
 
   // Reverse map: champion name (lowercase) → numeric champion key
   const champNameToKey = useMemo(() => {
@@ -1887,21 +1977,140 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         )}
 
         {!loading && !result && !error && (
-          <div className="mh-empty-state">
-            <svg className="mh-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
-              <path d="M20 21a8 8 0 1 0-16 0" />
-              <circle cx="12" cy="8" r="4" />
-              <path d="M3 21h18" opacity="0.3" />
-            </svg>
-            <h2 className="mh-empty-title">Look up a player</h2>
-            <p className="mh-empty-text">
-              Enter a Riot ID above to view their match history, ranked stats, and live game status.
-            </p>
-            <div className="mh-empty-hint">
-              <span className="mh-empty-hint-label">Example</span>
-              <span className="mh-empty-hint-value">Faker#KR1</span>
+          companionLiveData?.players && companionLiveData.players.length > 0 ? (
+            <div className="mh-list">
+              <div key="__live-empty__" className="mh-card mh-card--live mh-card--live-expanded">
+                <div className="mh-card-accent mh-card-accent--live" />
+                <div className="mh-live-indicator">
+                  <span className="mh-live-dot" />
+                  <span className="mh-live-label">LIVE</span>
+                </div>
+                <div className="mh-card-main">
+                  <div className="mh-champion-face-wrap">
+                    <div className="mh-champion-face mh-champion-face--placeholder">LIVE</div>
+                  </div>
+                  <div className="mh-card-body">
+                    <div className="mh-card-topline">
+                      <span className="mh-result mh-result--live">In Game</span>
+                      <span className="mh-card-sep">&middot;</span>
+                      <span className="mh-card-meta">{formatQueue(undefined, companionLiveData.gameMode)}</span>
+                      <span className="mh-card-sep">&middot;</span>
+                      <span className="mh-card-meta mh-live-time">{formatDuration(companionLiveData.gameTime)}</span>
+                      {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
+                    </div>
+                    <div className="mh-card-midline">
+                      <div className="mh-card-stat">
+                        <span className="mh-card-stat-value">{companionLiveData.players.length} players tracked</span>
+                        <span className="mh-card-stat-detail">Companion data is live. Search a Riot ID to load the full enriched scoreboard card.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mh-expanded-panel">
+                  <div className="mh-lobby-board">
+                    {[
+                      { label: 'Blue Team', team: 'ORDER' as const },
+                      { label: 'Red Team', team: 'CHAOS' as const },
+                    ].map(({ label, team }) => (
+                      <div key={`live-empty-${label}`} className="mh-lobby-team">
+                        <div className="mh-lobby-team-header">{label}</div>
+                        <div className="mh-lobby-section">
+                          <div className="mh-lobby-section-title">Live Players</div>
+                          {companionLiveData.players.filter((p) => p.team === team).map((p, idx) => (
+                            <div key={`live-empty-player-${team}-${idx}`} className="mh-lobby-action">
+                              <span className="mh-lobby-action-kind">KDA</span>
+                              <span className="mh-lobby-action-champ">{p.summonerName} ({p.kills}/{p.deaths}/{p.assists})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : companionLobbyData ? (
+            <div className="mh-list">
+              <div key="__lobby-empty__" className="mh-card mh-card--live mh-card--live-expanded">
+                <div className="mh-card-accent mh-card-accent--live" />
+                <div className="mh-live-indicator">
+                  <span className="mh-live-dot" />
+                  <span className="mh-live-label">LOBBY</span>
+                </div>
+                <div className="mh-card-main">
+                  <div className="mh-champion-face-wrap">
+                    <div className="mh-champion-face mh-champion-face--placeholder">CS</div>
+                  </div>
+                  <div className="mh-card-body">
+                    <div className="mh-card-topline">
+                      <span className="mh-result mh-result--live">Champion Select</span>
+                      <span className="mh-card-sep">&middot;</span>
+                      <span className="mh-card-meta">Lobby Open</span>
+                      {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
+                    </div>
+                    <div className="mh-card-midline">
+                      <div className="mh-card-stat">
+                        <span className="mh-card-stat-value">Tracking picks and bans</span>
+                        <span className="mh-card-stat-detail">Search a Riot ID to attach this to full match history.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mh-expanded-panel">
+                  <div className="mh-lobby-board">
+                    {[
+                      { label: 'Blue Team', team: 'ORDER' as const },
+                      { label: 'Red Team', team: 'CHAOS' as const },
+                    ].map(({ label, team }) => (
+                      <div key={label} className="mh-lobby-team">
+                        <div className="mh-lobby-team-header">{label}</div>
+                        <div className="mh-lobby-section">
+                          <div className="mh-lobby-section-title">Picks</div>
+                          {(companionLobbyData.picks ?? []).filter((a) => a.team === team).length > 0
+                            ? (companionLobbyData.picks ?? []).filter((a) => a.team === team).map((a, idx) => (
+                              <div key={`empty-lobby-pick-${team}-${idx}`} className="mh-lobby-action">
+                                <span className="mh-lobby-action-kind">Pick</span>
+                                <span className="mh-lobby-action-champ">{a.championName || a.championKey || (a.championId > 0 ? `Champion${a.championId}` : 'Pending')}</span>
+                                {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
+                              </div>
+                            ))
+                            : <span className="mh-lobby-empty">No picks yet</span>}
+                        </div>
+                        <div className="mh-lobby-section">
+                          <div className="mh-lobby-section-title">Bans</div>
+                          {(companionLobbyData.bans ?? []).filter((a) => a.team === team).length > 0
+                            ? (companionLobbyData.bans ?? []).filter((a) => a.team === team).map((a, idx) => (
+                              <div key={`empty-lobby-ban-${team}-${idx}`} className="mh-lobby-action">
+                                <span className="mh-lobby-action-kind">Ban</span>
+                                <span className="mh-lobby-action-champ">{a.championName || a.championKey || (a.championId > 0 ? `Champion${a.championId}` : 'Pending')}</span>
+                                {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
+                              </div>
+                            ))
+                            : <span className="mh-lobby-empty">No bans yet</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mh-empty-state">
+              <svg className="mh-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <path d="M20 21a8 8 0 1 0-16 0" />
+                <circle cx="12" cy="8" r="4" />
+                <path d="M3 21h18" opacity="0.3" />
+              </svg>
+              <h2 className="mh-empty-title">Look up a player</h2>
+              <p className="mh-empty-text">
+                Enter a Riot ID above to view their match history, ranked stats, and live game status.
+              </p>
+              <div className="mh-empty-hint">
+                <span className="mh-empty-hint-label">Example</span>
+                <span className="mh-empty-hint-value">Faker#KR1</span>
+              </div>
+            </div>
+          )
         )}
 
         {result && (
@@ -2030,6 +2239,94 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             </div>
 
             <div className="mh-list">
+              {!effectiveActiveGame && companionLobbyData && (() => {
+                const isExpanded = expandedMatchId === '__lobby__';
+                const lobbyPicks = companionLobbyData.picks ?? [];
+                const lobbyBans = companionLobbyData.bans ?? [];
+                const bluePicks = lobbyPicks.filter((a) => a.team === 'ORDER');
+                const redPicks = lobbyPicks.filter((a) => a.team === 'CHAOS');
+                const blueBans = lobbyBans.filter((a) => a.team === 'ORDER');
+                const redBans = lobbyBans.filter((a) => a.team === 'CHAOS');
+                const hasActions = lobbyPicks.length > 0 || lobbyBans.length > 0;
+
+                const renderActionList = (actions: typeof lobbyPicks, emptyLabel: string) => {
+                  if (actions.length === 0) {
+                    return <span className="mh-lobby-empty">{emptyLabel}</span>;
+                  }
+                  return actions.map((action, idx) => {
+                    const champName = resolveLobbyChampionName(action.championName, action.championKey, action.championId);
+                    const actionLabel = action.type === 'ban' ? 'Ban' : 'Pick';
+                    return (
+                      <div key={`${action.type}-${action.actorCellId}-${action.championId}-${idx}`} className="mh-lobby-action">
+                        <span className="mh-lobby-action-kind">{actionLabel}</span>
+                        <span className="mh-lobby-action-champ">{champName}</span>
+                        {!action.completed && <span className="mh-lobby-action-live">{action.inProgress ? 'in progress' : 'hovered'}</span>}
+                      </div>
+                    );
+                  });
+                };
+
+                return (
+                  <div key="__lobby__" className={`mh-card mh-card--live${isExpanded ? ' mh-card--live-expanded' : ''}`}>
+                    <div className="mh-card-accent mh-card-accent--live" />
+                    <div className="mh-live-indicator">
+                      <span className="mh-live-dot" />
+                      <span className="mh-live-label">LOBBY</span>
+                    </div>
+                    <div
+                      className="mh-card-main mh-card-clickable"
+                      onClick={() => { setExpandedMatchId(isExpanded ? null : '__lobby__'); setExpandedTab('scoreboard'); }}
+                    >
+                      <div className="mh-champion-face-wrap">
+                        <div className="mh-champion-face mh-champion-face--placeholder">CS</div>
+                      </div>
+                      <div className="mh-card-body">
+                        <div className="mh-card-topline">
+                          <span className="mh-result mh-result--live">Champion Select</span>
+                          <span className="mh-card-sep">&middot;</span>
+                          <span className="mh-card-meta">Lobby Open</span>
+                          {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
+                        </div>
+                        <div className="mh-card-midline">
+                          <div className="mh-card-stat">
+                            <span className="mh-card-stat-value">{hasActions ? 'Tracking picks and bans' : 'Waiting for picks and bans...'}</span>
+                            <span className="mh-card-stat-detail">This card switches to LIVE when the game starts.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`mh-card-chevron ${isExpanded ? 'mh-card-chevron--open' : ''}`}>&#9662;</span>
+                    </div>
+                    {isExpanded && (
+                      <div className="mh-expanded-panel">
+                        <div className="mh-lobby-board">
+                          <div className="mh-lobby-team">
+                            <div className="mh-lobby-team-header">Blue Team</div>
+                            <div className="mh-lobby-section">
+                              <div className="mh-lobby-section-title">Picks</div>
+                              {renderActionList(bluePicks, 'No picks yet')}
+                            </div>
+                            <div className="mh-lobby-section">
+                              <div className="mh-lobby-section-title">Bans</div>
+                              {renderActionList(blueBans, 'No bans yet')}
+                            </div>
+                          </div>
+                          <div className="mh-lobby-team">
+                            <div className="mh-lobby-team-header">Red Team</div>
+                            <div className="mh-lobby-section">
+                              <div className="mh-lobby-section-title">Picks</div>
+                              {renderActionList(redPicks, 'No picks yet')}
+                            </div>
+                            <div className="mh-lobby-section">
+                              <div className="mh-lobby-section-title">Bans</div>
+                              {renderActionList(redBans, 'No bans yet')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {effectiveActiveGame && (() => {
                 const searchedPlayer = effectiveActiveGame.participants.find((p) => p.puuid === result.puuid);
                 const searchedChampName = searchedPlayer ? resolveChampionName(searchedPlayer.championId) : '';
@@ -2062,7 +2359,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 const searchedTeamId = searchedPlayer?.teamId ?? 100;
 
                 const livePlacementMap = new Map<string, number>();
-                if (companionLiveData?.players && companionLiveData.players.length > 0) {
+                const liveHasAnyKills = liveCompanionData?.players?.some((p) => p.kills > 0) ?? false;
+                if (liveHasAnyKills && liveCompanionData?.players && liveCompanionData.players.length > 0) {
                   const scored = effectiveActiveGame.participants.map((p) => {
                     const cp2 = getCompanionPlayer(p);
                     const score = cp2 ? liveMvpScore(cp2.kills, cp2.deaths, cp2.assists, cp2.creepScore) : -Infinity;
@@ -2160,7 +2458,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                             className={`mh-expanded-tab${expandedTab === 'scoreboard' ? ' mh-expanded-tab--active' : ''}`}
                             onClick={(e) => { e.stopPropagation(); setExpandedTab('scoreboard'); }}
                           >Scoreboard</button>
-                          {companionLiveData?.killFeed && companionLiveData.killFeed.length > 0 && (
+                          {liveCompanionData?.killFeed && liveCompanionData.killFeed.length > 0 && (
                             <button
                               className={`mh-expanded-tab${expandedTab === 'killfeed' ? ' mh-expanded-tab--active' : ''}`}
                               onClick={(e) => { e.stopPropagation(); setExpandedTab('killfeed'); }}
@@ -2189,11 +2487,24 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                 {teamParticipants.map((p) => {
                                   const champName = resolveChampionName(p.championId);
                                   const cp = getCompanionPlayer(p);
+                                  const isPentaActiveForPlayer = (() => {
+                                    if (!cp || !livePentaSpotlight) return false;
+                                    const normalize = (value?: string): string => (value ?? '').trim().toLowerCase();
+                                    return normalize(cp.summonerName) === normalize(livePentaSpotlight.killerName)
+                                      && livePentaSpotlight.expiresAt > Date.now();
+                                  })();
+                                  const teamAllDead = teamParticipants.length > 0 && teamParticipants.every((tp) => {
+                                    const tcp = getCompanionPlayer(tp);
+                                    return !!tcp && tcp.isDead && tcp.respawnTimer > 0;
+                                  });
                                   const pKills = cp?.kills ?? 0;
                                   const pDeaths = cp?.deaths ?? 0;
                                   const pAssists = cp?.assists ?? 0;
                                   const pKdaNum = pDeaths > 0 ? (pKills + pAssists) / pDeaths : pKills + pAssists;
-                                  const pKdaLabel = cp ? (pDeaths > 0 ? pKdaNum.toFixed(1) : 'Perfect') : '-';
+                                  const hasCombatStats = pKills > 0 || pDeaths > 0 || pAssists > 0;
+                                  const pKdaLabel = cp && hasCombatStats
+                                    ? (pDeaths > 0 ? pKdaNum.toFixed(1) : 'Perfect')
+                                    : null;
                                   const pCs = cp?.creepScore ?? 0;
                                   const pItems = cp?.items ?? [];
                                   const pBuild = [0, 1, 2, 3, 4, 5, 6].map((s) => {
@@ -2216,7 +2527,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                   const posLabel = getPositionLabel(cp?.position);
 
                                   return (
-                                    <div key={p.puuid || `${teamId}-${p.championId}`} className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}${cp?.isDead ? ' mh-sb-row--dead' : ''}`}>
+                                    <div
+                                      key={p.puuid || `${teamId}-${p.championId}`}
+                                      className={`mh-sb-row ${isSearched ? 'mh-sb-row--you' : ''}${cp?.isDead ? ' mh-sb-row--dead' : ''}${teamAllDead && cp?.isDead && cp.respawnTimer > 0 ? ' mh-sb-row--team-wipe-pulse' : ''}${isPentaActiveForPlayer ? ' mh-sb-row--penta' : ''}`}
+                                    >
                                       <div className="mh-sb-col-champ">
                                         <img className="mh-sb-champ-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
                                         <div className="mh-sb-player-info">
@@ -2229,8 +2543,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         {cp && (
                                           <span className="mh-sb-level-badge">Lv{cp.level}</span>
                                         )}
-                                        {cp?.isDead && cp.respawnTimer > 0 && (
-                                          <span className="mh-sb-dead-badge">{Math.ceil(cp.respawnTimer)}s</span>
+                                        {isPentaActiveForPlayer ? (
+                                          <span className="mh-sb-penta-badge">PENTA</span>
+                                        ) : cp?.isDead && cp.respawnTimer > 0 && (
+                                          <span className="mh-sb-dead-badge">REVIVING IN {Math.ceil(cp.respawnTimer)}s</span>
                                         )}
                                         {(() => {
                                           const lp = livePlacementMap.get(p.puuid);
@@ -2291,7 +2607,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         {cp ? (
                                           <>
                                             <span className="mh-sb-kda-score">{pKills} / {pDeaths} / {pAssists}</span>
-                                            <span className="mh-sb-kda-ratio" style={{ color: kdaColor(pKdaNum) }}>{pKdaLabel} KDA</span>
+                                            {pKdaLabel && (
+                                              <span className="mh-sb-kda-ratio" style={{ color: kdaColor(pKdaNum) }}>{pKdaLabel} KDA</span>
+                                            )}
                                           </>
                                         ) : (
                                           <span className="mh-sb-kda-score mh-live-waiting">-</span>
@@ -2333,14 +2651,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                             ))}
                           </div>
                         )}
-                        {expandedTab === 'killfeed' && companionLiveData?.killFeed && (
+                        {expandedTab === 'killfeed' && liveCompanionData?.killFeed && (
                           <div className="mh-killfeed">
                             <div className="mh-killfeed-header">
                               <span className="mh-killfeed-title">Live Kill Feed</span>
-                              <span className="mh-killfeed-count">{companionLiveData.killFeed.length} kills</span>
+                              <span className="mh-killfeed-count">{liveCompanionData.killFeed.length} kills</span>
                             </div>
                             <div className="mh-killfeed-list">
-                              {companionLiveData.killFeed.map((kill, ki) => {
+                              {liveCompanionData.killFeed.map((kill, ki) => {
                                 const mins = Math.floor(kill.eventTime / 60);
                                 const secs = Math.floor(kill.eventTime % 60);
                                 const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -2614,7 +2932,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               </div>
                               {team.map((p) => {
                                 const pKdaNum = p.deaths > 0 ? (p.kills + p.assists) / p.deaths : p.kills + p.assists;
-                                const pKdaLabel = p.deaths > 0 ? pKdaNum.toFixed(1) : 'Perfect';
+                                const hasCombatStats = p.kills > 0 || p.deaths > 0 || p.assists > 0;
+                                const pKdaLabel = hasCombatStats ? (p.deaths > 0 ? pKdaNum.toFixed(1) : 'Perfect') : null;
                                 const pCs = p.totalMinionsKilled + p.neutralMinionsKilled;
                                 const pItems = [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6];
                                 const isYou = p.puuid === result.puuid;
@@ -2728,7 +3047,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                     </div>
                                     <div className="mh-sb-col-kda">
                                       <span className="mh-sb-kda-score">{p.kills} / {p.deaths} / {p.assists}</span>
-                                      <span className="mh-sb-kda-ratio" style={{ color: kdaColor(pKdaNum) }}>{pKdaLabel} KDA</span>
+                                      {pKdaLabel && (
+                                        <span className="mh-sb-kda-ratio" style={{ color: kdaColor(pKdaNum) }}>{pKdaLabel} KDA</span>
+                                      )}
                                     </div>
                                     <div className="mh-sb-col-cs">{pCs}</div>
                                     <div className="mh-sb-col-dmg">

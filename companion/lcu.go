@@ -30,12 +30,42 @@ type ChampInfo struct {
 
 // ChampSelectUpdate is the message sent to the bridge when champ select changes.
 type ChampSelectUpdate struct {
+	Type         string                 `json:"type"`
+	ChampionID   string                 `json:"championId,omitempty"`
+	ChampionName string                 `json:"championName,omitempty"`
+	ChampionKey  string                 `json:"championKey,omitempty"`
+	SkinNum      int                    `json:"skinNum,omitempty"`
+	SkinID       string                 `json:"skinId,omitempty"`
+	Lobby        *ChampSelectLobbyState `json:"lobby,omitempty"`
+}
+
+type ChampSelectLobbyState struct {
+	LocalPlayerCellId int                      `json:"localPlayerCellId"`
+	MyTeam            []ChampSelectLobbySlot   `json:"myTeam"`
+	TheirTeam         []ChampSelectLobbySlot   `json:"theirTeam"`
+	Picks             []ChampSelectLobbyAction `json:"picks"`
+	Bans              []ChampSelectLobbyAction `json:"bans"`
+}
+
+type ChampSelectLobbySlot struct {
+	CellID         int    `json:"cellId"`
+	Team           string `json:"team"`
+	ChampionID     int    `json:"championId"`
+	ChampionKey    string `json:"championKey,omitempty"`
+	ChampionName   string `json:"championName,omitempty"`
+	SelectedSkinID int    `json:"selectedSkinId,omitempty"`
+	IsLocalPlayer  bool   `json:"isLocalPlayer,omitempty"`
+}
+
+type ChampSelectLobbyAction struct {
 	Type         string `json:"type"`
-	ChampionID   string `json:"championId,omitempty"`
-	ChampionName string `json:"championName,omitempty"`
+	ActorCellID  int    `json:"actorCellId"`
+	Team         string `json:"team"`
+	ChampionID   int    `json:"championId"`
 	ChampionKey  string `json:"championKey,omitempty"`
-	SkinNum      int    `json:"skinNum,omitempty"`
-	SkinID       string `json:"skinId,omitempty"`
+	ChampionName string `json:"championName,omitempty"`
+	Completed    bool   `json:"completed"`
+	InProgress   bool   `json:"inProgress"`
 }
 
 // StatusCallback is called whenever the LCU connection status changes.
@@ -62,10 +92,10 @@ type LCUConnector struct {
 	port  string
 	token string
 
-	championMap map[string]ChampInfo // numeric key → ChampInfo
-	lastUpdate  string               // dedup key
+	championMap  map[string]ChampInfo // numeric key → ChampInfo
+	lastUpdate   string               // dedup key
 	lastUpdateMu sync.Mutex
-	authHeader  string
+	authHeader   string
 
 	onStatus      StatusCallback
 	onChampSelect ChampSelectCallback
@@ -373,6 +403,7 @@ type lcuEvent struct {
 type champSelectSession struct {
 	LocalPlayerCellId int             `json:"localPlayerCellId"`
 	MyTeam            []teamMember    `json:"myTeam"`
+	TheirTeam         []teamMember    `json:"theirTeam"`
 	Actions           [][]actionEntry `json:"actions"`
 }
 
@@ -384,9 +415,11 @@ type teamMember struct {
 }
 
 type actionEntry struct {
-	ActorCellId int    `json:"actorCellId"`
-	Type        string `json:"type"`
-	ChampionId  int    `json:"championId"`
+	ActorCellId  int    `json:"actorCellId"`
+	Type         string `json:"type"`
+	ChampionId   int    `json:"championId"`
+	Completed    bool   `json:"completed"`
+	IsInProgress bool   `json:"isInProgress"`
 }
 
 func teamCellIds(team []teamMember) []int {
@@ -395,6 +428,31 @@ func teamCellIds(team []teamMember) []int {
 		ids[i] = team[i].CellId
 	}
 	return ids
+}
+
+func (l *LCUConnector) resolveChampionInfo(championKey int) (string, string) {
+	if championKey <= 0 {
+		return "", ""
+	}
+	key := strconv.Itoa(championKey)
+	if champInfo, ok := l.championMap[key]; ok {
+		return champInfo.ID, champInfo.Name
+	}
+	return key, ""
+}
+
+func teamForCellID(cellID int, myTeam []teamMember, theirTeam []teamMember) string {
+	for i := range myTeam {
+		if myTeam[i].CellId == cellID {
+			return "ORDER"
+		}
+	}
+	for i := range theirTeam {
+		if theirTeam[i].CellId == cellID {
+			return "CHAOS"
+		}
+	}
+	return "UNKNOWN"
 }
 
 func (l *LCUConnector) handleEvent(raw json.RawMessage) {
@@ -488,47 +546,95 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 		}
 	}
 
-	if championKey == 0 {
-		log.Printf("[lcu] No champion selected yet (championId=0, pickIntent=%d)",
-			localPlayer.ChampionPickIntent)
-		return
-	}
-
 	skinNum := 0
 	if selectedSkinId > 0 {
 		skinNum = selectedSkinId % 1000
 	}
 
-	// De-duplicate: don't re-emit if nothing changed.
-	// Use numeric champion key so updates still flow even if championMap is stale/unavailable.
-	key := fmt.Sprintf("%d:%d", championKey, skinNum)
-	if !l.updateDedupKey(key) {
-		return
-	}
-
-	champID := ""
-	champName := ""
-	if champInfo, ok := l.championMap[strconv.Itoa(championKey)]; ok {
-		champID = champInfo.ID
-		champName = champInfo.Name
-		log.Printf("[lcu] Champion select: %s skin #%d", champInfo.Name, skinNum)
-	} else {
-		log.Printf("[lcu] Champion select key %d skin #%d (champion map missing entry)", championKey, skinNum)
-	}
+	champID, champName := l.resolveChampionInfo(championKey)
 
 	skinID := strconv.Itoa(selectedSkinId)
-	if selectedSkinId == 0 {
+	if selectedSkinId == 0 && championKey > 0 {
 		skinID = strconv.Itoa(championKey * 1000)
 	}
 
-	l.onChampSelect(ChampSelectUpdate{
+	myTeam := make([]ChampSelectLobbySlot, 0, len(session.MyTeam))
+	for _, member := range session.MyTeam {
+		memberChampionID, memberChampionName := l.resolveChampionInfo(member.ChampionId)
+		myTeam = append(myTeam, ChampSelectLobbySlot{
+			CellID:         member.CellId,
+			Team:           "ORDER",
+			ChampionID:     member.ChampionId,
+			ChampionKey:    memberChampionID,
+			ChampionName:   memberChampionName,
+			SelectedSkinID: member.SelectedSkinId,
+			IsLocalPlayer:  member.CellId == session.LocalPlayerCellId,
+		})
+	}
+
+	theirTeam := make([]ChampSelectLobbySlot, 0, len(session.TheirTeam))
+	for _, member := range session.TheirTeam {
+		memberChampionID, memberChampionName := l.resolveChampionInfo(member.ChampionId)
+		theirTeam = append(theirTeam, ChampSelectLobbySlot{
+			CellID:         member.CellId,
+			Team:           "CHAOS",
+			ChampionID:     member.ChampionId,
+			ChampionKey:    memberChampionID,
+			ChampionName:   memberChampionName,
+			SelectedSkinID: member.SelectedSkinId,
+			IsLocalPlayer:  false,
+		})
+	}
+
+	picks := make([]ChampSelectLobbyAction, 0)
+	bans := make([]ChampSelectLobbyAction, 0)
+	for _, group := range session.Actions {
+		for _, action := range group {
+			if action.Type != "pick" && action.Type != "ban" {
+				continue
+			}
+			actionChampionID, actionChampionName := l.resolveChampionInfo(action.ChampionId)
+			lobbyAction := ChampSelectLobbyAction{
+				Type:         action.Type,
+				ActorCellID:  action.ActorCellId,
+				Team:         teamForCellID(action.ActorCellId, session.MyTeam, session.TheirTeam),
+				ChampionID:   action.ChampionId,
+				ChampionKey:  actionChampionID,
+				ChampionName: actionChampionName,
+				Completed:    action.Completed,
+				InProgress:   action.IsInProgress,
+			}
+			if action.Type == "pick" {
+				picks = append(picks, lobbyAction)
+			} else {
+				bans = append(bans, lobbyAction)
+			}
+		}
+	}
+
+	update := ChampSelectUpdate{
 		Type:         "champSelectUpdate",
 		ChampionID:   champID,
 		ChampionName: champName,
 		ChampionKey:  strconv.Itoa(championKey),
 		SkinNum:      skinNum,
 		SkinID:       skinID,
-	})
+		Lobby: &ChampSelectLobbyState{
+			LocalPlayerCellId: session.LocalPlayerCellId,
+			MyTeam:            myTeam,
+			TheirTeam:         theirTeam,
+			Picks:             picks,
+			Bans:              bans,
+		},
+	}
+	keyBytes, _ := json.Marshal(update)
+	if !l.updateDedupKey(string(keyBytes)) {
+		return
+	}
+	if championKey > 0 {
+		log.Printf("[lcu] Champion select: %s skin #%d", champName, skinNum)
+	}
+	l.onChampSelect(update)
 }
 
 // ── Account info (LCU HTTP API) ────────────────────────────────────────
