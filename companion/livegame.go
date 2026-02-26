@@ -349,9 +349,6 @@ func (t *LiveGameTracker) poll() {
 	sanitizeLiveGameUpdate(update)
 
 	hash := t.computeHash(update)
-	if hash == t.lastHash {
-		return
-	}
 	t.lastHash = hash
 	t.lastUpdate = update
 

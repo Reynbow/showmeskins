@@ -78,6 +78,7 @@ export interface SpectatorParticipant {
   rankedLP?: number;
   rankedWins?: number;
   rankedLosses?: number;
+  rankedStatus?: 'pending' | 'unranked' | 'ready';
 }
 
 export interface SpectatorBan {
@@ -179,6 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         spell1Id: typeof src.spell1Id === 'number' ? src.spell1Id : 0,
         spell2Id: typeof src.spell2Id === 'number' ? src.spell2Id : 0,
         perks,
+        rankedStatus: skipRanks ? undefined : 'pending',
       });
     }
 
@@ -215,6 +217,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             p.rankedLP = solo.leaguePoints;
             p.rankedWins = solo.wins;
             p.rankedLosses = solo.losses;
+            p.rankedStatus = 'ready';
+          } else {
+            p.rankedStatus = 'unranked';
           }
         } catch { /* skip this participant */ }
       }

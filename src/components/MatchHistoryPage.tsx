@@ -61,6 +61,7 @@ interface SpectatorParticipant {
   rankedLP?: number;
   rankedWins?: number;
   rankedLosses?: number;
+  rankedStatus?: 'pending' | 'unranked' | 'ready';
 }
 
 interface SpectatorBan {
@@ -811,6 +812,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [queueFilter, setQueueFilter] = useState<number | null>(null);
   const [statusNowTs, setStatusNowTs] = useState(() => Date.now());
+  const [profileIconLoaded, setProfileIconLoaded] = useState(false);
   const regionPickerRef = useRef<HTMLDivElement | null>(null);
   const lastAutoSearchKeyRef = useRef<string>('');
   const searchRequestIdRef = useRef(0);
@@ -824,6 +826,8 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
   const topMastery = result?.profile?.topMastery ?? [];
   const profileBgChampion = topMastery.length > 0 ? topMastery[0].championName : null;
+  // Keep companion data as a live overlay (kills/items/kda/killfeed), while
+  // Riot spectator data provides authoritative participant structure/ranks.
   const liveCompanionData = companionLiveData ?? ((activeGame || liveGameEnded) ? lastCompanionLiveData : null);
   const liveUpdateAgeSec = companionLastLiveUpdateAt != null
     ? Math.max(0, Math.floor((statusNowTs - companionLastLiveUpdateAt) / 1000))
@@ -853,6 +857,10 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     const timer = setInterval(() => setStatusNowTs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setProfileIconLoaded(false);
+  }, [result?.profile?.profileIconId, result?.gameName]);
 
   useEffect(() => {
     // Once the game has ended, freeze the cached companion snapshot so
@@ -1537,19 +1545,40 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         if (latestIds.length === 0) return;
 
         const newIds = latestIds.filter((id) => !matchSlots.some((s) => s.matchId === id));
-        if (newIds.length === 0) return;
+        // During finalizing, keep checking even when match ID is already known:
+        // we only switch once detailed Riot post-game data is available.
+        if (newIds.length === 0 && !liveGameEnded) return;
 
         // If a live card is finalizing, automatically open the newly arrived Riot match.
         if (liveGameEnded) {
-          setExpandedMatchId(newIds[0]);
+          setExpandedMatchId((newIds[0] ?? latestIds[0]) || null);
           setExpandedTab('scoreboard');
           setItemHistoryPuuid(null);
         }
 
-        for (const id of newIds) {
+        const idsToProcess = newIds.length > 0
+          ? newIds
+          : (liveGameEnded && latestIds[0] ? [latestIds[0]] : []);
+
+        for (const id of idsToProcess) {
+          const upsertSlot = (nextSlot: MatchSlot) => {
+            setMatchSlots((prev) => {
+              const idx = prev.findIndex((s) => s.matchId === id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = nextSlot;
+                return next;
+              }
+              return [nextSlot, ...prev];
+            });
+          };
           const cached = getCachedMatch(id);
           if (cached) {
-            setMatchSlots((prev) => [cached, ...prev]);
+            if (liveGameEnded && cached.detail?.participants && cached.detail.participants.length > 0) {
+              setActiveGame(null);
+              setLiveGameEnded(false);
+            }
+            upsertSlot(cached);
             continue;
           }
           const detailParams = new URLSearchParams({ region, puuid: result.puuid, matchId: id, brief: '1' });
@@ -1558,22 +1587,20 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             const detailBody = (await detailRes.json()) as MatchDetailResponse;
             if (detailRes.ok && detailBody.match) {
               cacheMatch(id, detailBody.match, detailBody.detail);
-              setMatchSlots((prev) => [
-                { matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' },
-                ...prev,
-              ]);
+              upsertSlot({ matchId: id, status: 'ready', match: detailBody.match, detail: detailBody.detail, detailStatus: detailBody.detail ? 'ready' : 'idle' });
+              if (liveGameEnded && detailBody.detail?.participants && detailBody.detail.participants.length > 0) {
+                // Riot post-game detail is available (kills/items/etc.) — end live mode now.
+                setActiveGame(null);
+                setLiveGameEnded(false);
+              }
             }
           } catch { /* silent */ }
-        }
-
-        if (liveGameEnded) {
-          setActiveGame(null);
-          setLiveGameEnded(false);
         }
       } catch { /* silent */ }
     };
 
-    const interval = setInterval(checkNewMatches, 60_000);
+    checkNewMatches();
+    const interval = setInterval(checkNewMatches, liveGameEnded ? 10_000 : 60_000);
     return () => clearInterval(interval);
   }, [result?.puuid, result?.gameName, result?.tagLine, region, queueFilter, matchSlots, liveGameEnded]);
 
@@ -1616,6 +1643,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   p.rankedLP = cached.rankedLP;
                   p.rankedWins = cached.rankedWins;
                   p.rankedLosses = cached.rankedLosses;
+                }
+                if ((!p.rankedStatus || p.rankedStatus === 'pending') && cached.rankedStatus) {
+                  p.rankedStatus = cached.rankedStatus;
                 }
                 if (!p.spell1Id && cached.spell1Id) p.spell1Id = cached.spell1Id;
                 if (!p.spell2Id && cached.spell2Id) p.spell2Id = cached.spell2Id;
@@ -1665,17 +1695,19 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
   // Detect game end from companion
   useEffect(() => {
-    if (activeGame && !companionLiveData && liveGameEnded) {
-      // Game ended -- transition to completed match
-      // The spectator polling already set liveGameEnded=true
-    }
-  }, [activeGame, companionLiveData, liveGameEnded]);
+    const resultFromCompanion = (companionLiveData?.gameResult ?? lastCompanionLiveData?.gameResult ?? '').trim();
+    if (!resultFromCompanion) return;
+    if (liveGameEnded) return;
+    // Some queues (e.g. ARAM: Mayhem) may not provide reliable spectator end-state data.
+    // If companion explicitly reports Win/Lose, enter finalizing mode immediately.
+    setLiveGameEnded(true);
+  }, [companionLiveData?.gameResult, lastCompanionLiveData?.gameResult, liveGameEnded]);
 
   // Rank retry: keep trying while live participants are missing rank data.
   // Riot ranked lookups can be delayed/rate-limited, so a single retry is not enough.
   useEffect(() => {
     if (!activeGame || liveGameEnded || !result?.puuid || !result?.platformRegion) return;
-    const missingRanks = activeGame.participants.some((p) => !p.rankedTier);
+    const missingRanks = activeGame.participants.some((p) => !p.rankedTier && p.rankedStatus !== 'unranked');
     if (!missingRanks) return;
 
     const fetchRanks = async () => {
@@ -1697,6 +1729,9 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             }
             fresh.participants = fresh.participants.map((p) => {
               const cached = p.puuid ? oldMap.get(p.puuid) : undefined;
+              if (cached && (!p.rankedStatus || p.rankedStatus === 'pending') && cached.rankedStatus) {
+                p.rankedStatus = cached.rankedStatus;
+              }
               if (cached && !p.spell1Id && cached.spell1Id) p.spell1Id = cached.spell1Id;
               if (cached && !p.spell2Id && cached.spell2Id) p.spell2Id = cached.spell2Id;
               return p;
@@ -1868,7 +1903,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   // Computed live game time: prefer companion's gameTime while live; keep last known timer after end.
   const liveGameTime = liveGameEnded
     ? (activeGame?.gameLength ?? liveElapsed)
-    : (companionLiveData?.gameTime ?? activeGame?.gameLength ?? liveElapsed);
+    : (activeGame?.gameLength ?? companionLiveData?.gameTime ?? liveElapsed);
 
   return (
     <div className="mh-page">
@@ -2099,25 +2134,51 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                         <div className="mh-lobby-section">
                           <div className="mh-lobby-section-title">Picks</div>
                           {(companionLobbyData.picks ?? []).filter((a) => a.team === team).length > 0
-                            ? (companionLobbyData.picks ?? []).filter((a) => a.team === team).map((a, idx) => (
-                              <div key={`empty-lobby-pick-${team}-${idx}`} className="mh-lobby-action">
-                                <span className="mh-lobby-action-kind">Pick</span>
-                                <span className="mh-lobby-action-champ">{a.championName || a.championKey || (a.championId > 0 ? `Champion${a.championId}` : 'Pending')}</span>
-                                {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
-                              </div>
-                            ))
+                            ? <div className="mh-lobby-actions-row">{(companionLobbyData.picks ?? []).filter((a) => a.team === team).map((a, idx) => {
+                              const champName = resolveLobbyChampionName(a.championName, a.championKey, a.championId);
+                              const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
+                              return (
+                                <div key={`empty-lobby-pick-${team}-${idx}`} className="mh-lobby-action mh-lobby-action--champ">
+                                  <span className="mh-lobby-action-text">
+                                    <span className="mh-lobby-action-kind">Pick</span>
+                                    <span className="mh-lobby-action-champ">{champName}</span>
+                                  </span>
+                                  <span className="mh-lobby-action-icon-wrap">
+                                    {hasIcon ? (
+                                      <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                                    ) : (
+                                      <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
+                                    )}
+                                  </span>
+                                  {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
+                                </div>
+                              );
+                            })}</div>
                             : <span className="mh-lobby-empty">No picks yet</span>}
                         </div>
                         <div className="mh-lobby-section">
                           <div className="mh-lobby-section-title">Bans</div>
                           {(companionLobbyData.bans ?? []).filter((a) => a.team === team).length > 0
-                            ? (companionLobbyData.bans ?? []).filter((a) => a.team === team).map((a, idx) => (
-                              <div key={`empty-lobby-ban-${team}-${idx}`} className="mh-lobby-action">
-                                <span className="mh-lobby-action-kind">Ban</span>
-                                <span className="mh-lobby-action-champ">{a.championName || a.championKey || (a.championId > 0 ? `Champion${a.championId}` : 'Pending')}</span>
-                                {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
-                              </div>
-                            ))
+                            ? <div className="mh-lobby-actions-row">{(companionLobbyData.bans ?? []).filter((a) => a.team === team).map((a, idx) => {
+                              const champName = resolveLobbyChampionName(a.championName, a.championKey, a.championId);
+                              const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
+                              return (
+                                <div key={`empty-lobby-ban-${team}-${idx}`} className="mh-lobby-action mh-lobby-action--champ">
+                                  <span className="mh-lobby-action-text">
+                                    <span className="mh-lobby-action-kind">Ban</span>
+                                    <span className="mh-lobby-action-champ">{champName}</span>
+                                  </span>
+                                  <span className="mh-lobby-action-icon-wrap">
+                                    {hasIcon ? (
+                                      <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                                    ) : (
+                                      <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
+                                    )}
+                                  </span>
+                                  {!a.completed && <span className="mh-lobby-action-live">{a.inProgress ? 'in progress' : 'hovered'}</span>}
+                                </div>
+                              );
+                            })}</div>
                             : <span className="mh-lobby-empty">No bans yet</span>}
                         </div>
                       </div>
@@ -2167,14 +2228,21 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
               )}
               <div className="mh-profile-bg-fade" />
               <div className="mh-profile-head">
-                <img
-                  className="mh-profile-icon"
-                  src={formatProfileIcon(result.profile?.profileIconId ?? 29)}
-                  alt={`${result.gameName} profile icon`}
-                  loading="lazy"
-                  crossOrigin="anonymous"
-                  onError={handleImgError}
-                />
+                <div className="mh-profile-icon-wrap">
+                  {!profileIconLoaded && <div className="mh-skeleton mh-profile-icon-skeleton" />}
+                  <img
+                    className={`mh-profile-icon${profileIconLoaded ? ' is-loaded' : ''}`}
+                    src={formatProfileIcon(result.profile?.profileIconId ?? 29)}
+                    alt=""
+                    loading="lazy"
+                    crossOrigin="anonymous"
+                    onLoad={() => setProfileIconLoaded(true)}
+                    onError={(e) => {
+                      setProfileIconLoaded(false);
+                      handleImgError(e);
+                    }}
+                  />
+                </div>
                 <div className="mh-profile-info">
                   <div className="mh-profile-name">{result.gameName}<span className="mh-profile-tag">#{result.tagLine}</span></div>
                   <div className="mh-profile-meta">
@@ -2240,7 +2308,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                     <>
                       <div className="mh-rank-badge">
                         <img
-                          className="mh-rank-emblem"
+                          className="mh-rank-emblem mh-rank-emblem--unranked"
                           src={formatRankIcon('unranked')}
                           alt="Unranked emblem"
                           loading="lazy"
@@ -2285,17 +2353,27 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                   if (actions.length === 0) {
                     return <span className="mh-lobby-empty">{emptyLabel}</span>;
                   }
-                  return actions.map((action, idx) => {
+                  return <div className="mh-lobby-actions-row">{actions.map((action, idx) => {
                     const champName = resolveLobbyChampionName(action.championName, action.championKey, action.championId);
                     const actionLabel = action.type === 'ban' ? 'Ban' : 'Pick';
+                    const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
                     return (
-                      <div key={`${action.type}-${action.actorCellId}-${action.championId}-${idx}`} className="mh-lobby-action">
-                        <span className="mh-lobby-action-kind">{actionLabel}</span>
-                        <span className="mh-lobby-action-champ">{champName}</span>
+                      <div key={`${action.type}-${action.actorCellId}-${action.championId}-${idx}`} className="mh-lobby-action mh-lobby-action--champ">
+                        <span className="mh-lobby-action-text">
+                          <span className="mh-lobby-action-kind">{actionLabel}</span>
+                          <span className="mh-lobby-action-champ">{champName}</span>
+                        </span>
+                        <span className="mh-lobby-action-icon-wrap">
+                          {hasIcon ? (
+                            <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                          ) : (
+                            <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
+                          )}
+                        </span>
                         {!action.completed && <span className="mh-lobby-action-live">{action.inProgress ? 'in progress' : 'hovered'}</span>}
                       </div>
                     );
-                  });
+                  })}</div>;
                 };
 
                 return (
@@ -2517,6 +2595,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                   <span className="mh-sb-col-kda">KDA</span>
                                   <span className="mh-sb-col-cs">CS</span>
                                   <span className="mh-sb-col-items">Items</span>
+                                  <span className="mh-sb-col-live-status">Status</span>
                                 </div>
                                 {teamParticipants.map((p) => {
                                   const champName = resolveChampionName(p.championId);
@@ -2577,11 +2656,6 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         {cp && (
                                           <span className="mh-sb-level-badge">Lv{cp.level}</span>
                                         )}
-                                        {isPentaActiveForPlayer ? (
-                                          <span className="mh-sb-penta-badge">PENTA</span>
-                                        ) : cp?.isDead && cp.respawnTimer > 0 && (
-                                          <span className="mh-sb-dead-badge">REVIVING IN {Math.ceil(cp.respawnTimer)}s</span>
-                                        )}
                                         {(() => {
                                           const lp = livePlacementMap.get(p.puuid);
                                           if (!lp) return null;
@@ -2608,6 +2682,23 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                                   {p.rankedWins}W {p.rankedLosses}L &middot; {((p.rankedWins / Math.max(1, p.rankedWins + p.rankedLosses)) * 100).toFixed(1)}% WR
                                                 </div>
                                               )}
+                                            </div>
+                                          </div>
+                                        ) : p.rankedStatus === 'unranked' ? (
+                                          <div className="mh-sb-rank-hover">
+                                            <img className="mh-sb-rank-icon" src={formatRankMiniIcon('unranked')} alt="Unranked" loading="lazy" />
+                                            <span className="mh-sb-rank-label mh-sb-rank-label--unranked">UR</span>
+                                            <div className="mh-sb-rank-tooltip">
+                                              <div className="mh-sb-rank-tooltip-tier" style={{ color: '#9ca3af' }}>Unranked</div>
+                                              <div className="mh-sb-rank-tooltip-lp">No ranked tier data for this player yet.</div>
+                                            </div>
+                                          </div>
+                                        ) : p.rankedStatus === 'pending' || !p.rankedStatus ? (
+                                          <div className="mh-sb-rank-hover">
+                                            <span className="mh-sb-rank-label mh-sb-rank-label--pending">Loading</span>
+                                            <div className="mh-sb-rank-tooltip">
+                                              <div className="mh-sb-rank-tooltip-tier" style={{ color: '#fbbf24' }}>Checking Rank</div>
+                                              <div className="mh-sb-rank-tooltip-lp">Rank data is still loading or temporarily rate-limited.</div>
                                             </div>
                                           </div>
                                         ) : (
@@ -2677,6 +2768,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                             </ItemTooltip>
                                           );
                                         }) : <span className="mh-live-waiting">-</span>}
+                                      </div>
+                                      <div className="mh-sb-col-live-status">
+                                        {isPentaActiveForPlayer ? (
+                                          <span className="mh-sb-penta-badge">PENTA</span>
+                                        ) : cp?.isDead && cp.respawnTimer > 0 ? (
+                                          <span className="mh-sb-dead-badge">REVIVING IN {Math.ceil(cp.respawnTimer)}s</span>
+                                        ) : (
+                                          <span className="mh-live-waiting">-</span>
+                                        )}
                                       </div>
                                     </div>
                                   );
@@ -3053,7 +3153,14 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                           </div>
                                         </div>
                                       ) : (
-                                        <span className="mh-sb-rank-label" style={{ color: '#555' }}>-</span>
+                                        <div className="mh-sb-rank-hover">
+                                          <img className="mh-sb-rank-icon" src={formatRankMiniIcon('unranked')} alt="Unranked" loading="lazy" />
+                                          <span className="mh-sb-rank-label mh-sb-rank-label--unranked">UR</span>
+                                          <div className="mh-sb-rank-tooltip">
+                                            <div className="mh-sb-rank-tooltip-tier" style={{ color: '#9ca3af' }}>Unranked</div>
+                                            <div className="mh-sb-rank-tooltip-lp">No ranked tier data for this player yet.</div>
+                                          </div>
+                                        </div>
                                       )}
                                     </div>
                                     <div className="mh-sb-col-spells">

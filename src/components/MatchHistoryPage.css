@@ -566,11 +566,33 @@
   z-index: 1;
 }
 
+.mh-profile-icon-wrap {
+  width: 78px;
+  height: 78px;
+  position: relative;
+  flex-shrink: 0;
+}
+
 .mh-profile-icon {
   width: 78px;
   height: 78px;
   border: 2px solid var(--lol-gold-dark);
-  flex-shrink: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mh-profile-icon.is-loaded {
+  opacity: 1;
+}
+
+.mh-profile-icon-skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 78px;
+  height: 78px;
+  border-radius: 0;
 }
 
 .mh-profile-info {
@@ -636,6 +658,10 @@
 
 .mh-rank-emblem--oversized {
   transform: translate(calc(-51% - 30px), -49%) scale(0.25);
+}
+
+.mh-rank-emblem--unranked {
+  transform: translate(calc(-50% - 10px), -50%) scale(5);
 }
 
 .mh-rank-details {
@@ -1139,6 +1165,21 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.3px;
+}
+
+.mh-sb-rank-label--unranked {
+  color: #9ca3af;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.mh-sb-rank-label--pending {
+  color: #fbbf24;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .mh-sb-rank-hover {
@@ -2409,7 +2450,14 @@
 
 .mh-sb-team--live .mh-sb-header-row,
 .mh-sb-team--live .mh-sb-row {
-  grid-template-columns: 2fr 55px 60px 90px 50px 1.8fr;
+  grid-template-columns: 2fr 55px 60px 90px 50px 1.8fr 130px;
+}
+
+.mh-sb-col-live-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: right;
 }
 
 .mh-sb-level-badge {
@@ -2457,7 +2505,15 @@
 }
 
 .mh-sb-row--dead {
-  opacity: 0.5;
+  opacity: 1;
+}
+
+.mh-sb-team--live .mh-sb-row--dead {
+  background: linear-gradient(90deg, rgba(185, 28, 28, 0.16) 0%, rgba(127, 29, 29, 0.1) 55%, rgba(69, 10, 10, 0.06) 100%);
+}
+
+.mh-sb-team--live .mh-sb-row--dead .mh-sb-champ-icon {
+  filter: grayscale(1) saturate(0.15) brightness(0.8);
 }
 
 @keyframes mh-team-wipe-heartbeat {
@@ -2467,7 +2523,7 @@
   }
   38% {
     background: rgba(220, 38, 38, 0.2);
-    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.4), 0 0 16px rgba(220, 38, 38, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.4);
   }
   55% {
     background: rgba(220, 38, 38, 0.1);
@@ -2475,7 +2531,7 @@
   }
   78% {
     background: rgba(220, 38, 38, 0.26);
-    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5), 0 0 18px rgba(220, 38, 38, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5);
   }
   100% {
     background: rgba(220, 38, 38, 0.08);
@@ -2527,8 +2583,14 @@
 }
 
 .mh-sb-dead-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17ch;
   font-size: 11px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
   color: #ffe4e6;
   background: linear-gradient(180deg, rgba(239, 68, 68, 0.42), rgba(185, 28, 28, 0.52));
   border: 1px solid rgba(248, 113, 113, 0.65);
@@ -2604,11 +2666,36 @@
   margin-bottom: 6px;
 }
 
-.mh-lobby-action {
+.mh-lobby-actions-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.mh-lobby-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--lol-border);
+  background: rgba(14, 22, 35, 0.62);
+  border-radius: 6px;
+}
+
+.mh-lobby-action--champ {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 92px;
+  gap: 4px;
+}
+
+.mh-lobby-action-text {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .mh-lobby-action-kind {
@@ -2623,9 +2710,37 @@
   padding: 1px 5px;
 }
 
+.mh-lobby-action-icon-wrap {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+
+.mh-lobby-action-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.mh-lobby-action-icon--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--lol-text-dim);
+  background: rgba(148, 163, 184, 0.12);
+}
+
 .mh-lobby-action-champ {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--lol-text-primary);
+  text-align: center;
+  max-width: 84px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mh-lobby-action-live {
@@ -2633,6 +2748,7 @@
   color: #7cc7ff;
   text-transform: uppercase;
   letter-spacing: 1px;
+  text-align: center;
 }
 
 .mh-lobby-empty {

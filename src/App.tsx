@@ -495,6 +495,7 @@ function App() {
   const lastLiveGameUpdateAtRef = useRef<number | null>(null);
   const liveSessionEndedRef = useRef(true);
   const lastWsRecoveryAttemptAtRef = useRef(0);
+  const postGameClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accountInfoRef = useRef<AccountInfo | null>(accountInfo);
   accountInfoRef.current = accountInfo;
   const pendingChampSelectRef = useRef<{ championId?: string; championKey?: string; skinNum: number } | null>(null);
@@ -812,6 +813,10 @@ function App() {
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
+              if (postGameClearTimerRef.current) {
+                clearTimeout(postGameClearTimerRef.current);
+                postGameClearTimerRef.current = null;
+              }
               const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 25000;
               if (!!liveGameDataRef.current && hasRecentLive) {
                 // Ignore stale champ-select end while a clearly active live stream exists.
@@ -827,6 +832,10 @@ function App() {
 
             // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
+              if (postGameClearTimerRef.current) {
+                clearTimeout(postGameClearTimerRef.current);
+                postGameClearTimerRef.current = null;
+              }
               const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 25000;
               // Ignore stale champ-select noise while a live session is active.
               // Only allow lobby mode when no live data is active, or once liveGameEnd occurred.
@@ -865,6 +874,10 @@ function App() {
 
             // ── Live game updates (full scoreboard) ──
             if (data.type === 'liveGameUpdate') {
+              if (postGameClearTimerRef.current) {
+                clearTimeout(postGameClearTimerRef.current);
+                postGameClearTimerRef.current = null;
+              }
               // Some clients miss champSelectEnd; a valid live update should
               // always transition us out of champ-select mode.
               inChampSelectRef.current = false;
@@ -991,6 +1004,13 @@ function App() {
                 setLiveGameData(finalizedSnapshot);
                 liveGameDataRef.current = finalizedSnapshot;
               }
+              if (postGameClearTimerRef.current) clearTimeout(postGameClearTimerRef.current);
+              postGameClearTimerRef.current = setTimeout(() => {
+                // ARAM: Mayhem can miss spectator completion; retire companion snapshot after a grace period.
+                setLiveGameData(null);
+                liveGameDataRef.current = null;
+                postGameClearTimerRef.current = null;
+              }, 120000);
               setLobbyData(null);
               liveGameAutoNavDone.current = false;
             }
@@ -1030,6 +1050,10 @@ function App() {
       disposed = true;
       clearTimeout(reconnectTimer);
       clearTimeout(debounceTimer);
+      if (postGameClearTimerRef.current) {
+        clearTimeout(postGameClearTimerRef.current);
+        postGameClearTimerRef.current = null;
+      }
       ws?.close();
       companionWsRef.current = null;
     };
