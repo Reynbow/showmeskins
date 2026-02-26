@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -345,6 +346,7 @@ func (t *LiveGameTracker) poll() {
 
 	// Attach game result if we have it
 	update.GameResult = t.gameResult
+	sanitizeLiveGameUpdate(update)
 
 	hash := t.computeHash(update)
 	if hash == t.lastHash {
@@ -460,6 +462,58 @@ type scoresData struct {
 type gameDataInfo struct {
 	GameTime float64 `json:"gameTime"`
 	GameMode string  `json:"gameMode"`
+}
+
+func sanitizeFloat(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	return value
+}
+
+func sanitizeLiveGameStats(stats *LiveGameStats) {
+	stats.AttackDamage = sanitizeFloat(stats.AttackDamage)
+	stats.AbilityPower = sanitizeFloat(stats.AbilityPower)
+	stats.Armor = sanitizeFloat(stats.Armor)
+	stats.MagicResist = sanitizeFloat(stats.MagicResist)
+	stats.AttackSpeed = sanitizeFloat(stats.AttackSpeed)
+	stats.CritChance = sanitizeFloat(stats.CritChance)
+	stats.CritDamage = sanitizeFloat(stats.CritDamage)
+	stats.MoveSpeed = sanitizeFloat(stats.MoveSpeed)
+	stats.MaxHealth = sanitizeFloat(stats.MaxHealth)
+	stats.CurrentHealth = sanitizeFloat(stats.CurrentHealth)
+	stats.ResourceMax = sanitizeFloat(stats.ResourceMax)
+	stats.ResourceValue = sanitizeFloat(stats.ResourceValue)
+	stats.AbilityHaste = sanitizeFloat(stats.AbilityHaste)
+	stats.LifeSteal = sanitizeFloat(stats.LifeSteal)
+	stats.Omnivamp = sanitizeFloat(stats.Omnivamp)
+	stats.PhysicalLethality = sanitizeFloat(stats.PhysicalLethality)
+	stats.MagicLethality = sanitizeFloat(stats.MagicLethality)
+	stats.ArmorPenFlat = sanitizeFloat(stats.ArmorPenFlat)
+	stats.ArmorPenPercent = sanitizeFloat(stats.ArmorPenPercent)
+	stats.MagicPenFlat = sanitizeFloat(stats.MagicPenFlat)
+	stats.MagicPenPercent = sanitizeFloat(stats.MagicPenPercent)
+	stats.Tenacity = sanitizeFloat(stats.Tenacity)
+	stats.HealShieldPower = sanitizeFloat(stats.HealShieldPower)
+	stats.AttackRange = sanitizeFloat(stats.AttackRange)
+	stats.HealthRegenRate = sanitizeFloat(stats.HealthRegenRate)
+	stats.ResourceRegenRate = sanitizeFloat(stats.ResourceRegenRate)
+}
+
+func sanitizeLiveGameUpdate(update *LiveGameUpdate) {
+	update.GameTime = sanitizeFloat(update.GameTime)
+	update.Active.CurrentGold = sanitizeFloat(update.Active.CurrentGold)
+	sanitizeLiveGameStats(&update.Active.Stats)
+	for i := range update.Players {
+		update.Players[i].WardScore = sanitizeFloat(update.Players[i].WardScore)
+		update.Players[i].RespawnTimer = sanitizeFloat(update.Players[i].RespawnTimer)
+	}
+	for i := range update.KillFeed {
+		update.KillFeed[i].EventTime = sanitizeFloat(update.KillFeed[i].EventTime)
+	}
+	for i := range update.LiveEvents {
+		update.LiveEvents[i].EventTime = sanitizeFloat(update.LiveEvents[i].EventTime)
+	}
 }
 
 // isGameProcessRunning checks whether the "League of Legends.exe" game

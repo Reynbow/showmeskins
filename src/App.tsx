@@ -494,6 +494,7 @@ function App() {
   const inChampSelectRef = useRef(false);
   const lastLiveGameUpdateAtRef = useRef<number | null>(null);
   const liveSessionEndedRef = useRef(true);
+  const lastWsRecoveryAttemptAtRef = useRef(0);
   const accountInfoRef = useRef<AccountInfo | null>(accountInfo);
   accountInfoRef.current = accountInfo;
   const pendingChampSelectRef = useRef<{ championId?: string; championKey?: string; skinNum: number } | null>(null);
@@ -811,32 +812,31 @@ function App() {
 
             // ── Champion select ended: reset so next session's picks are processed
             if (data.type === 'champSelectEnd') {
-              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 90000;
-              if (hasRecentLive || !!liveGameDataRef.current) {
-                // Ignore stale champ-select end while an active live stream exists.
+              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 25000;
+              if (!!liveGameDataRef.current && hasRecentLive) {
+                // Ignore stale champ-select end while a clearly active live stream exists.
                 return;
               }
               pendingChampSelectRef.current = null;
               inChampSelectRef.current = false;
               liveSessionEndedRef.current = true;
+              lastLiveGameUpdateAtRef.current = null;
               setLobbyData(null);
               return;
             }
 
             // ── Champion select updates ──
             if (data.type === 'champSelectUpdate') {
-              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 90000;
-              if (hasRecentLive || !!liveGameDataRef.current) {
-                // Ignore stale champ-select noise while live data is active/recent.
-                return;
-              }
+              const hasRecentLive = !!lastLiveGameUpdateAtRef.current && (now - lastLiveGameUpdateAtRef.current) < 25000;
               // Ignore stale champ-select noise while a live session is active.
               // Only allow lobby mode when no live data is active, or once liveGameEnd occurred.
-              if (!liveSessionEndedRef.current && !!liveGameDataRef.current) {
+              if (!liveSessionEndedRef.current && !!liveGameDataRef.current && hasRecentLive) {
                 return;
               }
               champSelectSeenSinceLastLiveGame.current = true;
               inChampSelectRef.current = true;
+              liveSessionEndedRef.current = true;
+              lastLiveGameUpdateAtRef.current = null;
               setLiveGameData(null);
               liveGameDataRef.current = null;
 
@@ -1035,6 +1035,36 @@ function App() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // WebSocket watchdog: if live updates stall mid-game, force a reconnect.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const ws = companionWsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (inChampSelectRef.current || liveSessionEndedRef.current) return;
+      if (!liveGameDataRef.current) return;
+      const lastUpdateAt = lastLiveGameUpdateAtRef.current;
+      if (!lastUpdateAt) return;
+
+      const staleForMs = Date.now() - lastUpdateAt;
+      if (staleForMs < 30_000) return;
+      if (Date.now() - lastWsRecoveryAttemptAtRef.current < 45_000) return;
+
+      lastWsRecoveryAttemptAtRef.current = Date.now();
+      appendDebugLog(
+        'warn',
+        'ws.watchdog',
+        `No liveGameUpdate for ${Math.round(staleForMs / 1000)}s; reconnecting companion websocket`,
+      );
+      try {
+        ws.close();
+      } catch {
+        // no-op
+      }
+    }, 10_000);
+
+    return () => clearInterval(timer);
+  }, [appendDebugLog]);
+
   return (
     <div className="app">
       {loading && (
@@ -1063,6 +1093,7 @@ function App() {
           companionLiveData={liveGameData}
           companionLobbyData={lobbyData}
           companionConnected={liveDebug.companionConnected}
+          companionLastLiveUpdateAt={liveDebug.lastLiveUpdateAt}
           companionAccount={accountInfo}
         />
       ) : viewMode === 'companion' ? (

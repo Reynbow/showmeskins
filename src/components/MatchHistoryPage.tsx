@@ -226,6 +226,7 @@ interface Props {
   companionLiveData?: LiveGameData | null;
   companionLobbyData?: LobbyData | null;
   companionConnected?: boolean;
+  companionLastLiveUpdateAt?: number | null;
   companionAccount?: AccountInfo | null;
 }
 
@@ -776,7 +777,7 @@ function formatMasteryPoints(points: number): string {
   return String(points);
 }
 
-export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionLobbyData, companionConnected, companionAccount }: Props) {
+export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData, companionLobbyData, companionConnected, companionLastLiveUpdateAt, companionAccount }: Props) {
   const initialParsed = splitRiotId(initialRiotId);
   const [gameName, setGameName] = useState(initialParsed.gameName);
   const [tagLine, setTagLine] = useState(initialParsed.tagLine);
@@ -809,6 +810,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const profileCardRef = useRef<HTMLDivElement | null>(null);
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [queueFilter, setQueueFilter] = useState<number | null>(null);
+  const [statusNowTs, setStatusNowTs] = useState(() => Date.now());
   const regionPickerRef = useRef<HTMLDivElement | null>(null);
   const lastAutoSearchKeyRef = useRef<string>('');
   const searchRequestIdRef = useRef(0);
@@ -823,6 +825,16 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const topMastery = result?.profile?.topMastery ?? [];
   const profileBgChampion = topMastery.length > 0 ? topMastery[0].championName : null;
   const liveCompanionData = companionLiveData ?? ((activeGame || liveGameEnded) ? lastCompanionLiveData : null);
+  const liveUpdateAgeSec = companionLastLiveUpdateAt != null
+    ? Math.max(0, Math.floor((statusNowTs - companionLastLiveUpdateAt) / 1000))
+    : null;
+  const companionStatusChip = (() => {
+    if (!companionConnected) return { tone: 'off', label: 'App offline' };
+    if (liveUpdateAgeSec == null) return { tone: 'warn', label: 'No live packets' };
+    if (liveUpdateAgeSec <= 10) return { tone: 'ok', label: `Live ${liveUpdateAgeSec}s` };
+    if (liveUpdateAgeSec <= 30) return { tone: 'warn', label: `Delayed ${liveUpdateAgeSec}s` };
+    return { tone: 'stale', label: `Stale ${liveUpdateAgeSec}s` };
+  })();
 
   useEffect(() => {
     Promise.all([getItems(), getLatestVersion()]).then(async ([items, ver]) => {
@@ -835,6 +847,11 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
         setChampKeyToId(data.champKeyToId);
       } catch { /* supplementary data is optional */ }
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setStatusNowTs(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -1834,10 +1851,24 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
     }
   }, [effectiveActiveGame, liveGameEnded]);
 
+  // Auto-expand champion select lobby card when it appears.
+  const lobbyAutoExpandedRef = useRef(false);
+  useEffect(() => {
+    const hasLobbyPreview = !effectiveActiveGame && !!companionLobbyData;
+    if (hasLobbyPreview && !lobbyAutoExpandedRef.current) {
+      lobbyAutoExpandedRef.current = true;
+      setExpandedMatchId('__lobby__');
+      setExpandedTab('scoreboard');
+    }
+    if (!hasLobbyPreview) {
+      lobbyAutoExpandedRef.current = false;
+    }
+  }, [effectiveActiveGame, companionLobbyData]);
+
   // Computed live game time: prefer companion's gameTime while live; keep last known timer after end.
   const liveGameTime = liveGameEnded
     ? (activeGame?.gameLength ?? liveElapsed)
-    : (companionLiveData?.gameTime ?? liveElapsed);
+    : (companionLiveData?.gameTime ?? activeGame?.gameLength ?? liveElapsed);
 
   return (
     <div className="mh-page">
@@ -1996,6 +2027,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                       <span className="mh-card-meta">{formatQueue(undefined, companionLiveData.gameMode)}</span>
                       <span className="mh-card-sep">&middot;</span>
                       <span className="mh-card-meta mh-live-time">{formatDuration(companionLiveData.gameTime)}</span>
+                      <span className={`mh-companion-status-chip mh-companion-status-chip--${companionStatusChip.tone}`}>{companionStatusChip.label}</span>
                       {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
                     </div>
                     <div className="mh-card-midline">
@@ -2285,6 +2317,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                           <span className="mh-result mh-result--live">Champion Select</span>
                           <span className="mh-card-sep">&middot;</span>
                           <span className="mh-card-meta">Lobby Open</span>
+                          <span className={`mh-companion-status-chip mh-companion-status-chip--${companionStatusChip.tone}`}>{companionStatusChip.label}</span>
                           {companionConnected && <span className="mh-companion-badge">x9report app live</span>}
                         </div>
                         <div className="mh-card-midline">
@@ -2399,6 +2432,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                           <span className="mh-card-meta">{queueLabel}</span>
                           <span className="mh-card-sep">&middot;</span>
                           <span className="mh-card-meta mh-live-time">{formatDuration(liveGameTime)}</span>
+                          <span className={`mh-companion-status-chip mh-companion-status-chip--${companionStatusChip.tone}`}>{companionStatusChip.label}</span>
                           {companionConnected && !isFinalizing && <span className="mh-companion-badge">x9report app live</span>}
                         </div>
                         {isFinalizing && (
