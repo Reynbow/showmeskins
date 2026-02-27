@@ -50,6 +50,8 @@ type ChampSelectLobbyState struct {
 type ChampSelectLobbySlot struct {
 	CellID         int    `json:"cellId"`
 	Team           string `json:"team"`
+	PUUID          string `json:"puuid,omitempty"`
+	SummonerName   string `json:"summonerName,omitempty"`
 	ChampionID     int    `json:"championId"`
 	ChampionKey    string `json:"championKey,omitempty"`
 	ChampionName   string `json:"championName,omitempty"`
@@ -60,6 +62,7 @@ type ChampSelectLobbySlot struct {
 type ChampSelectLobbyAction struct {
 	Type         string `json:"type"`
 	ActorCellID  int    `json:"actorCellId"`
+	ActorPUUID   string `json:"actorPuuid,omitempty"`
 	Team         string `json:"team"`
 	ChampionID   int    `json:"championId"`
 	ChampionKey  string `json:"championKey,omitempty"`
@@ -408,10 +411,13 @@ type champSelectSession struct {
 }
 
 type teamMember struct {
-	CellId             int `json:"cellId"`
-	ChampionId         int `json:"championId"`
-	SelectedSkinId     int `json:"selectedSkinId"`
-	ChampionPickIntent int `json:"championPickIntent"`
+	CellId             int    `json:"cellId"`
+	ChampionId         int    `json:"championId"`
+	SelectedSkinId     int    `json:"selectedSkinId"`
+	ChampionPickIntent int    `json:"championPickIntent"`
+	PUUID              string `json:"puuid"`
+	SummonerName       string `json:"summonerName"`
+	GameName           string `json:"gameName"`
 }
 
 type actionEntry struct {
@@ -561,9 +567,15 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 	myTeam := make([]ChampSelectLobbySlot, 0, len(session.MyTeam))
 	for _, member := range session.MyTeam {
 		memberChampionID, memberChampionName := l.resolveChampionInfo(member.ChampionId)
+		memberName := strings.TrimSpace(member.GameName)
+		if memberName == "" {
+			memberName = strings.TrimSpace(member.SummonerName)
+		}
 		myTeam = append(myTeam, ChampSelectLobbySlot{
 			CellID:         member.CellId,
 			Team:           "ORDER",
+			PUUID:          strings.TrimSpace(member.PUUID),
+			SummonerName:   memberName,
 			ChampionID:     member.ChampionId,
 			ChampionKey:    memberChampionID,
 			ChampionName:   memberChampionName,
@@ -575,15 +587,29 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 	theirTeam := make([]ChampSelectLobbySlot, 0, len(session.TheirTeam))
 	for _, member := range session.TheirTeam {
 		memberChampionID, memberChampionName := l.resolveChampionInfo(member.ChampionId)
+		memberName := strings.TrimSpace(member.GameName)
+		if memberName == "" {
+			memberName = strings.TrimSpace(member.SummonerName)
+		}
 		theirTeam = append(theirTeam, ChampSelectLobbySlot{
 			CellID:         member.CellId,
 			Team:           "CHAOS",
+			PUUID:          strings.TrimSpace(member.PUUID),
+			SummonerName:   memberName,
 			ChampionID:     member.ChampionId,
 			ChampionKey:    memberChampionID,
 			ChampionName:   memberChampionName,
 			SelectedSkinID: member.SelectedSkinId,
 			IsLocalPlayer:  false,
 		})
+	}
+
+	actorPuuidByCellID := make(map[int]string, len(session.MyTeam)+len(session.TheirTeam))
+	for _, member := range session.MyTeam {
+		actorPuuidByCellID[member.CellId] = strings.TrimSpace(member.PUUID)
+	}
+	for _, member := range session.TheirTeam {
+		actorPuuidByCellID[member.CellId] = strings.TrimSpace(member.PUUID)
 	}
 
 	picks := make([]ChampSelectLobbyAction, 0)
@@ -597,6 +623,7 @@ func (l *LCUConnector) processSession(raw json.RawMessage) {
 			lobbyAction := ChampSelectLobbyAction{
 				Type:         action.Type,
 				ActorCellID:  action.ActorCellId,
+				ActorPUUID:   actorPuuidByCellID[action.ActorCellId],
 				Team:         teamForCellID(action.ActorCellId, session.MyTeam, session.TheirTeam),
 				ChampionID:   action.ChampionId,
 				ChampionKey:  actionChampionID,

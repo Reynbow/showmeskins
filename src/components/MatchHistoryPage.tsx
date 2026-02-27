@@ -221,6 +221,11 @@ interface MatchSlot {
   itemHistory?: MhItemEvent[];
 }
 
+interface LobbyChampionMastery {
+  championLevel: number;
+  championPoints: number;
+}
+
 interface Props {
   initialRiotId?: string;
   onBack: () => void;
@@ -825,6 +830,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const [statusNowTs, setStatusNowTs] = useState(() => Date.now());
   const [profileIconLoaded, setProfileIconLoaded] = useState(false);
   const [lobbyLockInKeys, setLobbyLockInKeys] = useState<Record<string, true>>({});
+  const [lobbyChampionMastery, setLobbyChampionMastery] = useState<Record<string, LobbyChampionMastery>>({});
   const endedSessionStartMsRef = useRef<number | null>(null);
   const prevLiveEndedRef = useRef(false);
   const liveRankLookupSessionRef = useRef<string | null>(null);
@@ -834,7 +840,15 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const searchRequestIdRef = useRef(0);
   const lobbyActionStateRef = useRef<Record<string, { championId: number; completed: boolean }>>({});
   const lobbyLockInTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const lobbyMasteryRequestedRef = useRef<Record<string, true>>({});
   const selectedRegion = REGION_OPTIONS.find((opt) => opt.value === region) ?? REGION_OPTIONS[0];
+  const lobbyMasteryRegion = useMemo<Region>(() => {
+    const companionPlatform = (companionAccount?.platformId ?? '').trim().toLowerCase();
+    if (REGION_OPTIONS.some((opt) => opt.value === companionPlatform)) {
+      return companionPlatform as Region;
+    }
+    return region;
+  }, [companionAccount?.platformId, region]);
   const loadedMatches = matchSlots.filter((slot) => slot.status === 'ready').length;
   const totalMatches = matchSlots.length;
   const getLobbyActionSlotKey = useCallback((action: LobbyData['picks'][number], side: 'blue' | 'red', idx: number): string => {
@@ -942,6 +956,66 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
       }, 820);
     }
   }, [companionLobbyData, getLobbyActionSlotKey]);
+
+  useEffect(() => {
+    if (!companionLobbyData) {
+      setLobbyChampionMastery({});
+      lobbyMasteryRequestedRef.current = {};
+      return;
+    }
+
+    const slotByCellId = new Map<number, LobbyData['myTeam'][number]>();
+    for (const slot of companionLobbyData.myTeam ?? []) slotByCellId.set(slot.cellId, slot);
+    for (const slot of companionLobbyData.theirTeam ?? []) slotByCellId.set(slot.cellId, slot);
+
+    const uniqueTargets = new Map<string, { puuid: string; championId: number }>();
+    for (const pick of companionLobbyData.picks ?? []) {
+      if (!pick.completed || pick.championId <= 0) continue;
+      const actorPuuid = (pick.actorPuuid ?? slotByCellId.get(pick.actorCellId)?.puuid ?? '').trim();
+      if (!actorPuuid) continue;
+      const key = `${actorPuuid}:${pick.championId}`;
+      if (!uniqueTargets.has(key)) {
+        uniqueTargets.set(key, { puuid: actorPuuid, championId: pick.championId });
+      }
+    }
+
+    for (const [masteryKey, target] of uniqueTargets) {
+      if (lobbyMasteryRequestedRef.current[masteryKey]) continue;
+      lobbyMasteryRequestedRef.current[masteryKey] = true;
+
+      const params = new URLSearchParams({
+        puuid: target.puuid,
+        championId: String(target.championId),
+        region: lobbyMasteryRegion,
+      });
+
+      fetch(`/api/champion-mastery?${params.toString()}`)
+        .then(async (res) => {
+          if (!res.ok) return null;
+          const body = await res.json() as {
+            mastery?: {
+              championLevel?: number;
+              championPoints?: number;
+            } | null;
+          };
+          const mastery = body.mastery;
+          if (!mastery) return null;
+          const championLevel = typeof mastery.championLevel === 'number' ? mastery.championLevel : 0;
+          const championPoints = typeof mastery.championPoints === 'number' ? mastery.championPoints : 0;
+          return { championLevel, championPoints };
+        })
+        .then((mastery) => {
+          if (!mastery) return;
+          setLobbyChampionMastery((prev) => ({
+            ...prev,
+            [masteryKey]: mastery,
+          }));
+        })
+        .catch(() => {
+          // Ignore per-player mastery failures to avoid noisy UI churn.
+        });
+    }
+  }, [companionLobbyData, lobbyMasteryRegion]);
 
   useEffect(() => {
     setProfileIconLoaded(false);
@@ -2370,7 +2444,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               {(companionLobbyData.picks ?? []).filter((a) => a.team === 'ORDER').map((a, idx) => {
                                 const champName = resolveLobbyChampionName(a.championName, a.championKey, a.championId);
                                 const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
-                                const stateLabel = a.completed ? 'picked' : (a.inProgress ? 'hovering' : 'hovered');
+                                const stateLabel = a.completed ? 'locked in' : (a.inProgress ? 'picking...' : 'hovered');
                                 return (
                                   <div key={`empty-lobby-pick-blue-${idx}`} className="mh-lobby-pick-row mh-lobby-pick-row--blue">
                                     <span className="mh-lobby-action-icon-wrap">
@@ -2380,7 +2454,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
                                       )}
                                     </span>
-                                    <span className="mh-lobby-action-champ">{champName}</span>
+                                    <span className={`mh-lobby-action-champ${champName === 'Pending' ? ' mh-lobby-action-champ--pending' : ''}`}>{champName}</span>
                                     <span className={`mh-lobby-pick-state${a.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
                                   </div>
                                 );
@@ -2400,9 +2474,11 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                               {(companionLobbyData.picks ?? []).filter((a) => a.team === 'CHAOS').map((a, idx) => {
                                 const champName = resolveLobbyChampionName(a.championName, a.championKey, a.championId);
                                 const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
-                                const stateLabel = a.completed ? 'picked' : (a.inProgress ? 'hovering' : 'hovered');
+                                const stateLabel = a.completed ? 'locked in' : (a.inProgress ? 'picking...' : 'hovered');
                                 return (
                                   <div key={`empty-lobby-pick-red-${idx}`} className="mh-lobby-pick-row mh-lobby-pick-row--red">
+                                    <span className={`mh-lobby-pick-state${a.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
+                                    <span className={`mh-lobby-action-champ mh-lobby-action-champ--right${champName === 'Pending' ? ' mh-lobby-action-champ--pending' : ''}`}>{champName}</span>
                                     <span className="mh-lobby-action-icon-wrap">
                                       {hasIcon ? (
                                         <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
@@ -2410,8 +2486,6 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                                         <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
                                       )}
                                     </span>
-                                    <span className="mh-lobby-action-champ">{champName}</span>
-                                    <span className={`mh-lobby-pick-state${a.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
                                   </div>
                                 );
                               })}
@@ -2587,6 +2661,17 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                 const blueBans = lobbyBans.filter((a) => a.team === 'ORDER');
                 const redBans = lobbyBans.filter((a) => a.team === 'CHAOS');
                 const hasActions = lobbyPicks.length > 0 || lobbyBans.length > 0;
+                const lobbySlotByCellId = new Map<number, LobbyData['myTeam'][number]>();
+                for (const slot of companionLobbyData.myTeam ?? []) lobbySlotByCellId.set(slot.cellId, slot);
+                for (const slot of companionLobbyData.theirTeam ?? []) lobbySlotByCellId.set(slot.cellId, slot);
+                const getLobbyPickMasteryLabel = (action: LobbyData['picks'][number]): string | null => {
+                  if (!action.completed || action.championId <= 0) return null;
+                  const actorPuuid = (action.actorPuuid ?? lobbySlotByCellId.get(action.actorCellId)?.puuid ?? '').trim();
+                  if (!actorPuuid) return null;
+                  const mastery = lobbyChampionMastery[`${actorPuuid}:${action.championId}`];
+                  if (!mastery) return null;
+                  return `M${mastery.championLevel} ${formatMasteryPoints(mastery.championPoints)} pts`;
+                };
 
                 const renderBanStrip = (actions: typeof lobbyBans, side: 'blue' | 'red') => {
                   if (actions.length === 0) {
@@ -2633,21 +2718,40 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
                         const isLockingIn = !!lobbyLockInKeys[slotKey];
                         const champName = resolveLobbyChampionName(action.championName, action.championKey, action.championId);
                         const hasIcon = champName !== 'Pending' && !champName.startsWith('Champion');
-                        const stateLabel = action.completed ? 'picked' : (action.inProgress ? 'hovering' : 'hovered');
+                        const masteryLabel = getLobbyPickMasteryLabel(action);
+                        const stateLabel = action.completed ? 'locked in' : (action.inProgress ? 'picking...' : 'hovered');
                         return (
                           <div
                             key={slotKey}
                             className={`mh-lobby-pick-row mh-lobby-pick-row--${side}${isLockingIn ? ` mh-lobby-lockin mh-lobby-lockin--pick mh-lobby-lockin--${side}` : ''}`}
                           >
-                            <span className="mh-lobby-action-icon-wrap">
-                              {hasIcon ? (
-                                <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
-                              ) : (
-                                <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
-                              )}
-                            </span>
-                            <span className="mh-lobby-action-champ">{champName}</span>
-                            <span className={`mh-lobby-pick-state${action.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
+                            {side === 'red' ? (
+                              <>
+                                <span className={`mh-lobby-pick-state${action.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
+                                <span className={`mh-lobby-action-champ mh-lobby-action-champ--right${champName === 'Pending' ? ' mh-lobby-action-champ--pending' : ''}`}>{champName}</span>
+                                {masteryLabel && <span className="mh-lobby-mastery">{masteryLabel}</span>}
+                                <span className="mh-lobby-action-icon-wrap">
+                                  {hasIcon ? (
+                                    <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                                  ) : (
+                                    <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
+                                  )}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="mh-lobby-action-icon-wrap">
+                                  {hasIcon ? (
+                                    <img className="mh-lobby-action-icon" src={formatChampionFaceIcon(champName, ddragonVersion)} alt={champName} loading="lazy" onError={handleImgError} />
+                                  ) : (
+                                    <span className="mh-lobby-action-icon mh-lobby-action-icon--placeholder">?</span>
+                                  )}
+                                </span>
+                                <span className={`mh-lobby-action-champ${champName === 'Pending' ? ' mh-lobby-action-champ--pending' : ''}`}>{champName}</span>
+                                {masteryLabel && <span className="mh-lobby-mastery">{masteryLabel}</span>}
+                                <span className={`mh-lobby-pick-state${action.completed ? '' : ' mh-lobby-pick-state--live'}`}>{stateLabel}</span>
+                              </>
+                            )}
                           </div>
                         );
                       })}

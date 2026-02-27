@@ -214,6 +214,8 @@ export type LobbyTeam = 'ORDER' | 'CHAOS' | 'UNKNOWN';
 export interface LobbyTeamSlot {
   cellId: number;
   team: LobbyTeam;
+  puuid?: string;
+  summonerName?: string;
   championId: number;
   championKey?: string;
   championName?: string;
@@ -224,6 +226,7 @@ export interface LobbyTeamSlot {
 export interface LobbyAction {
   type: 'pick' | 'ban';
   actorCellId: number;
+  actorPuuid?: string;
   team: LobbyTeam;
   championId: number;
   championKey?: string;

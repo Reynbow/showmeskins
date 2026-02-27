@@ -273,6 +273,8 @@ function normalizeLobbyPayload(raw: unknown): LobbyData | null {
         return {
           cellId: readNumericField(row, 'cellId', 'CellId'),
           team: normalizeTeam(row.team) === 'UNKNOWN' ? fallbackTeam : normalizeTeam(row.team),
+          puuid: readStringField(row, 'puuid', 'Puuid') || undefined,
+          summonerName: readStringField(row, 'summonerName', 'SummonerName') || undefined,
           championId: readNumericField(row, 'championId', 'ChampionId'),
           championKey: readStringField(row, 'championKey', 'ChampionKey') || undefined,
           championName: readStringField(row, 'championName', 'ChampionName') || undefined,
@@ -294,6 +296,7 @@ function normalizeLobbyPayload(raw: unknown): LobbyData | null {
         return {
           type: expectedType,
           actorCellId: readNumericField(row, 'actorCellId', 'ActorCellId'),
+          actorPuuid: readStringField(row, 'actorPuuid', 'ActorPuuid') || undefined,
           team: normalizeTeam(readStringField(row, 'team', 'Team')),
           championId: readNumericField(row, 'championId', 'ChampionId'),
           championKey: readStringField(row, 'championKey', 'ChampionKey') || undefined,

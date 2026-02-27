@@ -2780,6 +2780,24 @@
   text-overflow: ellipsis;
 }
 
+.mh-lobby-action-champ--pending {
+  color: var(--lol-text-dim);
+}
+
+.mh-lobby-action-champ--right {
+  text-align: right;
+}
+
+.mh-lobby-mastery {
+  font-size: 10px;
+  color: #c8aa6e;
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  border-radius: 999px;
+  padding: 1px 6px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 .mh-lobby-pick-list {
   display: flex;
   flex-direction: column;
@@ -2806,6 +2824,7 @@
 
 .mh-lobby-pick-row--red {
   border-right: 2px solid rgba(248, 113, 113, 0.5);
+  grid-template-columns: auto minmax(0, 1fr) 38px;
 }
 
 .mh-lobby-pick-state {
