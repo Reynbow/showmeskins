@@ -2645,6 +2645,64 @@
   padding: 10px;
 }
 
+.mh-lobby-board--draft {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mh-lobby-bans-corners {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mh-lobby-bans-corner {
+  border: 1px solid var(--lol-border);
+  background: rgba(10, 16, 26, 0.74);
+  padding: 8px;
+}
+
+.mh-lobby-bans-corner--blue {
+  border-left: 2px solid rgba(56, 189, 248, 0.72);
+}
+
+.mh-lobby-bans-corner--red {
+  border-right: 2px solid rgba(248, 113, 113, 0.72);
+}
+
+.mh-lobby-ban-strip {
+  display: flex;
+  gap: 6px;
+}
+
+.mh-lobby-ban-strip--red {
+  justify-content: flex-end;
+}
+
+.mh-lobby-ban-item {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 5px;
+}
+
+.mh-lobby-picks-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mh-lobby-team--blue {
+  border-left: 2px solid rgba(56, 189, 248, 0.72);
+}
+
+.mh-lobby-team--red {
+  border-right: 2px solid rgba(248, 113, 113, 0.72);
+}
+
 .mh-lobby-team-header {
   font-family: var(--font-heading);
   letter-spacing: 1.5px;
@@ -2666,13 +2724,6 @@
   margin-bottom: 6px;
 }
 
-.mh-lobby-actions-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .mh-lobby-action {
   display: flex;
   align-items: center;
@@ -2681,21 +2732,6 @@
   border: 1px solid var(--lol-border);
   background: rgba(14, 22, 35, 0.62);
   border-radius: 6px;
-}
-
-.mh-lobby-action--champ {
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-width: 92px;
-  gap: 4px;
-}
-
-.mh-lobby-action-text {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
 }
 
 .mh-lobby-action-kind {
@@ -2712,14 +2748,15 @@
 
 .mh-lobby-action-icon-wrap {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
 }
 
 .mh-lobby-action-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 38px;
+  height: 38px;
+  border-radius: 5px;
   object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
@@ -2734,25 +2771,129 @@
 }
 
 .mh-lobby-action-champ {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--lol-text-primary);
-  text-align: center;
-  max-width: 84px;
+  text-align: left;
+  max-width: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.mh-lobby-action-live {
+.mh-lobby-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mh-lobby-pick-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 1px solid var(--lol-border);
+  background: rgba(14, 22, 35, 0.62);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mh-lobby-pick-row--blue {
+  border-left: 2px solid rgba(56, 189, 248, 0.5);
+}
+
+.mh-lobby-pick-row--red {
+  border-right: 2px solid rgba(248, 113, 113, 0.5);
+}
+
+.mh-lobby-pick-state {
   font-size: 10px;
-  color: #7cc7ff;
+  color: var(--lol-text-dim);
   text-transform: uppercase;
   letter-spacing: 1px;
-  text-align: center;
+  border: 1px solid var(--lol-border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.3;
+}
+
+.mh-lobby-pick-state--live {
+  color: #7cc7ff;
+  border-color: rgba(124, 199, 255, 0.45);
+  background: rgba(124, 199, 255, 0.08);
+}
+
+.mh-lobby-lockin {
+  animation: mh-lobby-lockin-pop 0.42s ease-out;
+}
+
+.mh-lobby-lockin::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 0%, rgba(236, 244, 255, 0.4) 45%, transparent 76%);
+  animation: mh-lobby-lockin-sweep 0.62s cubic-bezier(0.21, 0.61, 0.28, 1) forwards;
+  pointer-events: none;
+}
+
+.mh-lobby-lockin--blue::after {
+  background: linear-gradient(105deg, transparent 0%, rgba(125, 211, 252, 0.5) 46%, transparent 78%);
+}
+
+.mh-lobby-lockin--red::after {
+  background: linear-gradient(105deg, transparent 0%, rgba(252, 165, 165, 0.5) 46%, transparent 78%);
+}
+
+.mh-lobby-lockin--pick {
+  box-shadow: inset 0 0 0 1px rgba(200, 170, 110, 0.35), 0 0 14px rgba(200, 170, 110, 0.18);
+}
+
+.mh-lobby-lockin--ban {
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45), 0 0 12px rgba(239, 68, 68, 0.2);
+}
+
+@keyframes mh-lobby-lockin-pop {
+  0% {
+    transform: translateX(-6px) scale(0.98);
+    filter: brightness(1.2);
+  }
+  60% {
+    transform: translateX(1px) scale(1.01);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes mh-lobby-lockin-sweep {
+  100% {
+    transform: translateX(130%);
+  }
 }
 
 .mh-lobby-empty {
   display: inline-flex;
   color: var(--lol-text-dim);
   font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .mh-lobby-picks-grid,
+  .mh-lobby-bans-corners {
+    grid-template-columns: 1fr;
+  }
+
+  .mh-lobby-ban-strip--red {
+    justify-content: flex-start;
+  }
+
+  .mh-lobby-bans-corner--red,
+  .mh-lobby-team--red {
+    border-right: 1px solid var(--lol-border);
+    border-left: 2px solid rgba(248, 113, 113, 0.72);
+  }
 }

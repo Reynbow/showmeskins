@@ -788,7 +788,13 @@ function App() {
         ws.onopen = () => {
           companionWsRef.current = ws;
           console.log('[companion] Connected to companion app');
-          setLiveDebug((prev) => ({ ...prev, companionConnected: true }));
+          setLiveDebug((prev) => ({
+            ...prev,
+            companionConnected: true,
+            // New socket session: reset live packet clock to avoid carrying
+            // a stale timestamp from a previous match/session.
+            lastLiveUpdateAt: null,
+          }));
           appendDebugLog('info', 'ws', 'Connected to companion bridge');
         };
 
@@ -826,6 +832,10 @@ function App() {
               inChampSelectRef.current = false;
               liveSessionEndedRef.current = true;
               lastLiveGameUpdateAtRef.current = null;
+              setLiveDebug((prev) => ({
+                ...prev,
+                lastLiveUpdateAt: null,
+              }));
               setLobbyData(null);
               return;
             }
@@ -846,6 +856,10 @@ function App() {
               inChampSelectRef.current = true;
               liveSessionEndedRef.current = true;
               lastLiveGameUpdateAtRef.current = null;
+              setLiveDebug((prev) => ({
+                ...prev,
+                lastLiveUpdateAt: null,
+              }));
               setLiveGameData(null);
               liveGameDataRef.current = null;
 
@@ -981,6 +995,7 @@ function App() {
                 return {
                   ...prev,
                   liveEndCount: prev.liveEndCount + 1,
+                  lastLiveUpdateAt: null,
                   latestLiveEndPayload: data,
                   activeMatch: null,
                   completedMatches: completedMatches.length > MAX_COMPLETED_MATCHES
@@ -1064,21 +1079,44 @@ function App() {
     const timer = setInterval(() => {
       const ws = companionWsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (inChampSelectRef.current || liveSessionEndedRef.current) return;
-      if (!liveGameDataRef.current) return;
+      if (inChampSelectRef.current) return;
+      const snapshot = liveGameDataRef.current;
+      if (!snapshot) return;
+      const snapshotHasEnded = typeof snapshot.gameResult === 'string' && snapshot.gameResult.trim().length > 0;
       const lastUpdateAt = lastLiveGameUpdateAtRef.current;
-      if (!lastUpdateAt) return;
+      const now = Date.now();
+      if (!lastUpdateAt) {
+        // We have a live snapshot but no packet timestamp; this can happen when
+        // stale end-state flags are out of sync. Force a reconnect to recover.
+        if (!snapshotHasEnded && now - lastWsRecoveryAttemptAtRef.current >= 45_000) {
+          lastWsRecoveryAttemptAtRef.current = now;
+          appendDebugLog('warn', 'ws.watchdog', 'Missing lastLiveGameUpdateAt while live snapshot exists; reconnecting websocket');
+          try {
+            ws.close();
+          } catch {
+            // no-op
+          }
+        }
+        return;
+      }
 
-      const staleForMs = Date.now() - lastUpdateAt;
-      if (staleForMs < 30_000) return;
-      if (Date.now() - lastWsRecoveryAttemptAtRef.current < 45_000) return;
+      const staleForMs = now - lastUpdateAt;
+      const staleThresholdMs = snapshotHasEnded ? 120_000 : 30_000;
+      if (staleForMs < staleThresholdMs) return;
+      if (now - lastWsRecoveryAttemptAtRef.current < 45_000) return;
 
-      lastWsRecoveryAttemptAtRef.current = Date.now();
+      lastWsRecoveryAttemptAtRef.current = now;
       appendDebugLog(
         'warn',
         'ws.watchdog',
-        `No liveGameUpdate for ${Math.round(staleForMs / 1000)}s; reconnecting companion websocket`,
+        `No liveGameUpdate for ${Math.round(staleForMs / 1000)}s (ended=${snapshotHasEnded}); reconnecting companion websocket`,
       );
+      // If we're clearly stale but still showing a non-final live snapshot,
+      // drop the stale overlay and let Riot spectator data carry the page.
+      if (!snapshotHasEnded && staleForMs >= 120_000) {
+        setLiveGameData(null);
+        liveGameDataRef.current = null;
+      }
       try {
         ws.close();
       } catch {
@@ -1154,4 +1192,3 @@ function App() {
 }
 
 export default App;
-
