@@ -336,6 +336,106 @@
   font-size: 13px;
 }
 
+.mh-api-waiting-state {
+  min-height: min(56vh, 480px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px 24px 32px;
+}
+
+.mh-api-waiting-visual {
+  width: 132px;
+  height: 132px;
+  border-radius: 20px;
+  border: 1px solid rgba(200, 170, 110, 0.28);
+  background:
+    radial-gradient(circle at 32% 24%, rgba(140, 188, 255, 0.2), transparent 46%),
+    linear-gradient(180deg, rgba(24, 33, 48, 0.9), rgba(11, 17, 28, 0.92));
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35), inset 0 0 24px rgba(255, 255, 255, 0.04);
+}
+
+.mh-api-waiting-logo {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  color: var(--lol-gold-light);
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  background: rgba(200, 170, 110, 0.14);
+}
+
+.mh-api-waiting-cloud {
+  width: 68px;
+  height: 68px;
+  color: #b8ccf8;
+}
+
+.mh-api-waiting-dots {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.mh-api-waiting-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(200, 170, 110, 0.85);
+  animation: mh-api-waiting-pulse 1.2s ease-in-out infinite;
+}
+
+.mh-api-waiting-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mh-api-waiting-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mh-api-waiting-pulse {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.mh-api-waiting-title {
+  margin: 8px 0 0;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  letter-spacing: 1.8px;
+  color: var(--lol-gold-light);
+}
+
+.mh-api-waiting-text {
+  margin: 0;
+  max-width: 470px;
+  color: var(--lol-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* ── Empty state ── */
 .mh-empty-state {
   display: flex;

@@ -2167,6 +2167,26 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
   const liveGameTime = liveGameEnded
     ? (activeGame?.gameLength ?? liveElapsed)
     : (activeGame?.gameLength ?? companionLiveData?.gameTime ?? liveElapsed);
+  const showRiotApiWaitingState = useMemo(() => {
+    if (!error) return false;
+    const normalized = error.toLowerCase();
+    const mentionsRiotApi = normalized.includes('riot')
+      || normalized.includes('api key')
+      || normalized.includes('apikey')
+      || normalized.includes('rgapi');
+    if (!mentionsRiotApi) return false;
+    return (
+      normalized.includes('403')
+      || normalized.includes('401')
+      || normalized.includes('forbidden')
+      || normalized.includes('unauthorized')
+      || normalized.includes('unknown apikey')
+      || normalized.includes('unknown api key')
+      || normalized.includes('expired')
+      || normalized.includes('developer api')
+      || normalized.includes('developer access')
+    );
+  }, [error]);
 
   return (
     <div className="mh-page">
@@ -2256,7 +2276,33 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           </div>
         </div>
 
-        {error && <p className="mh-error">{error}</p>}
+        {error && !showRiotApiWaitingState && <p className="mh-error">{error}</p>}
+        {error && showRiotApiWaitingState && (
+          <div className="mh-api-waiting-state" role="status" aria-live="polite">
+            <div className="mh-api-waiting-visual" aria-hidden="true">
+              <span className="mh-api-waiting-logo">R</span>
+              <span className="mh-api-waiting-dots">
+                <span />
+                <span />
+                <span />
+              </span>
+              <svg className="mh-api-waiting-cloud" viewBox="0 0 64 64" fill="none">
+                <path
+                  d="M18 48h28a10 10 0 0 0 .8-20 14 14 0 0 0-27-4.4A9 9 0 0 0 18 48Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <h2 className="mh-api-waiting-title">Riot API is AFK</h2>
+            <p className="mh-api-waiting-text">
+              We&apos;re waiting for Riot to grant developer API access in the first place.
+              Match history will appear as soon as access is available.
+            </p>
+          </div>
+        )}
 
         {loading && !result && (
           <>
