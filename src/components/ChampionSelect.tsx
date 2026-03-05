@@ -8,6 +8,7 @@ interface Props {
   version: string;
   onSelect: (champion: ChampionBasic) => void;
   onCompanion: () => void;
+  onSkinLines: () => void;
   onOpenMatchHistory: (riotId: string) => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
@@ -17,7 +18,16 @@ const ROLES = ['All', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Suppor
 const PLAYER_SEARCH_NAME_KEY = 'sms_player_search_name';
 const PLAYER_SEARCH_TAG_KEY = 'sms_player_search_tag';
 
-export function ChampionSelect({ champions, version, onSelect, onCompanion, onOpenMatchHistory, hasLiveGame, onLiveGame }: Props) {
+export function ChampionSelect({
+  champions,
+  version,
+  onSelect,
+  onCompanion,
+  onSkinLines,
+  onOpenMatchHistory,
+  hasLiveGame,
+  onLiveGame,
+}: Props) {
   const [search, setSearch] = useState('');
   const [riotGameNameSearch, setRiotGameNameSearch] = useState(() => {
     try {
@@ -194,10 +204,18 @@ export function ChampionSelect({ champions, version, onSelect, onCompanion, onOp
               {role}
             </button>
           ))}
+          <button className="role-btn cs-role-skin-lines-btn" onClick={onSkinLines}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-role-skin-lines-icon">
+              <path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" />
+            </svg>
+            Skin Lines
+          </button>
         </div>
 
-        <div className="champion-count">
-          {filtered.length} Champion{filtered.length !== 1 ? 's' : ''}
+        <div className="cs-secondary-actions">
+          <div className="champion-count">
+            {filtered.length} Champion{filtered.length !== 1 ? 's' : ''}
+          </div>
         </div>
       </div>
 

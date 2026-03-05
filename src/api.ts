@@ -1,4 +1,4 @@
-import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo } from './types';
+import type { ChampionBasic, ChampionDetail, ChromaInfo, ItemInfo, SkinLineCategory, SkinLineMember } from './types';
 
 const BASE_URL = 'https://ddragon.leagueoflegends.com';
 const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? '/model-cdn').replace(/\/+$/, '');
@@ -13,6 +13,13 @@ function normalizeChampionId(championId: string): string {
   const trimmed = championId.trim();
   if (!trimmed) return trimmed;
   return CHAMPION_ID_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
+export function toUrlSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 /**
@@ -146,6 +153,104 @@ export async function getItems(): Promise<Record<number, ItemInfo>> {
   }
   cachedItems = items;
   return items;
+}
+
+interface CdragonSkinLine {
+  id: number;
+  name: string;
+  description: string;
+}
+
+interface CdragonSkinLineRef {
+  id: number;
+}
+
+interface CdragonSkinSummary {
+  id: number;
+  isBase?: boolean;
+  name?: string;
+  skinLines?: CdragonSkinLineRef[];
+}
+
+let cachedSkinLineCatalog: SkinLineCategory[] | null = null;
+
+export async function getSkinLineCatalog(championsByKey: Record<string, ChampionBasic>): Promise<SkinLineCategory[]> {
+  if (cachedSkinLineCatalog) return cachedSkinLineCatalog;
+  if (Object.keys(championsByKey).length === 0) return [];
+
+  const [skinLinesRes, skinsRes] = await Promise.all([
+    fetch(`${CDRAGON}/skinlines.json`),
+    fetch(`${CDRAGON}/skins.json`),
+  ]);
+
+  if (!skinLinesRes.ok || !skinsRes.ok) {
+    throw new Error('Failed to load skin line data from CommunityDragon');
+  }
+
+  const skinLinesRaw = (await skinLinesRes.json()) as CdragonSkinLine[];
+  const skinsRaw = (await skinsRes.json()) as Record<string, CdragonSkinSummary>;
+
+  const skinLineMap = new Map<number, SkinLineCategory>();
+  for (const line of skinLinesRaw) {
+    if (!line || typeof line.id !== 'number') continue;
+    if (!line.name || !line.name.trim()) continue;
+    skinLineMap.set(line.id, {
+      id: line.id,
+      name: line.name,
+      slug: toUrlSlug(line.name),
+      description: line.description ?? '',
+      members: [],
+    });
+  }
+
+  const dedupe = new Set<string>();
+  for (const skin of Object.values(skinsRaw)) {
+    if (!skin || typeof skin.id !== 'number') continue;
+    if (skin.isBase) continue;
+    if (!Array.isArray(skin.skinLines) || skin.skinLines.length === 0) continue;
+
+    const championKey = String(Math.floor(skin.id / 1000));
+    const champion = championsByKey[championKey];
+    if (!champion) continue;
+
+    const member: SkinLineMember = {
+      championId: champion.id,
+      championKey,
+      championName: champion.name,
+      skinId: String(skin.id),
+      skinNum: skin.id % 1000,
+      skinName: skin.name?.trim() || champion.name,
+    };
+
+    for (const lineRef of skin.skinLines) {
+      if (!lineRef || typeof lineRef.id !== 'number') continue;
+      const line = skinLineMap.get(lineRef.id);
+      if (!line) continue;
+      const key = `${line.id}:${member.skinId}`;
+      if (dedupe.has(key)) continue;
+      dedupe.add(key);
+      line.members.push(member);
+    }
+  }
+
+  const categories = Array.from(skinLineMap.values())
+    .filter((line) => line.members.length > 0)
+    .map((line) => ({
+      ...line,
+      members: [...line.members].sort((a, b) => {
+        const champCmp = a.championName.localeCompare(b.championName);
+        if (champCmp !== 0) return champCmp;
+        return a.skinNum - b.skinNum;
+      }),
+    }))
+    .sort((a, b) => {
+      const memberDiff = b.members.length - a.members.length;
+      if (memberDiff !== 0) return memberDiff;
+      return a.name.localeCompare(b.name);
+    });
+
+  if (categories.length > 0) cachedSkinLineCatalog = categories;
+  return categories;
 }
 
 export async function getChampionDetail(id: string): Promise<ChampionDetail> {

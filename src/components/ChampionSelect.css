@@ -168,6 +168,15 @@
   height: 16px;
 }
 
+.cs-secondary-actions {
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Controls */
 .champion-select-controls {
   display: flex;
@@ -363,9 +372,24 @@
 .role-filters {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 860px;
   justify-content: center;
   margin-top: 6px;
+}
+
+.cs-role-skin-lines-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.cs-role-skin-lines-icon {
+  width: 13px;
+  height: 13px;
 }
 
 .role-btn {
@@ -407,6 +431,15 @@
 
   .riot-id-inputs {
     grid-template-columns: minmax(0, 1fr) auto 74px;
+  }
+
+  .role-filters {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .cs-role-skin-lines-btn {
+    margin-left: 6px;
   }
 }
 

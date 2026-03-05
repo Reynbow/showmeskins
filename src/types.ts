@@ -16,6 +16,23 @@ export interface Skin {
   chromas: boolean;
 }
 
+export interface SkinLineMember {
+  championId: string;
+  championKey: string;
+  championName: string;
+  skinId: string;
+  skinNum: number;
+  skinName: string;
+}
+
+export interface SkinLineCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  members: SkinLineMember[];
+}
+
 export interface ChromaInfo {
   id: number;
   name: string;
