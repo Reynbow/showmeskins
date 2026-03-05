@@ -128,7 +128,7 @@
 .skin-lines-search-wrap {
   position: relative;
   width: 100%;
-  max-width: 700px;
+  max-width: 560px;
 }
 
 .skin-lines-search-icon {
@@ -144,7 +144,7 @@
 
 .skin-lines-search {
   width: 100%;
-  max-width: 700px;
+  max-width: 560px;
   background: var(--lol-bg-panel);
   border: 1px solid var(--lol-border-gold);
   color: var(--lol-text-primary);
@@ -224,7 +224,7 @@
   transition: border-color 0.2s ease;
   position: relative;
   overflow: hidden;
-  min-height: 152px;
+  height: 152px;
 }
 
 .skin-line-card:hover {
