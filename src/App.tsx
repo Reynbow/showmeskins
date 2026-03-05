@@ -1379,8 +1379,11 @@ function App() {
       ) : viewMode === 'skin-lines' ? (
         <SkinLinesPage
           skinLines={skinLines}
+          version={version}
+          champions={champions}
           onBack={handleSkinLinesBack}
           onOpenLine={handleOpenSkinLine}
+          onOpenMember={handleSkinLineMemberSelect}
         />
       ) : viewMode === 'skin-line-viewer' && activeSkinLine && activeSkinLineMember && selectedChampion && selectedSkin ? (
         <SkinLineViewer
