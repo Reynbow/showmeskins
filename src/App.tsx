@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
@@ -25,6 +26,7 @@ import type {
 } from './types';
 import { useSeoHead } from './hooks/useSeoHead';
 import './App.css';
+import * as THREE from 'three';
 
 const MAX_DEBUG_LOGS = 800;
 const MAX_MATCH_EVENTS = 2500;
@@ -398,6 +400,22 @@ function normalizeErrorMessage(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function AppLoadingModel() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useFrame((state) => {
+    if (!meshRef.current) return;
+    meshRef.current.rotation.y = state.clock.elapsedTime * 1.5;
+    meshRef.current.rotation.x = state.clock.elapsedTime * 0.7;
+    meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 2) * 0.12;
+  });
+  return (
+    <mesh ref={meshRef} position={[0, 0, 0]}>
+      <octahedronGeometry args={[0.6, 0]} />
+      <meshStandardMaterial color="#c8aa6e" wireframe emissive="#c8aa6e" emissiveIntensity={0.8} toneMapped={false} />
+    </mesh>
+  );
 }
 
 function App() {
@@ -1336,8 +1354,12 @@ function App() {
     <div className="app">
       {loading && (
         <div className="loading-overlay">
-          <div className="loading-hex">
-            <div className="loading-hex-inner" />
+          <div className="loading-model-canvas">
+            <Canvas camera={{ position: [0, 0, 3], fov: 50 }}>
+              <ambientLight intensity={0.8} color="#f0e6d2" />
+              <pointLight position={[2, 2, 3]} intensity={1.1} color="#c8aa6e" />
+              <AppLoadingModel />
+            </Canvas>
           </div>
           <span className="loading-text">Loading</span>
         </div>
