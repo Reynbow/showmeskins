@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getChampionIcon, getSplashArt, getSplashArtFallback } from '../api';
 import type { ChampionBasic, SkinLineCategory, SkinLineMember } from '../types';
 import './SkinLinesPage.css';
@@ -24,6 +24,11 @@ export function SkinLinesPage({
   const [drawerLine, setDrawerLine] = useState<SkinLineCategory | null>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [drawerRole, setDrawerRole] = useState('All');
+  const [drawerPinned, setDrawerPinned] = useState(false);
+  const [drawerSide, setDrawerSide] = useState<'left' | 'right'>('right');
+  const closeDrawerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawerPinnedRef = useRef(false);
+  const drawerListRef = useRef<HTMLDivElement>(null);
   const previewMembers = useMemo(() => {
     const byLine = new Map<number, SkinLineMember>();
     for (const line of skinLines) {
@@ -87,6 +92,67 @@ export function SkinLinesPage({
       return matchesRole && matchesSearch;
     });
   }, [drawerChampions, drawerRole, drawerSearch]);
+
+  const clearDrawerCloseTimer = () => {
+    if (!closeDrawerTimerRef.current) return;
+    clearTimeout(closeDrawerTimerRef.current);
+    closeDrawerTimerRef.current = null;
+  };
+
+  const resolveDrawerSide = (triggerElement?: HTMLElement | null): 'left' | 'right' => {
+    if (!triggerElement) return 'right';
+    const rect = triggerElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    return centerX > window.innerWidth / 2 ? 'left' : 'right';
+  };
+
+  const openDrawer = (line: SkinLineCategory, pinned: boolean, triggerElement?: HTMLElement | null) => {
+    clearDrawerCloseTimer();
+    setDrawerLine(line);
+    setDrawerPinned(pinned);
+    setDrawerSide(resolveDrawerSide(triggerElement));
+    setDrawerSearch('');
+    setDrawerRole('All');
+  };
+
+  const closeDrawer = () => {
+    clearDrawerCloseTimer();
+    setDrawerLine(null);
+    setDrawerPinned(false);
+  };
+
+  const scheduleHoverClose = () => {
+    clearDrawerCloseTimer();
+    closeDrawerTimerRef.current = setTimeout(() => {
+      if (!drawerPinnedRef.current) {
+        setDrawerLine(null);
+      }
+    }, 220);
+  };
+
+  useEffect(() => {
+    drawerPinnedRef.current = drawerPinned;
+  }, [drawerPinned]);
+
+  useEffect(() => () => {
+    if (closeDrawerTimerRef.current) clearTimeout(closeDrawerTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!drawerLine) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      const list = drawerListRef.current;
+      if (!list) return;
+      if (list.scrollHeight <= list.clientHeight) return;
+
+      list.scrollTop += event.deltaY;
+      event.preventDefault();
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [drawerLine]);
 
   return (
     <div className="skin-lines-page">
@@ -164,11 +230,12 @@ export function SkinLinesPage({
             <p>{line.description || 'Explore champions in this skin line.'}</p>
             <button
               className="skin-line-card-count"
+              onMouseEnter={(event) => openDrawer(line, false, event.currentTarget)}
+              onMouseLeave={scheduleHoverClose}
+              onFocus={(event) => openDrawer(line, false, event.currentTarget)}
               onClick={(event) => {
                 event.stopPropagation();
-                setDrawerLine(line);
-                setDrawerSearch('');
-                setDrawerRole('All');
+                openDrawer(line, true, event.currentTarget);
               }}
               aria-label={`View champions in ${line.name}`}
             >
@@ -179,14 +246,33 @@ export function SkinLinesPage({
       </div>
 
       {drawerLine && (
-        <div className="skin-line-drawer-overlay" onClick={() => setDrawerLine(null)}>
-          <aside className="skin-line-drawer" onClick={(event) => event.stopPropagation()}>
+        <div
+          className={`skin-line-drawer-overlay${drawerPinned ? '' : ' hover-open'}${drawerSide === 'left' ? ' left' : ' right'}`}
+          onClick={() => {
+            if (drawerPinned) closeDrawer();
+          }}
+        >
+          <aside
+            className="skin-line-drawer"
+            onClick={(event) => event.stopPropagation()}
+            onMouseEnter={clearDrawerCloseTimer}
+            onMouseLeave={() => {
+              if (!drawerPinned) closeDrawer();
+            }}
+            onWheel={(event) => {
+              const list = drawerListRef.current;
+              if (!list) return;
+              list.scrollTop += event.deltaY;
+              event.stopPropagation();
+              event.preventDefault();
+            }}
+          >
             <div className="skin-line-drawer-head">
               <div className="skin-line-drawer-title-wrap">
                 <span className="skin-line-drawer-kicker">Champion Roster</span>
                 <h3>{drawerLine.name}</h3>
               </div>
-              <button className="skin-line-drawer-close" onClick={() => setDrawerLine(null)} aria-label="Close roster">
+              <button className="skin-line-drawer-close" onClick={closeDrawer} aria-label="Close roster">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
@@ -213,7 +299,7 @@ export function SkinLinesPage({
               </div>
             </div>
 
-            <div className="skin-line-drawer-list">
+            <div className="skin-line-drawer-list" ref={drawerListRef}>
               {filteredDrawerChampions.map((champ) => (
                 <button
                   key={`${drawerLine.id}-${champ.championId}`}

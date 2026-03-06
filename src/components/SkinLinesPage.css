@@ -338,16 +338,39 @@
   background: rgba(1, 10, 19, 0.62);
   z-index: 80;
   display: flex;
+}
+
+.skin-line-drawer-overlay.right {
   justify-content: flex-end;
+}
+
+.skin-line-drawer-overlay.left {
+  justify-content: flex-start;
+}
+
+.skin-line-drawer-overlay.hover-open {
+  background: transparent;
+  pointer-events: none;
+}
+
+.skin-line-drawer-overlay.hover-open .skin-line-drawer {
+  pointer-events: auto;
 }
 
 .skin-line-drawer {
   width: min(560px, 100%);
   height: 100%;
   background: linear-gradient(180deg, rgba(10, 20, 38, 0.98), rgba(5, 11, 20, 0.98));
-  border-left: 1px solid var(--lol-border-gold);
   display: flex;
   flex-direction: column;
+}
+
+.skin-line-drawer-overlay.right .skin-line-drawer {
+  border-left: 1px solid var(--lol-border-gold);
+}
+
+.skin-line-drawer-overlay.left .skin-line-drawer {
+  border-right: 1px solid var(--lol-border-gold);
 }
 
 .skin-line-drawer-head {
