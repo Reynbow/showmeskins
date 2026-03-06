@@ -392,6 +392,18 @@
   height: 13px;
 }
 
+.cs-role-regions-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cs-role-regions-icon {
+  width: 13px;
+  height: 13px;
+}
+
 .role-btn {
   padding: 6px 16px;
   background: transparent;

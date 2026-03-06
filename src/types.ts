@@ -33,6 +33,20 @@ export interface SkinLineCategory {
   members: SkinLineMember[];
 }
 
+export interface RegionMember {
+  championId: string;
+  championKey: string;
+  championName: string;
+}
+
+export interface RegionCategory {
+  id: string;
+  name: string;
+  slug: string;
+  imageUri?: string;
+  members: RegionMember[];
+}
+
 export interface ChromaInfo {
   id: number;
   name: string;

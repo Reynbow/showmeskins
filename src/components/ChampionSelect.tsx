@@ -9,6 +9,7 @@ interface Props {
   onSelect: (champion: ChampionBasic) => void;
   onCompanion: () => void;
   onSkinLines: () => void;
+  onRegions: () => void;
   onOpenMatchHistory: (riotId: string) => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
@@ -24,6 +25,7 @@ export function ChampionSelect({
   onSelect,
   onCompanion,
   onSkinLines,
+  onRegions,
   onOpenMatchHistory,
   hasLiveGame,
   onLiveGame,
@@ -209,6 +211,12 @@ export function ChampionSelect({
               <path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" />
             </svg>
             Skin Lines
+          </button>
+          <button className="role-btn cs-role-regions-btn" onClick={onRegions}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-role-regions-icon">
+              <path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" />
+            </svg>
+            Regions
           </button>
         </div>
 
