@@ -227,7 +227,6 @@ export function SkinLinesPage({
             <div className="skin-line-card-head">
               <h2>{line.name}</h2>
             </div>
-            <p>{line.description || 'Explore champions in this skin line.'}</p>
             <button
               className="skin-line-card-count"
               onMouseEnter={(event) => openDrawer(line, false, event.currentTarget)}
