@@ -5,6 +5,7 @@ import type {
   ItemInfo,
   RegionCategory,
   RegionMember,
+  Skin,
   SkinLineCategory,
   SkinLineMember,
 } from './types';
@@ -505,12 +506,31 @@ export async function getRegionCatalog(championsByKey: Record<string, ChampionBa
   return categories;
 }
 
+/**
+ * Data Dragon lists chromas as extra skin rows; the carousel should only show
+ * CommunityDragon top-level skins (one card per skin; chromas stay on swatches).
+ */
+async function filterDdragonSkinsToBaseSkins(championKey: string, skins: Skin[]): Promise<Skin[]> {
+  try {
+    const res = await fetch(`${CDRAGON}/champions/${championKey}.json`);
+    if (!res.ok) return skins;
+    const data = (await res.json()) as { skins?: Array<{ id: number }> };
+    const baseSkinIds = new Set((data.skins ?? []).map((s) => String(s.id)));
+    if (baseSkinIds.size === 0) return skins;
+    return skins.filter((s) => baseSkinIds.has(s.id));
+  } catch {
+    return skins;
+  }
+}
+
 export async function getChampionDetail(id: string): Promise<ChampionDetail> {
   const normalizedId = normalizeChampionId(id);
   const version = await getLatestVersion();
   const res = await fetch(`${BASE_URL}/cdn/${version}/data/en_US/champion/${normalizedId}.json`);
   const data = await res.json();
   const detail = data.data[normalizedId] as ChampionDetail;
+
+  detail.skins = await filterDdragonSkinsToBaseSkins(detail.key, detail.skins);
 
   // Seraphine's launch ultimate skin ships as three progression variants in
   // Data Dragon. Treat them as one skin card and expose variants in-model.
