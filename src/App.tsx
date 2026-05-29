@@ -10,7 +10,7 @@ import { RegionsPage } from './components/RegionsPage';
 import { SkinLinesPage } from './components/SkinLinesPage';
 import { SkinLineViewer } from './components/SkinLineViewer';
 import { TeamSkinLinesPage } from './components/TeamSkinLinesPage';
-import { getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug } from './api';
+import { getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug, type RecentSkinSpotlight } from './api';
 import type {
   ChampionBasic,
   ChampionDetail,
@@ -881,6 +881,26 @@ function App() {
     }
   }, []);
 
+  const handleOpenSkinSpotlight = useCallback(async (spotlight: RecentSkinSpotlight) => {
+    setLoading(true);
+    try {
+      const detail = await getChampionDetail(spotlight.championId);
+      const skin = detail.skins.find((s) => s.id === spotlight.skinId)
+        ?? findSkinBySlug(detail.skins, spotlight.skinSlug)
+        ?? detail.skins[0];
+      setSelectedChampion(detail);
+      setSelectedSkin(skin);
+      setCompanionChromaId(null);
+      setViewMode('viewer');
+      const skinPath = skin.num === 0 ? '' : `/${skinSlug(skin.name)}`;
+      window.history.pushState(null, '', `/${spotlight.championId}${skinPath}`);
+    } catch (err) {
+      console.error('Failed to open skin spotlight:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const handleBack = useCallback(() => {
     setViewMode('select');
     setSelectedChampion(null);
@@ -1457,6 +1477,7 @@ function App() {
           champions={champions}
           version={version}
           onSelect={handleChampionSelect}
+          onOpenSkin={handleOpenSkinSpotlight}
           onCompanion={handleCompanion}
           onRegions={handleOpenRegions}
           onSkinLines={handleOpenSkinLines}

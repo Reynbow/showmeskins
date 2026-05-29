@@ -1,0 +1,201 @@
+.recent-skins-hero {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 10px;
+  padding: 0 24px;
+}
+
+.recent-skins-hero-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.recent-skins-hero-stage {
+  position: relative;
+  height: 200px;
+  border: 1px solid var(--lol-border-gold);
+  overflow: hidden;
+  background: #0a0e16;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.recent-skins-hero-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.65s ease;
+  background: transparent;
+}
+
+.recent-skins-hero-slide.active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.recent-skins-hero-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 15%;
+  display: block;
+}
+
+.recent-skins-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(10, 14, 22, 0.95) 0%,
+    rgba(10, 14, 22, 0.35) 45%,
+    rgba(10, 14, 22, 0.05) 100%
+  );
+  pointer-events: none;
+}
+
+.recent-skins-hero-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  pointer-events: none;
+}
+
+.recent-skins-hero-copy span {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 2px 8px rgba(0, 0, 0, 0.85),
+    0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.recent-skins-hero-champ {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  font-family: var(--font-heading);
+}
+
+.recent-skins-hero-name {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  color: var(--lol-gold-light);
+  letter-spacing: 1px;
+  line-height: 1.2;
+}
+
+.recent-skins-hero-cta {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(240, 230, 210, 0.65);
+}
+
+.recent-skins-hero-slide:hover .recent-skins-hero-cta,
+.recent-skins-hero-slide:focus-visible .recent-skins-hero-cta {
+  color: var(--lol-gold-light);
+}
+
+.recent-skins-hero-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  background: rgba(10, 14, 22, 0.72);
+  color: var(--lol-gold-light);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.recent-skins-hero-stage:hover .recent-skins-hero-nav {
+  opacity: 1;
+}
+
+.recent-skins-hero-nav:hover {
+  border-color: var(--lol-gold);
+}
+
+.recent-skins-hero-nav svg {
+  width: 18px;
+  height: 18px;
+}
+
+.recent-skins-hero-nav--prev {
+  left: 10px;
+}
+
+.recent-skins-hero-nav--next {
+  right: 10px;
+}
+
+.recent-skins-hero-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.recent-skins-hero-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(200, 170, 110, 0.25);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.recent-skins-hero-dot.active {
+  background: var(--lol-gold);
+  transform: scale(1.15);
+}
+
+@media (max-width: 640px) {
+  .recent-skins-hero {
+    padding: 0 16px;
+    margin-bottom: 8px;
+  }
+
+  .recent-skins-hero-stage {
+    height: 160px;
+  }
+
+  .recent-skins-hero-name {
+    font-size: 16px;
+  }
+
+  .recent-skins-hero-nav {
+    opacity: 1;
+    width: 30px;
+    height: 30px;
+  }
+}

@@ -1,12 +1,15 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ChampionBasic } from '../types';
-import { getChampionIcon } from '../api';
+import type { RecentSkinSpotlight } from '../api';
+import { getChampionIcon, getRecentSkins } from '../api';
+import { RecentSkinsHero } from './RecentSkinsHero';
 import './ChampionSelect.css';
 
 interface Props {
   champions: ChampionBasic[];
   version: string;
   onSelect: (champion: ChampionBasic) => void;
+  onOpenSkin: (spotlight: RecentSkinSpotlight) => void;
   onCompanion: () => void;
   onSkinLines: () => void;
   onRegions: () => void;
@@ -23,6 +26,7 @@ export function ChampionSelect({
   champions,
   version,
   onSelect,
+  onOpenSkin,
   onCompanion,
   onSkinLines,
   onRegions,
@@ -48,6 +52,15 @@ export function ChampionSelect({
   const [selectedRole, setSelectedRole] = useState('All');
   const [scrolled, setScrolled] = useState(false);
   const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
+  const [recentSkins, setRecentSkins] = useState<RecentSkinSpotlight[]>([]);
+
+  useEffect(() => {
+    if (champions.length === 0) return;
+    const byKey = Object.fromEntries(champions.map((c) => [c.key, c]));
+    getRecentSkins(byKey)
+      .then(setRecentSkins)
+      .catch(() => setRecentSkins([]));
+  }, [champions]);
 
   useEffect(() => {
     try {
@@ -195,6 +208,10 @@ export function ChampionSelect({
             </button>
           </div>
         </div>
+
+        {recentSkins.length > 0 && (
+          <RecentSkinsHero skins={recentSkins} onOpenSkin={onOpenSkin} />
+        )}
 
         <div className="role-filters">
           {ROLES.map(role => (
