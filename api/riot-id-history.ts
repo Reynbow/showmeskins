@@ -221,9 +221,9 @@ function resolveRiotApiKey(): string | undefined {
   // Local dev fallback when env injection is missing or stale.
   const cwd = process.cwd();
   const candidates = [
-    join(cwd, '.vercel', '.env.development.local'),
     join(cwd, '.env.local'),
     join(cwd, '.env'),
+    join(cwd, '.vercel', '.env.development.local'),
   ];
   const localFileKey = (() => {
     for (const filePath of candidates) {

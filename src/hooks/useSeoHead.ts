@@ -33,10 +33,12 @@ export function useSeoHead({
   title,
   description,
   path = '/',
+  imageUrl,
 }: {
   title: string;
   description: string;
   path?: string;
+  imageUrl?: string;
 }) {
   useEffect(() => {
     document.title = title;
@@ -50,12 +52,21 @@ export function useSeoHead({
       setMeta('og:url', `${baseUrl}${path}`, true);
     }
 
+    if (imageUrl) {
+      setMeta('og:image', imageUrl, true);
+      setMeta('twitter:card', 'summary_large_image');
+      setMeta('twitter:image', imageUrl);
+    } else {
+      setMeta('twitter:card', 'summary');
+    }
+
     setJsonLd({
       '@context': 'https://schema.org',
       '@type': 'WebApplication',
       name: SITE_NAME,
       description: BASE_DESCRIPTION,
       url: baseUrl ? `${baseUrl}${path}` : undefined,
+      ...(imageUrl ? { image: imageUrl } : {}),
     });
-  }, [title, description, path]);
+  }, [title, description, path, imageUrl]);
 }

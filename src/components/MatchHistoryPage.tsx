@@ -7,6 +7,21 @@ import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
 import './MatchHistoryPage.css';
 
+/** Parse /api JSON; empty bodies happen when Vite's proxy cannot reach port 3000. */
+async function readApiJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(
+      'API returned an empty response. For local dev, run `npm run dev:api` in a second terminal (RIOT_API_KEY in .env.local) while `npm run dev` is running.',
+    );
+  }
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`API returned invalid JSON (HTTP ${res.status}).`);
+  }
+}
+
 type Region =
   | 'br1'
   | 'eun1'
@@ -1230,13 +1245,13 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
           if (ids.length === 1) params.set('queue', String(ids[0]));
         }
         const res = await fetch(`/api/riot-id-history?${params.toString()}`);
-        const body = await res.json();
+        const body = await readApiJson(res);
         if (!res.ok) {
-          const msg = typeof body?.error === 'string' ? body.error : `Request failed (${res.status})`;
-          const details = typeof body?.details === 'string' && body.details ? `: ${body.details}` : '';
+          const msg = typeof body.error === 'string' ? body.error : `Request failed (${res.status})`;
+          const details = typeof body.details === 'string' && body.details ? `: ${body.details}` : '';
           throw new Error(`${msg}${details}`);
         }
-        initial = body as HistoryResponse;
+        initial = body as unknown as HistoryResponse;
         if (initial.gameName && initial.tagLine) {
           setGameName(initial.gameName);
           setTagLine(initial.tagLine);

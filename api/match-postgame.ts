@@ -109,9 +109,9 @@ function resolveRiotApiKey(): string | undefined {
 
   const cwd = process.cwd();
   const candidates = [
-    join(cwd, '.vercel', '.env.development.local'),
     join(cwd, '.env.local'),
     join(cwd, '.env'),
+    join(cwd, '.vercel', '.env.development.local'),
   ];
   for (const filePath of candidates) {
     const key = readEnvFileKey(filePath, 'RIOT_API_KEY');

@@ -9,7 +9,8 @@ import { MatchHistoryPage } from './components/MatchHistoryPage';
 import { RegionsPage } from './components/RegionsPage';
 import { SkinLinesPage } from './components/SkinLinesPage';
 import { SkinLineViewer } from './components/SkinLineViewer';
-import { getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, resolveLcuSkinNum, toUrlSlug } from './api';
+import { TeamSkinLinesPage } from './components/TeamSkinLinesPage';
+import { getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug } from './api';
 import type {
   ChampionBasic,
   ChampionDetail,
@@ -47,6 +48,7 @@ type ParsedRoute =
   | { mode: 'regions' }
   | { mode: 'skin-lines' }
   | { mode: 'skin-line'; lineSlug: string; championId?: string; skinId?: string }
+  | { mode: 'team-skin-lines' }
   | { mode: 'champion'; championId: string; skinSlug: string | null };
 
 /** Parse the current URL path into app routes. */
@@ -62,6 +64,7 @@ function parseRoute(): ParsedRoute {
     if (!parts[1]) return { mode: 'skin-lines' };
     return { mode: 'skin-line', lineSlug: parts[1], championId: parts[2], skinId: parts[3] };
   }
+  if (parts[0] === 'team-skin-lines') return { mode: 'team-skin-lines' };
 
   return { mode: 'champion', championId: parts[0], skinSlug: parts[1] || null };
 }
@@ -429,7 +432,7 @@ function App() {
   const [companionChromaId, setCompanionChromaId] = useState<number | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history' | 'regions' | 'skin-lines' | 'skin-line-viewer'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history' | 'regions' | 'skin-lines' | 'skin-line-viewer' | 'team-skin-lines'>('select');
   const [historyInitialRiotId, setHistoryInitialRiotId] = useState<string>('');
   const [regions, setRegions] = useState<RegionCategory[]>([]);
   const [skinLines, setSkinLines] = useState<SkinLineCategory[]>([]);
@@ -492,7 +495,9 @@ function App() {
   }, []);
 
   // SEO: update document head (invisible to users; for search engines)
-  const seoTitle = 'x9report.com';
+  const seoTitle = viewMode === 'viewer' && selectedChampion && selectedSkin
+    ? `${selectedChampion.name} — ${selectedSkin.num === 0 ? selectedChampion.name : selectedSkin.name} | x9report.com`
+    : 'x9report.com';
   const seoDesc = viewMode === 'select'
     ? 'Browse and view all League of Legends champion skins in 3D. Free LoL skin viewer.'
     : viewMode === 'history'
@@ -501,6 +506,8 @@ function App() {
         ? 'Browse League of Legends champions grouped by their Runeterra regions.'
       : viewMode === 'skin-lines'
         ? 'Browse League of Legends skin lines and discover champions by theme.'
+        : viewMode === 'team-skin-lines'
+          ? 'Compare skin lines owned across your five-player team.'
         : viewMode === 'skin-line-viewer' && activeSkinLine
           ? `Explore ${activeSkinLine.name} skins and champions in 3D.`
       : viewMode === 'companion'
@@ -514,6 +521,8 @@ function App() {
       ? '/regions'
     : viewMode === 'skin-lines'
       ? '/skin-lines'
+      : viewMode === 'team-skin-lines'
+        ? '/team-skin-lines'
       : viewMode === 'skin-line-viewer' && activeSkinLine && activeSkinLineMember
         ? `/skin-lines/${activeSkinLine.slug}/${activeSkinLineMember.championId}/${activeSkinLineMember.skinId}`
     : viewMode === 'companion'
@@ -521,7 +530,13 @@ function App() {
       : selectedChampion && selectedSkin
         ? `/${selectedChampion.id}${selectedSkin.num ? `/${skinSlug(selectedSkin.name)}` : ''}`
         : '/';
-  useSeoHead({ title: seoTitle, description: seoDesc, path: seoPath });
+  const seoImage =
+    viewMode === 'viewer' && selectedChampion && selectedSkin
+      ? getSplashArt(selectedChampion.id, selectedSkin.num)
+      : viewMode === 'skin-line-viewer' && activeSkinLineMember
+        ? getSplashArt(activeSkinLineMember.championId, activeSkinLineMember.skinNum)
+        : undefined;
+  useSeoHead({ title: seoTitle, description: seoDesc, path: seoPath, imageUrl: seoImage });
 
   // Track whether we've already auto-navigated for this game session
   // (so we don't force the user back if they navigate away)
@@ -627,6 +642,11 @@ function App() {
           const regionCatalog = await getRegionCatalog(championsByKey);
           setRegions(regionCatalog);
           setViewMode('regions');
+        } else if (route.mode === 'team-skin-lines') {
+          const championsByKey = Object.fromEntries(champList.map((champ) => [champ.key, champ]));
+          const lines = await getSkinLineCatalog(championsByKey);
+          setSkinLines(lines);
+          setViewMode('team-skin-lines');
         } else if (route.mode === 'skin-lines' || route.mode === 'skin-line') {
           const championsByKey = Object.fromEntries(champList.map((champ) => [champ.key, champ]));
           const lines = await getSkinLineCatalog(championsByKey);
@@ -748,6 +768,20 @@ function App() {
           setViewMode('regions');
         } catch (err) {
           console.error('Failed to load region route:', err);
+          setViewMode('select');
+        }
+        return;
+      }
+      if (route.mode === 'team-skin-lines') {
+        try {
+          if (skinLines.length === 0 && champions.length > 0) {
+            const championsByKey = Object.fromEntries(champions.map((champ) => [champ.key, champ]));
+            const lines = await getSkinLineCatalog(championsByKey);
+            setSkinLines(lines);
+          }
+          setViewMode('team-skin-lines');
+        } catch (err) {
+          console.error('Failed to load team skin lines route:', err);
           setViewMode('select');
         }
         return;
@@ -877,6 +911,11 @@ function App() {
   }, [champions, regions]);
 
   const handleRegionsBack = useCallback(() => {
+    setViewMode('select');
+    window.history.pushState(null, '', '/');
+  }, []);
+
+  const handleTeamSkinLinesBack = useCallback(() => {
     setViewMode('select');
     window.history.pushState(null, '', '/');
   }, []);
@@ -1432,6 +1471,11 @@ function App() {
           version={version}
           onBack={handleRegionsBack}
           onSelectChampion={handleChampionSelect}
+        />
+      ) : viewMode === 'team-skin-lines' ? (
+        <TeamSkinLinesPage
+          skinLines={skinLines}
+          onBack={handleTeamSkinLinesBack}
         />
       ) : viewMode === 'skin-lines' ? (
         <SkinLinesPage

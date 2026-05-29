@@ -1,0 +1,225 @@
+.team-skin-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lol-bg-primary);
+  padding: 18px 22px;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.team-skin-scroll {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  padding-bottom: 24px;
+}
+
+.team-skin-note {
+  max-width: 900px;
+  margin: 0 auto 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--lol-border-gold);
+  background: rgba(200, 170, 110, 0.06);
+  color: var(--lol-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.team-skin-roster {
+  max-width: 1100px;
+  margin: 0 auto 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.team-skin-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.team-skin-manual-add {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.team-skin-manual-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--lol-text-primary);
+}
+
+.team-skin-manual-add button {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--lol-border-gold);
+  background: transparent;
+  color: var(--lol-gold);
+  cursor: pointer;
+}
+
+.team-skin-row label {
+  color: var(--lol-gold);
+  font-size: 12px;
+  font-family: var(--font-heading);
+  letter-spacing: 1px;
+}
+
+.team-skin-row input,
+.team-skin-region select {
+  padding: 8px 10px;
+  border: 1px solid var(--lol-border-gold);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--lol-text-primary);
+  font-size: 14px;
+}
+
+.team-skin-region {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.team-skin-region select {
+  min-width: 160px;
+}
+
+.team-skin-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.team-skin-compare-btn {
+  padding: 10px 28px;
+  border: 1px solid var(--lol-gold);
+  background: rgba(200, 170, 110, 0.15);
+  color: var(--lol-gold-light);
+  font-family: var(--font-heading);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.team-skin-compare-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.team-skin-compare-btn:hover:not(:disabled) {
+  background: rgba(200, 170, 110, 0.28);
+}
+
+.team-skin-error {
+  text-align: center;
+  color: #e8998a;
+  margin-bottom: 12px;
+}
+
+.team-skin-results h2 {
+  font-family: var(--font-heading);
+  color: var(--lol-gold-light);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: 16px;
+  margin: 20px 0 12px;
+  text-align: center;
+}
+
+.team-skin-line-card {
+  max-width: 1100px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--lol-border-gold);
+  background: rgba(10, 14, 22, 0.85);
+  padding: 14px;
+}
+
+.team-skin-line-card h3 {
+  font-family: var(--font-heading);
+  color: var(--lol-gold);
+  letter-spacing: 1px;
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.team-skin-player-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.team-skin-player-col {
+  border: 1px solid rgba(200, 170, 110, 0.25);
+  padding: 8px;
+  min-height: 80px;
+}
+
+.team-skin-player-col h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--lol-gold);
+  letter-spacing: 0.5px;
+  word-break: break-word;
+}
+
+.team-skin-player-col ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--lol-text-secondary);
+}
+
+.team-skin-player-col li {
+  margin-bottom: 4px;
+}
+
+.team-skin-player-col .none {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+.team-skin-player-status {
+  font-size: 12px;
+  color: var(--lol-text-secondary);
+  margin-top: 4px;
+}
+
+.team-skin-near {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.team-skin-near-chip {
+  padding: 6px 12px;
+  border: 1px solid rgba(200, 170, 110, 0.4);
+  color: var(--lol-text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .team-skin-row {
+    grid-template-columns: 28px 1fr 1fr;
+  }
+  .team-skin-row .team-skin-region-cell {
+    grid-column: 2 / -1;
+  }
+  .team-skin-player-grid {
+    grid-template-columns: 1fr;
+  }
+}
