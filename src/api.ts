@@ -198,105 +198,14 @@ let cachedRegionCatalog: RegionCategory[] | null = null;
 let cachedRecentSkins: RecentSkinSpotlight[] | null = null;
 let cachedRecentSkinsKey = '';
 
-function patchFolderFromVersion(version: string): string {
-  const [major, minor] = version.split('.');
-  return `${major}.${minor}`;
-}
-
-function cdragonSkinsUrl(patchFolder: string): string {
-  return `/cdragon/${patchFolder}/plugins/rcp-be-lol-game-data/global/default/v1/skins.json`;
-}
-
-async function fetchCdragonSkinsJson(patchFolder: string): Promise<Record<string, CdragonSkinSummary> | null> {
-  const res = await fetch(cdragonSkinsUrl(patchFolder));
-  if (!res.ok) return null;
-  return (await res.json()) as Record<string, CdragonSkinSummary>;
-}
-
-function isHeroCarouselSkin(skin: CdragonSkinSummary): boolean {
-  return Boolean(
-    skin
-    && typeof skin.id === 'number'
-    && !skin.isBase
-    && skin.skinClassification === 'kChampion'
-    && skin.name
-    && !skin.name.startsWith('Prestige '),
-  );
-}
-
-/** When a patch adds multiple forms for one champ (e.g. Eclipse variant), keep the primary skin. */
-function pickPrimaryNewSkinPerChampion(added: CdragonSkinSummary[]): CdragonSkinSummary[] {
-  const byChampion = new Map<number, CdragonSkinSummary[]>();
-  for (const skin of added.filter(isHeroCarouselSkin)) {
-    const championKey = Math.floor(skin.id / 1000);
-    const group = byChampion.get(championKey) ?? [];
-    group.push(skin);
-    byChampion.set(championKey, group);
-  }
-
-  const picked: CdragonSkinSummary[] = [];
-  for (const group of byChampion.values()) {
-    const nonEclipse = group.filter((skin) => !skin.name!.startsWith('Eclipse '));
-    const pool = nonEclipse.length > 0 ? nonEclipse : group;
-    pool.sort((a, b) => a.id - b.id);
-    picked.push(pool[0]);
-  }
-
-  return picked.sort((a, b) => b.id - a.id);
-}
-
-/**
- * Skins newly added in the current patch — detected by diffing CommunityDragon
- * skins.json (latest vs previous Data Dragon patch folder).
- */
-export async function getRecentSkins(
-  championsByKey: Record<string, ChampionBasic>,
-  limit = 16,
-): Promise<RecentSkinSpotlight[]> {
-  if (Object.keys(championsByKey).length === 0) return [];
-
-  const versionsRes = await fetch(`${BASE_URL}/api/versions.json`);
-  if (!versionsRes.ok) throw new Error('Failed to load patch versions from Data Dragon');
-  const versions = (await versionsRes.json()) as string[];
-  const currentVersion = versions[0] ?? '';
-  const previousVersion = versions[1] ?? '';
-  const previousPatch = previousVersion ? patchFolderFromVersion(previousVersion) : '';
-  const cacheKey = `${currentVersion}:${previousVersion}:${limit}`;
-
+/** Skins newly added in the current patch (server-side patch diff via /api/recent-skins). */
+export async function getRecentSkins(limit = 16): Promise<RecentSkinSpotlight[]> {
+  const cacheKey = `api:${limit}`;
   if (cachedRecentSkins && cachedRecentSkinsKey === cacheKey) return cachedRecentSkins;
 
-  const [latestSkins, previousSkins] = await Promise.all([
-    fetchCdragonSkinsJson('latest'),
-    previousPatch ? fetchCdragonSkinsJson(previousPatch) : Promise.resolve(null),
-  ]);
-
-  if (!latestSkins) throw new Error('Failed to load skin data from CommunityDragon');
-
-  let newSkins: CdragonSkinSummary[] = [];
-  if (previousSkins) {
-    const previousIds = new Set(Object.keys(previousSkins));
-    newSkins = Object.values(latestSkins).filter((skin) => !previousIds.has(String(skin.id)));
-  }
-
-  const candidates = pickPrimaryNewSkinPerChampion(newSkins);
-
-  const result: RecentSkinSpotlight[] = [];
-  for (const skin of candidates) {
-    const championKey = String(Math.floor(skin.id / 1000));
-    const champion = championsByKey[championKey];
-    if (!champion || !skin.name) continue;
-
-    const label = skin.name === 'default' ? champion.name : skin.name;
-    result.push({
-      championId: champion.id,
-      championName: champion.name,
-      skinId: String(skin.id),
-      skinNum: skin.id % 1000,
-      skinName: label,
-      skinSlug: toUrlSlug(label),
-    });
-    if (result.length >= limit) break;
-  }
+  const res = await fetch(`/api/recent-skins?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to load recent skins');
+  const result = (await res.json()) as RecentSkinSpotlight[];
 
   cachedRecentSkins = result;
   cachedRecentSkinsKey = cacheKey;

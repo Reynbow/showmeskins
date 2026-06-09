@@ -55,12 +55,13 @@ export function ChampionSelect({
   const [recentSkins, setRecentSkins] = useState<RecentSkinSpotlight[]>([]);
 
   useEffect(() => {
-    if (champions.length === 0) return;
-    const byKey = Object.fromEntries(champions.map((c) => [c.key, c]));
-    getRecentSkins(byKey)
+    getRecentSkins()
       .then(setRecentSkins)
-      .catch(() => setRecentSkins([]));
-  }, [champions]);
+      .catch((err) => {
+        console.error('Failed to load recent skins:', err);
+        setRecentSkins([]);
+      });
+  }, []);
 
   useEffect(() => {
     try {
