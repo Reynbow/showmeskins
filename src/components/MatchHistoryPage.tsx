@@ -2313,7 +2313,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
             </div>
             <h2 className="mh-api-waiting-title">Riot API is AFK</h2>
             <p className="mh-api-waiting-text">
-              We&apos;re waiting for Riot to grant developer API access in the first place.
+              We&apos;re waiting for Riot to grant developer API access.
               Match history will appear as soon as access is available.
             </p>
           </div>
