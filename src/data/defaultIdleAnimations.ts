@@ -54,7 +54,7 @@ export const DEFAULT_IDLE_ANIMATIONS: Record<string, string> = {
   heimerdinger: 'Idle1_Base',
   hwei: 'Idle1_Base',
   illaoi: 'Idle1_Base',
-  irelia: 'Spell4_Idle',
+  irelia: 'Irelia_Idle_01',
   ivern: 'Idle1_Base',
   janna: 'Idle1',
   jarvaniv: 'Idle1',

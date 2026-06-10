@@ -4,6 +4,15 @@ const SITE_NAME = 'x9report.com';
 const SITE_BASE = 'https://x9report.com';
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
 
+/** DDragon's image CDN uses old internal names for some champions (e.g. FiddleSticks). */
+const CHAMPION_ART_ALIASES: Record<string, string> = {
+  fiddlesticks: 'FiddleSticks',
+};
+
+function artChampionId(championId: string): string {
+  return CHAMPION_ART_ALIASES[championId.toLowerCase()] ?? championId;
+}
+
 const RESERVED = new Set([
   'companion', 'history', 'dev', 'regions', 'skin-lines', 'team-skin-lines', 'api',
 ]);
@@ -100,7 +109,7 @@ async function resolveChampionSkinMeta(path: string): Promise<OgMeta | null> {
   return {
     title: `${champion.name} — ${skinLabel} | ${SITE_NAME}`,
     description: `View ${champion.name} ${skinLabel} skin in 3D. League of Legends skin viewer.`,
-    image: `${DDRAGON}/cdn/img/champion/splash/${championEntry.id}_${skinNum}.jpg`,
+    image: `${DDRAGON}/cdn/img/champion/splash/${artChampionId(championEntry.id)}_${skinNum}.jpg`,
     canonicalPath,
   };
 }

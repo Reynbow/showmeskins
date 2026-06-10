@@ -210,6 +210,7 @@ function resolveConfiguredAnimation(
   names: string[],
   configured: string,
   alias?: string,
+  skinId?: string,
 ): string | undefined {
   if (!configured) return undefined;
 
@@ -239,6 +240,21 @@ function resolveConfiguredAnimation(
     if (prefixed) return prefixed;
   }
 
+  // 5) Dotted suffix match — base clip name precedes a skin tag
+  //    ("Irelia_Idle_01" → "Irelia_Idle_01.SKINS_Irelia_Skin63.anm").
+  const dottedMatches = names.filter((n) => normalizeAnimName(n).startsWith(`${target}.`));
+  if (dottedMatches.length > 0) {
+    if (skinId) {
+      const skinNum = Number(skinId) % 1000;
+      if (!Number.isNaN(skinNum)) {
+        const skinToken = `skin${skinNum}`;
+        const skinMatch = dottedMatches.find((n) => normalizeAnimName(n).includes(skinToken));
+        if (skinMatch) return skinMatch;
+      }
+    }
+    return dottedMatches[0];
+  }
+
   return undefined;
 }
 
@@ -246,7 +262,7 @@ function findIdleName(names: string[], alias?: string, skinId?: string): string 
   // Check for a champion-specific configured idle first.
   const preferred = getConfiguredAnimationByKey(DEFAULT_IDLE_ANIMATIONS, alias, skinId);
   if (preferred) {
-    const matched = resolveConfiguredAnimation(names, preferred, alias);
+    const matched = resolveConfiguredAnimation(names, preferred, alias, skinId);
     if (matched) return matched;
   }
   // First try matching from candidate idle animations only
@@ -492,7 +508,7 @@ function ChampionModel({ url, viewMode, emoteRequest, chromaTextureUrl, preferre
       if (stanceIdle) return stanceIdle;
     }
     if (preferredIdleAnimation) {
-      const forcedIdle = resolveConfiguredAnimation(names, preferredIdleAnimation, champAlias);
+      const forcedIdle = resolveConfiguredAnimation(names, preferredIdleAnimation, champAlias, skinId);
       if (forcedIdle) return forcedIdle;
     }
     if (champAlias?.toLowerCase() === 'azir') {

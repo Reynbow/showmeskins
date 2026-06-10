@@ -20,10 +20,25 @@ const CHAMPION_ID_ALIASES: Record<string, string> = {
   fiddlesticks: 'Fiddlesticks',
 };
 
+/**
+ * Data Dragon's image CDN (splash/loading art) uses old internal champion
+ * names for some champions, unlike the data/icon endpoints. Notably the
+ * newer Fiddlesticks skins only exist under "FiddleSticks_N.jpg".
+ */
+const CHAMPION_ART_ALIASES: Record<string, string> = {
+  fiddlesticks: 'FiddleSticks',
+};
+
 function normalizeChampionId(championId: string): string {
   const trimmed = championId.trim();
   if (!trimmed) return trimmed;
   return CHAMPION_ID_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
+function artChampionId(championId: string): string {
+  const trimmed = championId.trim();
+  if (!trimmed) return trimmed;
+  return CHAMPION_ART_ALIASES[trimmed.toLowerCase()] ?? trimmed;
 }
 
 export function toUrlSlug(value: string): string {
@@ -578,21 +593,21 @@ export function getChampionIcon(id: string, version: string): string {
 }
 
 export function getSplashArt(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/splash/${normalizeChampionId(championId)}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/splash/${artChampionId(championId)}_${skinNum}.jpg`;
 }
 
 export function getLoadingArt(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${artChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /** Fallback for splash art – uses loading art from Data Dragon */
 export function getSplashArtFallback(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${artChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /** Direct Data Dragon loading art URL (always external, JPG) */
 export function getLoadingArtDdragon(championId: string, skinNum: number): string {
-  return `${BASE_URL}/cdn/img/champion/loading/${normalizeChampionId(championId)}_${skinNum}.jpg`;
+  return `${BASE_URL}/cdn/img/champion/loading/${artChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /**
