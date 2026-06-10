@@ -135,6 +135,15 @@
   letter-spacing: 1px;
 }
 
+/* Re-enable Download App: remove cs-companion-btn--hidden from ChampionSelect.tsx */
+.cs-companion-btn--hidden {
+  display: none;
+}
+
+.cs-companion-wrap:has(.cs-companion-btn--hidden):not(:has(.cs-live-game-btn)) {
+  display: none;
+}
+
 .cs-companion-btn {
   display: inline-flex;
   align-items: center;

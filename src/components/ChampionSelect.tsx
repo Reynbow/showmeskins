@@ -138,7 +138,7 @@ export function ChampionSelect({
               Live Game
             </button>
           )}
-          <button className="cs-companion-btn" onClick={onCompanion}>
+          <button className="cs-companion-btn cs-companion-btn--hidden" onClick={onCompanion}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-companion-icon">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
