@@ -94,12 +94,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const versions = (await versionsRes.json()) as string[];
     const currentVersion = versions[0] ?? '';
-    const previousVersion = versions[1] ?? '';
-    const previousPatch = previousVersion ? patchFolderFromVersion(previousVersion) : '';
 
-    const [latestSkins, previousSkins, championsRes] = await Promise.all([
+    const [latestSkins, championsRes] = await Promise.all([
       fetchCdragonSkinsJson('latest'),
-      previousPatch ? fetchCdragonSkinsJson(previousPatch) : Promise.resolve(null),
       fetch(`${DDRAGON}/cdn/${currentVersion}/data/en_US/champion.json`),
     ]);
 
@@ -115,10 +112,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Object.values(championsData.data ?? {}).map((champ) => [champ.key, champ]),
     );
 
+    // Walk back through older patches until we find the most recent batch of
+    // new skins. Early in a patch cycle the diff vs the previous patch is
+    // empty (skins ship mid-patch), so compare against older patches too.
+    const MAX_PATCHES_BACK = 4;
     let newSkins: CdragonSkinSummary[] = [];
-    if (previousSkins) {
+    for (let i = 1; i <= MAX_PATCHES_BACK && i < versions.length; i++) {
+      const patchFolder = patchFolderFromVersion(versions[i]);
+      const previousSkins = await fetchCdragonSkinsJson(patchFolder);
+      if (!previousSkins) continue;
+
       const previousIds = new Set(Object.keys(previousSkins));
       newSkins = Object.values(latestSkins).filter((skin) => !previousIds.has(String(skin.id)));
+      if (newSkins.some(isHeroCarouselSkin)) break;
     }
 
     const candidates = pickPrimaryNewSkinPerChampion(newSkins);
