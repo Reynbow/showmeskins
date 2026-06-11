@@ -2,10 +2,13 @@
  * Builds public/og.png for Discord / Open Graph previews.
  * Uses the site icon, Cinzel title styling, and a hextech lattice backdrop.
  *
+ * Text is outlined via fontkit so Sharp/librsvg does not need embedded font support.
+ *
  * Usage: npx tsx scripts/generate-og.ts
  */
 
-import { readFileSync } from 'node:fs';
+import * as fontkit from 'fontkit';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -13,13 +16,22 @@ import sharp from 'sharp';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const OUT = join(ROOT, 'public', 'og.png');
-const ICON = join(ROOT, 'public', 'icon.png');
-const FONT = join(ROOT, 'public', 'cinzel-v23-latin-700.woff2');
+const ICON_CANDIDATES = [
+  join(ROOT, 'public', 'icon.png'),
+  join(ROOT, 'companion', 'assets', 'icon.png'),
+];
+const FONT = join(__dirname, 'assets', 'Cinzel-wght.ttf');
 
 const W = 1200;
 const H = 630;
 const HEX_R = 38;
 const HEX_SEED = 0x39_72_70_6f; // stable layout
+
+const TITLE_MAIN_SIZE = 58;
+const TITLE_X_SIZE = Math.round(TITLE_MAIN_SIZE * 0.8);
+const TITLE_LETTER_SPACING = 6 * (TITLE_MAIN_SIZE / 24);
+const TITLE_BASELINE_Y = 500;
+const TITLE_COLOR = '#f0e6d2';
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -56,18 +68,73 @@ function hexPolygons(): string {
   return parts.join('\n    ');
 }
 
-function buildSvg(fontBase64: string): string {
+type TitleFont = ReturnType<ReturnType<typeof fontkit.create>['getVariation']>;
+
+function measureText(font: TitleFont, text: string, size: number, letterSpacing: number): number {
+  const scale = size / font.unitsPerEm;
+  const run = font.layout(text);
+  let width = 0;
+  for (let i = 0; i < run.glyphs.length; i++) {
+    width += run.positions[i].xAdvance * scale;
+    if (i < run.glyphs.length - 1) width += letterSpacing;
+  }
+  return width;
+}
+
+function textToPaths(
+  font: TitleFont,
+  text: string,
+  startX: number,
+  baselineY: number,
+  size: number,
+  letterSpacing: number,
+): string {
+  const scale = size / font.unitsPerEm;
+  const run = font.layout(text);
+  let cursorX = startX;
+  const parts: string[] = [];
+
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const glyph = run.glyphs[i];
+    const pos = run.positions[i];
+    if (glyph.id !== 0 && glyph.path) {
+      const path = glyph.path.transform(
+        scale,
+        0,
+        0,
+        -scale,
+        cursorX + pos.xOffset * scale,
+        baselineY + pos.yOffset * scale,
+      );
+      parts.push(`<path d="${path.toSVG()}" fill="${TITLE_COLOR}" />`);
+    }
+    cursorX += pos.xAdvance * scale;
+    if (i < run.glyphs.length - 1) cursorX += letterSpacing;
+  }
+
+  return parts.join('\n    ');
+}
+
+function buildTitlePaths(font: TitleFont): string {
+  const xText = 'x';
+  const mainText = '9REPORT.COM';
+  const gap = TITLE_LETTER_SPACING * 0.35;
+  const xWidth = measureText(font, xText, TITLE_X_SIZE, TITLE_LETTER_SPACING);
+  const mainWidth = measureText(font, mainText, TITLE_MAIN_SIZE, TITLE_LETTER_SPACING);
+  const totalWidth = xWidth + gap + mainWidth;
+  const startX = (W - totalWidth) / 2;
+
+  return [
+    textToPaths(font, xText, startX, TITLE_BASELINE_Y, TITLE_X_SIZE, TITLE_LETTER_SPACING),
+    textToPaths(font, mainText, startX + xWidth + gap, TITLE_BASELINE_Y, TITLE_MAIN_SIZE, TITLE_LETTER_SPACING),
+  ].join('\n    ');
+}
+
+function buildSvg(titlePaths: string): string {
   const hexes = hexPolygons();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <style>
-      @font-face {
-        font-family: 'Cinzel';
-        font-weight: 600;
-        src: url('data:font/woff2;base64,${fontBase64}') format('woff2');
-      }
-    </style>
     <radialGradient id="goldGlow" cx="50%" cy="8%" r="65%">
       <stop offset="0%" stop-color="#c8aa6e" stop-opacity="0.14" />
       <stop offset="100%" stop-color="#c8aa6e" stop-opacity="0" />
@@ -92,29 +159,29 @@ function buildSvg(fontBase64: string): string {
     ${hexes}
   </g>
 
-  <text
-    x="${W / 2}"
-    y="500"
-    text-anchor="middle"
-    font-family="Cinzel, serif"
-    font-weight="600"
-    font-size="58"
-    fill="#f0e6d2"
-    letter-spacing="6"
-  ><tspan font-size="46">x</tspan><tspan>9REPORT.COM</tspan></text>
+  <g>
+    ${titlePaths}
+  </g>
 </svg>`;
 }
 
+function resolveIconPath(): string {
+  for (const candidate of ICON_CANDIDATES) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`No icon found. Checked: ${ICON_CANDIDATES.join(', ')}`);
+}
+
 async function main() {
-  const fontBase64 = readFileSync(FONT).toString('base64');
-  const svg = buildSvg(fontBase64);
+  const font = fontkit.create(readFileSync(FONT)).getVariation({ wght: 600 });
+  const svg = buildSvg(buildTitlePaths(font));
 
   const logoSize = 168;
   const logoLeft = Math.round((W - logoSize) / 2);
   const logoTop = 148;
 
   const base = await sharp(Buffer.from(svg)).png().toBuffer();
-  const logo = await sharp(ICON)
+  const logo = await sharp(resolveIconPath())
     .resize(logoSize, logoSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
