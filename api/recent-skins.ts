@@ -8,6 +8,7 @@ interface CdragonSkinSummary {
   isBase?: boolean;
   name?: string;
   skinClassification?: string;
+  splashPath?: string;
 }
 
 interface RecentSkinSpotlight {
@@ -17,6 +18,8 @@ interface RecentSkinSpotlight {
   skinNum: number;
   skinName: string;
   skinSlug: string;
+  /** Riot's centered (champion-framed) splash; falls back to Data Dragon art when absent. */
+  splashUrl?: string;
 }
 
 interface DdragonChampion {
@@ -39,6 +42,13 @@ function patchFolderFromVersion(version: string): string {
 
 function cdragonSkinsUrl(patchFolder: string): string {
   return `${CDRAGON_RAW}/${patchFolder}/plugins/rcp-be-lol-game-data/global/default/v1/skins.json`;
+}
+
+/** Map an LCU asset path (e.g. splashPath) to its raw.communitydragon.org URL. */
+function cdragonAssetUrl(assetPath: string): string | undefined {
+  const prefix = '/lol-game-data/assets/';
+  if (!assetPath.startsWith(prefix)) return undefined;
+  return `${CDRAGON_RAW}/latest/plugins/rcp-be-lol-game-data/global/default/${assetPath.slice(prefix.length).toLowerCase()}`;
 }
 
 async function fetchCdragonSkinsJson(patchFolder: string): Promise<Record<string, CdragonSkinSummary> | null> {
@@ -143,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         skinNum: skin.id % 1000,
         skinName: label,
         skinSlug: toUrlSlug(label),
+        splashUrl: skin.splashPath ? cdragonAssetUrl(skin.splashPath) : undefined,
       });
       if (result.length >= limit) break;
     }

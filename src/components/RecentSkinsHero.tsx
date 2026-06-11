@@ -58,11 +58,18 @@ export function RecentSkinsHero({ skins, onOpenSkin }: Props) {
             onClick={() => onOpenSkin(skin)}
           >
             <img
-              src={getSplashArt(skin.championId, skin.skinNum)}
+              src={skin.splashUrl ?? getSplashArt(skin.championId, skin.skinNum)}
               alt=""
               loading={i <= 1 ? 'eager' : 'lazy'}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = getSplashArtFallback(skin.championId, skin.skinNum);
+                // Centered splash -> Data Dragon splash -> loading art.
+                const img = e.target as HTMLImageElement;
+                const ddragonSplash = getSplashArt(skin.championId, skin.skinNum);
+                if (skin.splashUrl && img.src === skin.splashUrl) {
+                  img.src = ddragonSplash;
+                } else if (img.src === ddragonSplash) {
+                  img.src = getSplashArtFallback(skin.championId, skin.skinNum);
+                }
               }}
             />
             <div className="recent-skins-hero-overlay" />

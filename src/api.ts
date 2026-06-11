@@ -206,6 +206,8 @@ export interface RecentSkinSpotlight {
   skinNum: number;
   skinName: string;
   skinSlug: string;
+  /** Riot's centered (champion-framed) splash; falls back to Data Dragon art when absent. */
+  splashUrl?: string;
 }
 
 let cachedSkinLineCatalog: SkinLineCategory[] | null = null;
