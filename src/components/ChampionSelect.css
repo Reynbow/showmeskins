@@ -4,7 +4,13 @@
   height: 100vh;
   background: var(--lol-bg-primary);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.champion-select::-webkit-scrollbar {
+  display: none;
 }
 
 /* Fade ambient hex bloom behind the champion grid — keep header/search vivid */
@@ -486,18 +492,9 @@
 
 /* Champion grid */
 .champion-grid-wrapper {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 24px 8px;
+  padding: 4px 24px 40px;
   position: relative;
   z-index: 1;
-  mask-image: none;
-  -webkit-mask-image: none;
-}
-
-.champion-grid-wrapper.scrolled {
-  mask-image: linear-gradient(to bottom, transparent, black 24px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, black 24px);
 }
 
 .champion-grid {
@@ -1014,13 +1011,14 @@
   font-size: 13px;
 }
 
-/* Bottom border */
+/* Bottom border — fixed to viewport while page content scrolls */
 .cs-bottom-border {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--lol-gold-dark), var(--lol-gold), var(--lol-gold-dark), transparent);
   z-index: 2;
+  pointer-events: none;
 }

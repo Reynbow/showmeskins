@@ -109,7 +109,6 @@ export function ChampionSelect({
     }
   });
   const [selectedRole, setSelectedRole] = useState('All');
-  const [scrolled, setScrolled] = useState(false);
   const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
   const [recentSkins, setRecentSkins] = useState<RecentSkinSpotlight[]>([]);
 
@@ -161,10 +160,6 @@ export function ChampionSelect({
       // ignore storage errors
     }
   }, [riotTagSearch]);
-
-  const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrolled(e.currentTarget.scrollTop > 0);
-  }, []);
 
   const openRegionRoster = useCallback((region: RegionCategory) => {
     setActiveRegion(region);
@@ -320,7 +315,7 @@ export function ChampionSelect({
 
   return (
     <div className="champion-select">
-      <AmbientBackground />
+      <AmbientBackground fixed />
 
       <div className="champion-select-header">
         <div className="cs-logo">
@@ -562,7 +557,7 @@ export function ChampionSelect({
         </div>
       </div>
 
-      <div className={`champion-grid-wrapper${scrolled ? ' scrolled' : ''}`} onScroll={handleGridScroll}>
+      <div className="champion-grid-wrapper">
         {showingSkinLineGrid ? (
           <div className="champion-grid regions-grid">
             {skinLinesLoading && skinLines.length === 0 && !skinLinesError && (
