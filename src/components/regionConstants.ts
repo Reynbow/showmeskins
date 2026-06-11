@@ -1,0 +1,16 @@
+export const REGION_LOGOS: Record<string, string> = {
+  'Bandle City': 'https://universe.leagueoflegends.com/images/bandle_city_crest_icon.png',
+  Bilgewater: 'https://universe.leagueoflegends.com/images/bilgewater_crest_icon.png',
+  Demacia: 'https://universe.leagueoflegends.com/images/demacia_crest_icon.png',
+  Freljord: 'https://universe.leagueoflegends.com/images/freljord_crest_icon.png',
+  Ionia: 'https://universe.leagueoflegends.com/images/iona_crest_icon.png',
+  Ixtal: 'https://universe.leagueoflegends.com/images/ixtal_crest_icon.png',
+  Noxus: 'https://universe.leagueoflegends.com/images/noxus_crest_icon.png',
+  Piltover: 'https://universe.leagueoflegends.com/images/piltover_crest_icon.png',
+  'Shadow Isles': 'https://universe.leagueoflegends.com/images/shadow_isles_crest_icon.png',
+  Shurima: 'https://universe.leagueoflegends.com/images/shurima_crest_icon.png',
+  Targon: 'https://universe.leagueoflegends.com/images/mt_targon_crest_icon.png',
+  'The Void': 'https://universe.leagueoflegends.com/images/void_crest_icon.png',
+  Zaun: 'https://universe.leagueoflegends.com/images/zaun_crest_icon.png',
+  Runeterra: 'https://universe.leagueoflegends.com/images/icon-faction.png',
+};

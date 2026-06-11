@@ -194,6 +194,8 @@ interface CdragonSkinSummary {
   isBase?: boolean;
   name?: string;
   skinClassification?: string;
+  splashPath?: string;
+  tilePath?: string;
   skinLines?: CdragonSkinLineRef[];
 }
 
@@ -246,7 +248,13 @@ export async function getAramWardrobeCatalog(): Promise<AramWardrobeChampion[]> 
 }
 
 export async function getSkinLineCatalog(championsByKey: Record<string, ChampionBasic>): Promise<SkinLineCategory[]> {
-  if (cachedSkinLineCatalog) return cachedSkinLineCatalog;
+  if (
+    cachedSkinLineCatalog
+    && !cachedSkinLineCatalog.some((line) => line.members.some((m) => !m.championAlias || !m.tilePath || !m.splashPath))
+  ) {
+    return cachedSkinLineCatalog;
+  }
+  cachedSkinLineCatalog = null;
   if (Object.keys(championsByKey).length === 0) return [];
 
   const [skinLinesRes, skinsRes] = await Promise.all([
@@ -288,6 +296,9 @@ export async function getSkinLineCatalog(championsByKey: Record<string, Champion
       championId: champion.id,
       championKey,
       championName: champion.name,
+      championAlias: championAliasFromSplashPath(skin.splashPath) ?? champion.id.toLowerCase(),
+      tilePath: skin.tilePath,
+      splashPath: skin.splashPath,
       skinId: String(skin.id),
       skinNum: skin.id % 1000,
       skinName: skin.name?.trim() || champion.name,
@@ -391,8 +402,41 @@ export async function getChampionDetail(id: string): Promise<ChampionDetail> {
   return detail;
 }
 
+function championAliasFromSplashPath(splashPath?: string | null): string | undefined {
+  if (!splashPath) return undefined;
+  const match = splashPath.match(/\/characters\/([^/]+)\/skins\//i);
+  return match?.[1]?.toLowerCase();
+}
+
 export function getChampionIcon(id: string, version: string): string {
   return `${BASE_URL}/cdn/${version}/img/champion/${normalizeChampionId(id)}.png`;
+}
+
+/** Map an LCU asset path to a same-origin CommunityDragon URL (via /cdragon proxy). */
+export function getCdragonLcuAssetUrl(assetPath: string): string | undefined {
+  const prefix = '/lol-game-data/assets/';
+  if (!assetPath.startsWith(prefix)) return undefined;
+  return `/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/${assetPath.slice(prefix.length).toLowerCase()}`;
+}
+
+/** Square skin preview crop (character-focused tile art from game files). */
+export function getSkinPreviewArt(member: Pick<SkinLineMember, 'championId' | 'skinNum' | 'tilePath'>): string {
+  if (member.tilePath) {
+    const proxied = getCdragonLcuAssetUrl(member.tilePath);
+    if (proxied) return proxied;
+  }
+  return getTileArt(member.championId, member.skinNum);
+}
+
+/** Centered splash crop for hero carousels (matches newest-skins artwork). */
+export function getSkinCenteredSplashArt(
+  member: Pick<SkinLineMember, 'championId' | 'skinNum' | 'splashPath'>,
+): string {
+  if (member.splashPath) {
+    const proxied = getCdragonLcuAssetUrl(member.splashPath);
+    if (proxied) return proxied;
+  }
+  return getSplashArt(member.championId, member.skinNum);
 }
 
 export function getSplashArt(championId: string, skinNum: number): string {

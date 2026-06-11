@@ -8,13 +8,14 @@
 }
 
 .recent-skins-hero-label {
+  margin: 0 0 8px;
   font-family: var(--font-heading);
-  font-size: 11px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--lol-gold);
-  margin-bottom: 8px;
+  font-size: 18px;
+  color: var(--lol-gold-light);
+  letter-spacing: 0.5px;
+  line-height: 1.2;
   text-align: center;
+  text-shadow: 0 0 24px rgba(200, 170, 110, 0.12);
 }
 
 .recent-skins-hero-stage {
@@ -163,7 +164,7 @@
   flex-wrap: wrap;
 }
 
-.recent-skins-hero-dot {
+.recent-skins-hero-dots .recent-skins-hero-dot {
   width: 7px;
   height: 7px;
   padding: 0;
@@ -174,7 +175,13 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.recent-skins-hero-dot.active {
+.recent-skins-hero-dots span.recent-skins-hero-dot {
+  display: inline-block;
+  cursor: default;
+  pointer-events: none;
+}
+
+.recent-skins-hero-dots .recent-skins-hero-dot.active {
   background: var(--lol-gold);
   transform: scale(1.15);
 }

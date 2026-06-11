@@ -415,6 +415,17 @@
   box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
 }
 
+.cs-page-nav-btn--back svg {
+  width: 14px;
+  height: 14px;
+}
+
+.role-filters--placeholder {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 31px;
+}
+
 /* Role filters */
 .role-filters {
   display: flex;
@@ -467,6 +478,7 @@
   }
 
   .role-filters,
+  .region-filters,
   .cs-page-nav {
     justify-content: center;
   }
@@ -635,6 +647,351 @@
 
 .champion-card:hover .champion-card-name {
   color: var(--lol-gold-light);
+}
+
+/* Regions — up to 5 per row on desktop; cards stay square and fill the row */
+.regions-grid {
+  gap: 10px;
+  align-items: start;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 560px) {
+  .regions-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 760px) {
+  .regions-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .regions-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.region-grid-card {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--lol-border-gold);
+  background: linear-gradient(180deg, rgba(12, 20, 35, 0.92), rgba(7, 12, 24, 0.95));
+  cursor: pointer;
+  overflow: hidden;
+  animation: fadeIn 0.35s ease forwards;
+  opacity: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.region-grid-card:hover {
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 16px rgba(200, 170, 110, 0.14);
+}
+
+.region-grid-card-art {
+  position: absolute;
+  inset: 0;
+}
+
+.region-grid-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  transition: transform 220ms ease;
+}
+
+.region-grid-card:hover .region-grid-card-art img {
+  transform: scale(1.04);
+}
+
+.region-grid-card-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0.1) 20%, rgba(0, 0, 0, 0.55) 72%, rgba(0, 0, 0, 0.82) 100%),
+    linear-gradient(to top, rgba(1, 10, 19, 0.88) 0%, rgba(1, 10, 19, 0.2) 48%, transparent 100%);
+  pointer-events: none;
+}
+
+.region-grid-card-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  transform: translate(-50%, -58%);
+  object-fit: contain;
+  z-index: 1;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.95))
+    drop-shadow(0 0 16px rgba(0, 0, 0, 0.8));
+  opacity: 0.92;
+}
+
+.region-grid-card-name {
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  color: var(--lol-gold);
+  text-align: center;
+  line-height: 1.25;
+  padding: 0 8px 10px;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 1),
+    0 4px 12px rgba(0, 0, 0, 0.95);
+}
+
+.skinline-grid-card .region-grid-card-name {
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 0 6px 10px;
+}
+
+.region-grid-card-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(200, 170, 110, 0.55);
+  background: rgba(4, 11, 20, 0.78);
+  color: var(--lol-gold-light);
+  font-size: 12px;
+  font-family: var(--font-body);
+  letter-spacing: 0.3px;
+}
+
+.grid-status-message {
+  grid-column: 1 / -1;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--lol-text-dim);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+/* Region roster — hero panel (matches recent-skins-hero placement/size) */
+.region-roster-hero {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 10px;
+  padding: 0 24px;
+}
+
+.region-roster-hero-label {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  color: var(--lol-gold-light);
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 0 24px rgba(200, 170, 110, 0.12);
+}
+
+.region-roster-hero-stage {
+  position: relative;
+  height: 200px;
+  border: 1px solid var(--lol-border-gold);
+  overflow: hidden;
+  background: #0a0e16;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.region-roster-hero-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 15%;
+  display: block;
+}
+
+.region-roster-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(10, 14, 22, 0.95) 0%,
+    rgba(10, 14, 22, 0.35) 45%,
+    rgba(10, 14, 22, 0.05) 100%
+  );
+  pointer-events: none;
+}
+
+.region-roster-hero-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.region-roster-hero-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
+}
+
+.region-roster-hero-text {
+  min-width: 0;
+}
+
+.region-roster-hero-kicker {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  font-family: var(--font-heading);
+  margin-bottom: 2px;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.region-roster-hero-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  color: var(--lol-gold-light);
+  letter-spacing: 1px;
+  line-height: 1.2;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 2px 8px rgba(0, 0, 0, 0.85),
+    0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.region-roster-hero-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.region-roster-hero-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(200, 170, 110, 0.25);
+}
+
+.region-roster-hero-dot.active {
+  background: var(--lol-gold);
+  transform: scale(1.15);
+}
+
+/* Region quick-switch filters (replaces role filters in roster view) */
+.region-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 860px;
+  justify-content: center;
+  align-items: center;
+}
+
+.region-filter-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  background: rgba(10, 20, 40, 0.55);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold-light);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.region-filter-back svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.region-filter-back:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
+}
+
+.region-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.region-btn:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+.region-btn.active {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.1);
+}
+
+@media (max-width: 640px) {
+  .region-roster-hero {
+    padding: 0 16px;
+    margin-bottom: 8px;
+  }
+
+  .region-roster-hero-stage {
+    height: 160px;
+  }
+
+  .region-roster-hero-title {
+    font-size: 16px;
+  }
+
+  .region-roster-hero-logo {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* No results */

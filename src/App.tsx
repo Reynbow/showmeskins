@@ -7,8 +7,6 @@ import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
 import { DevPage, type AccountInfo, type CompanionLiveDebug } from './components/DevPage';
 import { MatchHistoryPage } from './components/MatchHistoryPage';
-import { RegionsPage } from './components/RegionsPage';
-import { SkinLinesPage } from './components/SkinLinesPage';
 import { SkinLineViewer } from './components/SkinLineViewer';
 import { TeamSkinLinesPage } from './components/TeamSkinLinesPage';
 import { getAramWardrobeCatalog, getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug, type RecentSkinSpotlight } from './api';
@@ -443,6 +441,8 @@ function App() {
   const [regionsError, setRegionsError] = useState<string | null>(null);
   const [aramWardrobe, setAramWardrobe] = useState<AramWardrobeChampion[]>([]);
   const [skinLines, setSkinLines] = useState<SkinLineCategory[]>([]);
+  const [skinLinesLoading, setSkinLinesLoading] = useState(false);
+  const [skinLinesError, setSkinLinesError] = useState<string | null>(null);
   const [activeSkinLine, setActiveSkinLine] = useState<SkinLineCategory | null>(null);
   const [activeSkinLineMember, setActiveSkinLineMember] = useState<SkinLineMember | null>(null);
   const [stayOnDevDuringLive, setStayOnDevDuringLive] = useState<boolean>(() => {
@@ -999,21 +999,22 @@ function App() {
   }, []);
 
   const handleOpenSkinLines = useCallback(async () => {
+    setViewMode('skin-lines');
+    setActiveSkinLine(null);
+    setActiveSkinLineMember(null);
+    window.history.pushState(null, '', '/skin-lines');
+    if (skinLines.length > 0 || champions.length === 0) return;
+    setSkinLinesLoading(true);
+    setSkinLinesError(null);
     try {
-      if (skinLines.length === 0 && champions.length > 0) {
-        setLoading(true);
-        const championsByKey = Object.fromEntries(champions.map((champ) => [champ.key, champ]));
-        const lines = await getSkinLineCatalog(championsByKey);
-        setSkinLines(lines);
-      }
-      setViewMode('skin-lines');
-      setActiveSkinLine(null);
-      setActiveSkinLineMember(null);
-      window.history.pushState(null, '', '/skin-lines');
+      const championsByKey = Object.fromEntries(champions.map((champ) => [champ.key, champ]));
+      const lines = await getSkinLineCatalog(championsByKey);
+      setSkinLines(lines);
     } catch (err) {
       console.error('Failed to load skin lines:', err);
+      setSkinLinesError('Failed to load skin lines. Please try again.');
     } finally {
-      setLoading(false);
+      setSkinLinesLoading(false);
     }
   }, [champions, skinLines]);
 
@@ -1022,26 +1023,6 @@ function App() {
     setActiveSkinLine(null);
     setActiveSkinLineMember(null);
     window.history.pushState(null, '', '/');
-  }, []);
-
-  const handleOpenSkinLine = useCallback(async (line: SkinLineCategory) => {
-    const firstMember = line.members[0];
-    if (!firstMember) return;
-    setLoading(true);
-    try {
-      const detail = await getChampionDetail(firstMember.championId);
-      const skin = detail.skins.find((item) => item.id === firstMember.skinId) ?? detail.skins[0];
-      setSelectedChampion(detail);
-      setSelectedSkin(skin);
-      setActiveSkinLine(line);
-      setActiveSkinLineMember(firstMember);
-      setViewMode('skin-line-viewer');
-      window.history.pushState(null, '', `/skin-lines/${line.slug}/${firstMember.championId}/${firstMember.skinId}`);
-    } catch (err) {
-      console.error('Failed to load skin line:', err);
-    } finally {
-      setLoading(false);
-    }
   }, []);
 
   const handleSkinLineMemberSelect = useCallback(async (line: SkinLineCategory, member: SkinLineMember) => {
@@ -1530,7 +1511,7 @@ function App() {
         </div>
       )}
 
-      {viewMode === 'select' ? (
+      {viewMode === 'select' || viewMode === 'regions' || viewMode === 'skin-lines' ? (
         <ChampionSelect
           champions={champions}
           version={version}
@@ -1543,16 +1524,17 @@ function App() {
           onOpenMatchHistory={handleOpenMatchHistory}
           hasLiveGame={!!liveGameData}
           onLiveGame={handleLiveGameNavigate}
-        />
-      ) : viewMode === 'regions' ? (
-        <RegionsPage
+          regionsView={viewMode === 'regions'}
           regions={regions}
-          champions={champions}
-          version={version}
-          loading={regionsLoading}
-          error={regionsError}
-          onBack={handleRegionsBack}
-          onSelectChampion={handleChampionSelect}
+          regionsLoading={regionsLoading}
+          regionsError={regionsError}
+          onRegionsBack={handleRegionsBack}
+          skinLinesView={viewMode === 'skin-lines'}
+          skinLines={skinLines}
+          skinLinesLoading={skinLinesLoading}
+          skinLinesError={skinLinesError}
+          onSkinLinesBack={handleSkinLinesBack}
+          onSelectSkinLineMember={handleSkinLineMemberSelect}
         />
       ) : viewMode === 'aram-wardrobe' ? (
         <AramWardrobePage
@@ -1563,15 +1545,6 @@ function App() {
         <TeamSkinLinesPage
           skinLines={skinLines}
           onBack={handleTeamSkinLinesBack}
-        />
-      ) : viewMode === 'skin-lines' ? (
-        <SkinLinesPage
-          skinLines={skinLines}
-          version={version}
-          champions={champions}
-          onBack={handleSkinLinesBack}
-          onOpenLine={handleOpenSkinLine}
-          onOpenMember={handleSkinLineMemberSelect}
         />
       ) : viewMode === 'skin-line-viewer' && activeSkinLine && activeSkinLineMember && selectedChampion && selectedSkin ? (
         <SkinLineViewer

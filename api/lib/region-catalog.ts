@@ -4,6 +4,11 @@ import {
   type RegionCategory,
 } from '../../lib/region-catalog-core';
 import { loadUniverseRegionImages } from '../../lib/region-catalog-images';
+import {
+  buildCatalogFromUniverseRosters,
+  buildChampionSlugIndex,
+  loadUniverseFactionRosters,
+} from '../../lib/region-catalog-universe';
 
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
 const CDRAGON = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1';
@@ -37,12 +42,13 @@ async function loadChampionsByKey(): Promise<Map<string, ChampionRow>> {
   return map;
 }
 
-/** Build the region catalog from a handful of upstream requests (no per-champion fetches). */
+/** Build the region catalog from official Universe faction rosters (+ images). */
 export async function buildRegionCatalog(): Promise<RegionCategory[]> {
-  const [championsByKey, summaryRes, regionImages] = await Promise.all([
+  const [championsByKey, summaryRes, regionImages, universeRosters] = await Promise.all([
     loadChampionsByKey(),
     fetch(`${CDRAGON}/champion-summary.json`),
     loadUniverseRegionImages(),
+    loadUniverseFactionRosters(),
   ]);
 
   if (!summaryRes.ok) {
@@ -50,5 +56,12 @@ export async function buildRegionCatalog(): Promise<RegionCategory[]> {
   }
 
   const summary = (await summaryRes.json()) as CdragonChampionSummaryEntry[];
+
+  if (universeRosters.size > 0) {
+    const slugIndex = buildChampionSlugIndex(championsByKey, summary);
+    const catalog = buildCatalogFromUniverseRosters(slugIndex, universeRosters, regionImages);
+    if (catalog.length > 0) return catalog;
+  }
+
   return buildCatalogFromSummary(championsByKey, summary, regionImages);
 }

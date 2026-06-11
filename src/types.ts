@@ -20,6 +20,12 @@ export interface SkinLineMember {
   championId: string;
   championKey: string;
   championName: string;
+  /** Lowercase game client folder name (e.g. monkeyking, fiddlesticks). */
+  championAlias?: string;
+  /** LCU tile art path — square, character-focused skin preview crop. */
+  tilePath?: string;
+  /** LCU centered splash path — character-focused hero crop (newest-skins carousel). */
+  splashPath?: string;
   skinId: string;
   skinNum: number;
   skinName: string;
