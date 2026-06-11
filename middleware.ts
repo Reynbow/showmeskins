@@ -5,7 +5,7 @@ const BOT_UA =
   /discordbot|facebookexternalhit|twitterbot|slackbot|telegrambot|whatsapp|linkedinbot|embedly|vkshare|redditbot|applebot|bingbot|googlebot/i;
 
 const RESERVED = new Set([
-  'companion', 'history', 'dev', 'regions', 'skin-lines', 'team-skin-lines', 'api',
+  'companion', 'history', 'dev', 'regions', 'aram-wardrobe', 'skin-lines', 'team-skin-lines', 'api',
 ]);
 
 function isChampionSkinPath(pathname: string): boolean {
@@ -14,12 +14,17 @@ function isChampionSkinPath(pathname: string): boolean {
   return !RESERVED.has(parts[0].toLowerCase());
 }
 
+function needsOgPreview(pathname: string): boolean {
+  if (pathname === '/') return true;
+  return isChampionSkinPath(pathname);
+}
+
 export default function middleware(request: Request) {
   const ua = request.headers.get('user-agent') ?? '';
   if (!BOT_UA.test(ua)) return;
 
   const url = new URL(request.url);
-  if (!isChampionSkinPath(url.pathname)) return;
+  if (!needsOgPreview(url.pathname)) return;
 
   const preview = new URL('/api/og-preview', url.origin);
   preview.searchParams.set('path', url.pathname);

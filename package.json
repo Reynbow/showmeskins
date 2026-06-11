@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "sync-chromas": "npx tsx scripts/sync-chromas.ts",
-    "sync-art": "npx tsx scripts/sync-art.ts"
+    "sync-art": "npx tsx scripts/sync-art.ts",
+    "generate-og": "npx tsx scripts/generate-og.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

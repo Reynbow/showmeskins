@@ -7,6 +7,21 @@
   overflow: hidden;
 }
 
+/* Fade ambient hex bloom behind the champion grid — keep header/search vivid */
+.champion-select > .ambient-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 40%,
+    rgba(1, 10, 19, 0.38) 54%,
+    rgba(1, 10, 19, 0.72) 100%
+  );
+  pointer-events: none;
+}
+
 /* Header */
 .champion-select-header {
   text-align: center;

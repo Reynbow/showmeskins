@@ -439,6 +439,8 @@ function App() {
   const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history' | 'regions' | 'aram-wardrobe' | 'skin-lines' | 'skin-line-viewer' | 'team-skin-lines'>('select');
   const [historyInitialRiotId, setHistoryInitialRiotId] = useState<string>('');
   const [regions, setRegions] = useState<RegionCategory[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+  const [regionsError, setRegionsError] = useState<string | null>(null);
   const [aramWardrobe, setAramWardrobe] = useState<AramWardrobeChampion[]>([]);
   const [skinLines, setSkinLines] = useState<SkinLineCategory[]>([]);
   const [activeSkinLine, setActiveSkinLine] = useState<SkinLineCategory | null>(null);
@@ -504,7 +506,7 @@ function App() {
     ? `${selectedChampion.name} — ${selectedSkin.num === 0 ? selectedChampion.name : selectedSkin.name} | x9report.com`
     : 'x9report.com';
   const seoDesc = viewMode === 'select'
-    ? 'Browse and view all League of Legends champion skins in 3D. Free LoL skin viewer.'
+    ? '3D League of Legends skin viewer.'
     : viewMode === 'history'
       ? 'Search Riot ID and view recent League of Legends match history.'
       : viewMode === 'regions'
@@ -544,7 +546,9 @@ function App() {
       ? getSplashArt(selectedChampion.id, selectedSkin.num)
       : viewMode === 'skin-line-viewer' && activeSkinLineMember
         ? getSplashArt(activeSkinLineMember.championId, activeSkinLineMember.skinNum)
-        : undefined;
+        : viewMode === 'select'
+          ? '/og.png'
+          : undefined;
   useSeoHead({ title: seoTitle, description: seoDesc, path: seoPath, imageUrl: seoImage });
 
   // Track whether we've already auto-navigated for this game session
@@ -594,6 +598,10 @@ function App() {
         setItemData(items);
         const champList = Object.values(champs).sort((a, b) => a.name.localeCompare(b.name));
         setChampions(champList);
+
+        void getRegionCatalog()
+          .then((catalog) => setRegions(catalog))
+          .catch((err) => console.error('Failed to prefetch regions:', err));
 
         // Process any champ select update that arrived before champions loaded
         const pending = pendingChampSelectRef.current;
@@ -647,8 +655,7 @@ function App() {
             setViewMode('companion');
           }
         } else if (route.mode === 'regions') {
-          const championsByKey = Object.fromEntries(champList.map((champ) => [champ.key, champ]));
-          const regionCatalog = await getRegionCatalog(championsByKey);
+          const regionCatalog = await getRegionCatalog();
           setRegions(regionCatalog);
           setViewMode('regions');
         } else if (route.mode === 'aram-wardrobe') {
@@ -773,15 +780,18 @@ function App() {
         return;
       }
       if (route.mode === 'regions') {
+        setViewMode('regions');
+        if (regions.length > 0) return;
+        setRegionsLoading(true);
+        setRegionsError(null);
         try {
-          if (regions.length === 0 && champions.length > 0) {
-            const regionCatalog = await getRegionCatalog(Object.fromEntries(champions.map((champ) => [champ.key, champ])));
-            setRegions(regionCatalog);
-          }
-          setViewMode('regions');
+          const regionCatalog = await getRegionCatalog();
+          setRegions(regionCatalog);
         } catch (err) {
           console.error('Failed to load region route:', err);
-          setViewMode('select');
+          setRegionsError('Failed to load regions. Please try again.');
+        } finally {
+          setRegionsLoading(false);
         }
         return;
       }
@@ -941,20 +951,21 @@ function App() {
   }, []);
 
   const handleOpenRegions = useCallback(async () => {
+    setViewMode('regions');
+    window.history.pushState(null, '', '/regions');
+    if (regions.length > 0) return;
+    setRegionsLoading(true);
+    setRegionsError(null);
     try {
-      if (regions.length === 0 && champions.length > 0) {
-        setLoading(true);
-        const regionCatalog = await getRegionCatalog(Object.fromEntries(champions.map((champ) => [champ.key, champ])));
-        setRegions(regionCatalog);
-      }
-      setViewMode('regions');
-      window.history.pushState(null, '', '/regions');
+      const regionCatalog = await getRegionCatalog();
+      setRegions(regionCatalog);
     } catch (err) {
       console.error('Failed to load regions:', err);
+      setRegionsError('Failed to load regions. Please try again.');
     } finally {
-      setLoading(false);
+      setRegionsLoading(false);
     }
-  }, [champions, regions]);
+  }, [regions]);
 
   const handleRegionsBack = useCallback(() => {
     setViewMode('select');
@@ -1538,6 +1549,8 @@ function App() {
           regions={regions}
           champions={champions}
           version={version}
+          loading={regionsLoading}
+          error={regionsError}
           onBack={handleRegionsBack}
           onSelectChampion={handleChampionSelect}
         />

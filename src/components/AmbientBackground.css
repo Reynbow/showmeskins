@@ -1,5 +1,5 @@
-/* Ambient page backdrop: hex lattice + glow wash + ember dust.
-   Sits behind all content (z-index 0) and never captures input. */
+/* Ambient page backdrop: hex lattice + ember dust.
+   Bloom pulse on hex lines is driven by requestAnimationFrame in AmbientBackground.tsx. */
 
 .ambient-bg {
   position: absolute;
@@ -14,24 +14,24 @@
   position: fixed;
 }
 
-/* Soft colour fields: gold from the top, hints of teal and warm bronze below */
-.ambient-bg-glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 75% 50% at 50% -8%, rgba(200, 170, 110, 0.09), transparent 65%),
-    radial-gradient(ellipse 55% 45% at 102% 105%, rgba(10, 200, 185, 0.05), transparent 60%),
-    radial-gradient(ellipse 45% 40% at -2% 102%, rgba(120, 90, 40, 0.05), transparent 60%);
-}
-
 /* Hextech lattice, vignetted so it fades away toward the edges */
 .ambient-bg-hex {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  mask-image: radial-gradient(ellipse 85% 75% at 50% 38%, black 30%, transparent 98%);
-  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 38%, black 30%, transparent 98%);
+  mask-image: radial-gradient(ellipse 88% 78% at 50% 40%, black 24%, transparent 98%);
+  -webkit-mask-image: radial-gradient(ellipse 88% 78% at 50% 40%, black 24%, transparent 98%);
+}
+
+.ambient-bg-hex-bloom {
+  opacity: 0.55;
+  will-change: opacity;
+}
+
+.ambient-bg-hex-sharp {
+  opacity: 0.85;
+  will-change: opacity;
 }
 
 /* Sparse ember dust drifting slowly upward */
@@ -42,25 +42,22 @@
 
 .ambient-bg-dust span {
   position: absolute;
-  bottom: -10px;
+  bottom: -12px;
   border-radius: 50%;
-  background: var(--lol-gold);
-  box-shadow: 0 0 6px rgba(200, 170, 110, 0.45);
+  background: #c8aa6e;
+  box-shadow:
+    0 0 4px rgba(200, 170, 110, 0.65),
+    0 0 10px rgba(200, 170, 110, 0.3);
   opacity: 0;
   animation-name: ambient-bg-drift;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  --mote-peak: 0.55;
 }
 
 @keyframes ambient-bg-drift {
   0% { transform: translateY(0); opacity: 0; }
-  10% { opacity: 0.5; }
-  75% { opacity: 0.25; }
+  8% { opacity: var(--mote-peak); }
+  70% { opacity: calc(var(--mote-peak) * 0.55); }
   100% { transform: translateY(-105vh); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ambient-bg-dust {
-    display: none;
-  }
 }

@@ -14,7 +14,7 @@ function artChampionId(championId: string): string {
 }
 
 const RESERVED = new Set([
-  'companion', 'history', 'dev', 'regions', 'skin-lines', 'team-skin-lines', 'api',
+  'companion', 'history', 'dev', 'regions', 'aram-wardrobe', 'skin-lines', 'team-skin-lines', 'api',
 ]);
 
 function toUrlSlug(value: string): string {
@@ -44,11 +44,13 @@ interface OgMeta {
   canonicalPath: string;
 }
 
+const DEFAULT_OG_IMAGE = `${SITE_BASE}/og.png`;
+
 function defaultMeta(path: string): OgMeta {
   return {
     title: SITE_NAME,
-    description: 'View League of Legends champion skins in 3D and look up match history.',
-    image: `${SITE_BASE}/icon.png`,
+    description: '3D League of Legends skin viewer.',
+    image: DEFAULT_OG_IMAGE,
     canonicalPath: path || '/',
   };
 }
@@ -132,6 +134,9 @@ function renderHtml(meta: OgMeta, requestUrl: string): string {
   <meta property="og:url" content="${escapeHtml(pageUrl)}" />
   <meta property="og:image" content="${image}" />
   <meta property="og:image:secure_url" content="${image}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:type" content="image/png" />
   <meta property="og:site_name" content="${SITE_NAME}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${title}" />

@@ -5,7 +5,6 @@ import type {
   ChromaInfo,
   ItemInfo,
   RegionCategory,
-  RegionMember,
   Skin,
   SkinLineCategory,
   SkinLineMember,
@@ -15,8 +14,6 @@ const BASE_URL = 'https://ddragon.leagueoflegends.com';
 const MODEL_CDN = (import.meta.env.VITE_MODEL_CDN_BASE ?? '/model-cdn').replace(/\/+$/, '');
 const CDRAGON = '/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/v1';
 const CDRAGON_RAW = 'https://raw.communitydragon.org';
-const UNIVERSE_MEEPS_BASE = 'https://universe-meeps.leagueoflegends.com/v1';
-
 const CHAMPION_ID_ALIASES: Record<string, string> = {
   fiddlesticks: 'Fiddlesticks',
 };
@@ -327,245 +324,30 @@ export async function getSkinLineCatalog(championsByKey: Record<string, Champion
   return categories;
 }
 
-interface CdragonChampionSummaryEntry {
-  id: number;
-  alias: string;
-  name: string;
-  description?: string;
-}
-
-interface CdragonChampionProfile {
-  shortBio?: string;
-}
-
-interface UniverseFactionImage {
-  uri?: string;
-}
-
-interface UniverseFactionEntry {
-  name?: string;
-  slug?: string;
-  image?: UniverseFactionImage;
-}
-
-interface UniverseFactionBrowse {
-  factions?: UniverseFactionEntry[];
-}
-
-const REGION_NAMES = [
-  'Bandle City',
-  'Bilgewater',
-  'Demacia',
-  'Freljord',
-  'Ionia',
-  'Ixtal',
-  'Noxus',
-  'Piltover',
-  'Shadow Isles',
-  'Shurima',
-  'Targon',
-  'The Void',
-  'Zaun',
-  'Runeterra',
-] as const;
-
-const REGION_PATTERNS: Array<{ region: (typeof REGION_NAMES)[number]; patterns: RegExp[] }> = [
-  { region: 'Bandle City', patterns: [/\bbandle\b/i, /\byordle\b/i] },
-  { region: 'Bilgewater', patterns: [/\bbilgewater\b/i, /\bsaltwater\b/i, /\bbounty hunter\b/i] },
-  { region: 'Demacia', patterns: [/\bdemacia\b/i] },
-  { region: 'Freljord', patterns: [/\bfreljord\b/i] },
-  { region: 'Ionia', patterns: [/\bionia\b/i, /\bionian\b/i, /\bwuju\b/i] },
-  { region: 'Ixtal', patterns: [/\bixtal\b/i, /\bjungle's edge\b/i, /\bnazumah\b/i] },
-  { region: 'Noxus', patterns: [/\bnoxus\b/i, /\bnoxian\b/i] },
-  { region: 'Piltover', patterns: [/\bpiltover\b/i] },
-  { region: 'Shadow Isles', patterns: [/\bshadow isles\b/i, /\bblack mist\b/i, /\bruined\b/i, /\bhelia\b/i] },
-  { region: 'Shurima', patterns: [/\bshurima\b/i, /\bascended\b/i, /\bdarkin\b/i] },
-  { region: 'Targon', patterns: [/\btargon\b/i, /\bsolari\b/i, /\blunari\b/i, /\baspect\b/i, /\bcelestial\b/i] },
-  { region: 'The Void', patterns: [/\bvoid\b/i, /\bvoidborn\b/i] },
-  { region: 'Zaun', patterns: [/\bzaun\b/i] },
-];
-
-const REGION_OVERRIDES: Record<string, (typeof REGION_NAMES)[number]> = {
-  Aatrox: 'Shurima',
-  Alistar: 'Runeterra',
-  Annie: 'Noxus',
-  Bard: 'Runeterra',
-  Brand: 'Freljord',
-  Evelynn: 'Runeterra',
-  Fiddlesticks: 'Runeterra',
-  Gwen: 'Shadow Isles',
-  Janna: 'Zaun',
-  Jax: 'Shurima',
-  Kindred: 'Runeterra',
-  Lucian: 'Demacia',
-  Morgana: 'Demacia',
-  Nilah: 'Runeterra',
-  Nocturne: 'Runeterra',
-  Ryze: 'Runeterra',
-  Senna: 'Shadow Isles',
-  Shaco: 'Runeterra',
-  Smolder: 'Runeterra',
-  TahmKench: 'Bilgewater',
-  Taric: 'Targon',
-  Varus: 'Ionia',
-  Veigar: 'Bandle City',
-  Zyra: 'Ixtal',
-};
-
-function toRegionSlug(region: string): string {
-  return region.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-const UNIVERSE_REGION_TO_LOCAL: Record<string, (typeof REGION_NAMES)[number]> = {
-  'bandle city': 'Bandle City',
-  'bandle-city': 'Bandle City',
-  bilgewater: 'Bilgewater',
-  demacia: 'Demacia',
-  ionia: 'Ionia',
-  ixtal: 'Ixtal',
-  noxus: 'Noxus',
-  piltover: 'Piltover',
-  'shadow isles': 'Shadow Isles',
-  'shadow-isles': 'Shadow Isles',
-  shurima: 'Shurima',
-  targon: 'Targon',
-  'mount targon': 'Targon',
-  'mount-targon': 'Targon',
-  freljord: 'Freljord',
-  void: 'The Void',
-  'the void': 'The Void',
-  zaun: 'Zaun',
-  runeterra: 'Runeterra',
-  'unaffiliated runeterra': 'Runeterra',
-  'unaffiliated-runeterra': 'Runeterra',
-};
-
-async function loadUniverseRegionImages(locale = 'en_us'): Promise<Map<string, string>> {
-  const images = new Map<string, string>();
-
-  const addEntry = (entry: UniverseFactionEntry | null | undefined) => {
-    if (!entry) return;
-    const uri = entry.image?.uri?.trim();
-    if (!uri) return;
-    const nameKey = (entry.name ?? '').trim().toLowerCase();
-    const slugKey = (entry.slug ?? '').trim().toLowerCase();
-    const mappedName = UNIVERSE_REGION_TO_LOCAL[nameKey] ?? UNIVERSE_REGION_TO_LOCAL[slugKey];
-    if (!mappedName) return;
-    images.set(mappedName, uri);
-  };
-
-  try {
-    const browseRes = await fetch(`${UNIVERSE_MEEPS_BASE}/${locale}/faction-browse/index.json`);
-    if (browseRes.ok) {
-      const browse = (await browseRes.json()) as UniverseFactionBrowse;
-      for (const faction of browse.factions ?? []) addEntry(faction);
-    }
-  } catch {
-    // Use whatever images have already been captured.
-  }
-
-  if (!images.has('Runeterra')) {
-    try {
-      const runeterraRes = await fetch(`${UNIVERSE_MEEPS_BASE}/${locale}/factions/unaffiliated-runeterra/index.json`);
-      if (runeterraRes.ok) {
-        const runeterra = (await runeterraRes.json()) as UniverseFactionEntry;
-        addEntry({ name: 'Runeterra', slug: 'unaffiliated-runeterra', image: runeterra.image });
-      }
-    } catch {
-      // Optional extra image source.
-    }
-  }
-
-  return images;
-}
-
-function inferRegion(champion: ChampionBasic, summaryDescription: string, shortBio: string): string {
-  const override = REGION_OVERRIDES[champion.id];
-  if (override) return override;
-
-  const text = `${summaryDescription} ${shortBio}`.trim();
-  for (const matcher of REGION_PATTERNS) {
-    if (matcher.patterns.some((pattern) => pattern.test(text))) {
-      return matcher.region;
-    }
-  }
-  return 'Runeterra';
-}
-
-async function loadChampionShortBio(championNumericId: number): Promise<string> {
-  try {
-    const res = await fetch(`${CDRAGON}/champions/${championNumericId}.json`);
-    if (!res.ok) return '';
-    const payload = (await res.json()) as CdragonChampionProfile;
-    return payload.shortBio ?? '';
-  } catch {
-    return '';
-  }
-}
-
-export async function getRegionCatalog(championsByKey: Record<string, ChampionBasic>): Promise<RegionCategory[]> {
+/** Region catalog — prefers /api/regions; falls back to a fast client build when the API is unavailable. */
+export async function getRegionCatalog(): Promise<RegionCategory[]> {
   if (cachedRegionCatalog) return cachedRegionCatalog;
-  if (Object.keys(championsByKey).length === 0) return [];
 
-  const [summaryRes, regionImages] = await Promise.all([
-    fetch(`${CDRAGON}/champion-summary.json`),
-    loadUniverseRegionImages(),
-  ]);
-  if (!summaryRes.ok) {
-    throw new Error('Failed to load champion summary data from CommunityDragon');
-  }
-  const summary = (await summaryRes.json()) as CdragonChampionSummaryEntry[];
-
-  const summaries = summary.filter((entry) => entry.id > 0 && championsByKey[String(entry.id)]);
-  const shortBioById = new Map<number, string>();
-  const chunkSize = 20;
-  for (let i = 0; i < summaries.length; i += chunkSize) {
-    const chunk = summaries.slice(i, i + chunkSize);
-    await Promise.all(
-      chunk.map(async (entry) => {
-        const shortBio = await loadChampionShortBio(entry.id);
-        shortBioById.set(entry.id, shortBio);
-      }),
-    );
+  try {
+    const res = await fetch('/api/regions');
+    if (res.ok) {
+      const contentType = res.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        const result = (await res.json()) as RegionCategory[];
+        if (Array.isArray(result) && result.length > 0) {
+          cachedRegionCatalog = result;
+          return result;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[regions] API unavailable, using client fallback:', err);
   }
 
-  const regionMap = new Map<string, RegionCategory>();
-  for (const name of REGION_NAMES) {
-    regionMap.set(name, {
-      id: toRegionSlug(name),
-      name,
-      slug: toRegionSlug(name),
-      imageUri: regionImages.get(name),
-      members: [],
-    });
-  }
-
-  for (const entry of summaries) {
-    const champion = championsByKey[String(entry.id)];
-    if (!champion) continue;
-
-    const regionName = inferRegion(champion, entry.description ?? '', shortBioById.get(entry.id) ?? '');
-    const region = regionMap.get(regionName);
-    if (!region) continue;
-
-    const member: RegionMember = {
-      championId: champion.id,
-      championKey: champion.key,
-      championName: champion.name,
-    };
-    region.members.push(member);
-  }
-
-  const categories = Array.from(regionMap.values())
-    .filter((region) => region.members.length > 0)
-    .map((region) => ({
-      ...region,
-      members: [...region.members].sort((a, b) => a.championName.localeCompare(b.championName)),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  cachedRegionCatalog = categories;
-  return categories;
+  const { buildRegionCatalogClient } = await import('./lib/region-catalog-client');
+  const result = await buildRegionCatalogClient();
+  cachedRegionCatalog = result;
+  return result;
 }
 
 /**

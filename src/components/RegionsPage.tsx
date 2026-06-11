@@ -8,6 +8,8 @@ interface Props {
   regions: RegionCategory[];
   champions: ChampionBasic[];
   version: string;
+  loading?: boolean;
+  error?: string | null;
   onBack: () => void;
   onSelectChampion: (champion: ChampionBasic) => void;
 }
@@ -33,6 +35,8 @@ export function RegionsPage({
   regions,
   champions,
   version,
+  loading = false,
+  error = null,
   onBack,
   onSelectChampion,
 }: Props) {
@@ -152,6 +156,15 @@ export function RegionsPage({
       </div>
 
       <div className="skin-lines-grid">
+        {loading && regions.length === 0 && !error && (
+          <div className="skin-lines-loading">Loading regions…</div>
+        )}
+        {error && regions.length === 0 && (
+          <div className="skin-lines-loading">{error}</div>
+        )}
+        {!loading && filtered.length === 0 && regions.length === 0 && (
+          <div className="skin-lines-loading">No regions found.</div>
+        )}
         {filtered.map((region) => (
           <div
             key={region.id}
