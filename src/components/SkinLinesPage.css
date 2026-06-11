@@ -9,32 +9,6 @@
   overflow: hidden;
 }
 
-.sl-bg-glow {
-  position: absolute;
-  top: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(200, 170, 110, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.sl-bg-lines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image:
-    linear-gradient(rgba(200, 170, 110, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(200, 170, 110, 0.07) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .skin-lines-header {
   position: relative;
   display: flex;

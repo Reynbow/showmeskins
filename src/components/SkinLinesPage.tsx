@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getChampionIcon, getSplashArt, getSplashArtFallback } from '../api';
 import type { ChampionBasic, SkinLineCategory, SkinLineMember } from '../types';
+import { AmbientBackground } from './AmbientBackground';
 import './SkinLinesPage.css';
 
 interface Props {
@@ -156,8 +157,7 @@ export function SkinLinesPage({
 
   return (
     <div className="skin-lines-page">
-      <div className="sl-bg-glow" />
-      <div className="sl-bg-lines" />
+      <AmbientBackground />
       <div className="skin-lines-header">
         <button className="skin-lines-back-btn" onClick={onBack}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -3,6 +3,7 @@ import type { ChampionBasic } from '../types';
 import type { RecentSkinSpotlight } from '../api';
 import { getChampionIcon, getRecentSkins } from '../api';
 import { RecentSkinsHero } from './RecentSkinsHero';
+import { AmbientBackground } from './AmbientBackground';
 import './ChampionSelect.css';
 
 interface Props {
@@ -116,9 +117,8 @@ export function ChampionSelect({
 
   return (
     <div className="champion-select">
-      {/* Background decorations */}
-      <div className="cs-bg-glow" />
-      <div className="cs-bg-lines" />
+      {/* Background decoration */}
+      <AmbientBackground />
 
       <div className="champion-select-header">
         <div className="cs-logo">

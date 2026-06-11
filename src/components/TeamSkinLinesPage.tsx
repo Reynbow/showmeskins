@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { SkinLineCategory } from '../types';
 import { getSplashArt, getSplashArtFallback } from '../api';
 import { computeSharedSkinLines } from '../utils/skinLineCompare';
+import { AmbientBackground } from './AmbientBackground';
 import './SkinLinesPage.css';
 import './TeamSkinLinesPage.css';
 
@@ -211,8 +212,7 @@ export function TeamSkinLinesPage({ skinLines, onBack }: Props) {
 
   return (
     <div className="team-skin-page skin-lines-page">
-      <div className="sl-bg-glow" />
-      <div className="sl-bg-lines" />
+      <AmbientBackground />
 
       <div className="skin-lines-header">
         <button type="button" className="skin-lines-back-btn" onClick={onBack}>

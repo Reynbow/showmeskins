@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { getItems, getLatestVersion } from '../api';
 import { ItemTooltip } from './ItemTooltip';
 import { TextTooltip } from './TextTooltip';
+import { AmbientBackground } from './AmbientBackground';
 import './MatchHistoryPage.css';
 
 /** Parse /api JSON; empty bodies happen when Vite's proxy cannot reach port 3000. */
@@ -2205,8 +2206,7 @@ export function MatchHistoryPage({ initialRiotId = '', onBack, companionLiveData
 
   return (
     <div className="mh-page">
-      <div className="mh-bg-glow" />
-      <div className="mh-bg-lines" />
+      <AmbientBackground fixed />
       <div className="mh-content">
         <button className="mh-back" onClick={onBack}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
