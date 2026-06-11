@@ -153,10 +153,19 @@ export function RegionsPage({
 
       <div className="skin-lines-grid">
         {filtered.map((region) => (
-          <button
+          <div
             key={region.id}
             className="skin-line-card region-card"
+            role="button"
+            tabIndex={0}
             onClick={() => openRegionModal(region)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openRegionModal(region);
+              }
+            }}
           >
             {(region.imageUri || previewMembers.get(region.id)) && (
               <div className="skin-line-card-preview">
@@ -205,7 +214,7 @@ export function RegionsPage({
             >
               {region.members.length}
             </button>
-          </button>
+          </div>
         ))}
       </div>
 

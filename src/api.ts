@@ -1,4 +1,5 @@
 import type {
+  AramWardrobeChampion,
   ChampionBasic,
   ChampionDetail,
   ChromaInfo,
@@ -212,6 +213,7 @@ export interface RecentSkinSpotlight {
 
 let cachedSkinLineCatalog: SkinLineCategory[] | null = null;
 let cachedRegionCatalog: RegionCategory[] | null = null;
+let cachedAramWardrobe: AramWardrobeChampion[] | null = null;
 let cachedRecentSkins: RecentSkinSpotlight[] | null = null;
 let cachedRecentSkinsKey = '';
 
@@ -226,6 +228,23 @@ export async function getRecentSkins(limit = 16): Promise<RecentSkinSpotlight[]>
 
   cachedRecentSkins = result;
   cachedRecentSkinsKey = cacheKey;
+  return result;
+}
+
+/**
+ * Champions (and their qualifying skins) included in the "ARAM Wardrobe"
+ * subscription: skins released before 2026, currently available to purchase,
+ * and originally priced at 1350 RP or less. Computed server-side from Meraki
+ * pricing data via /api/aram-wardrobe.
+ */
+export async function getAramWardrobeCatalog(): Promise<AramWardrobeChampion[]> {
+  if (cachedAramWardrobe) return cachedAramWardrobe;
+
+  const res = await fetch('/api/aram-wardrobe');
+  if (!res.ok) throw new Error('Failed to load ARAM wardrobe');
+  const result = (await res.json()) as AramWardrobeChampion[];
+
+  cachedAramWardrobe = result;
   return result;
 }
 
@@ -600,6 +619,11 @@ export function getSplashArt(championId: string, skinNum: number): string {
 
 export function getLoadingArt(championId: string, skinNum: number): string {
   return `${BASE_URL}/cdn/img/champion/loading/${artChampionId(championId)}_${skinNum}.jpg`;
+}
+
+/** Square skin tile art (e.g. for dense list thumbnails). */
+export function getTileArt(championId: string, skinNum: number): string {
+  return `${BASE_URL}/cdn/img/champion/tiles/${artChampionId(championId)}_${skinNum}.jpg`;
 }
 
 /** Fallback for splash art – uses loading art from Data Dragon */

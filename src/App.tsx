@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { AramWardrobePage } from './components/AramWardrobePage';
 import { ChampionSelect } from './components/ChampionSelect';
 import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
@@ -10,8 +11,9 @@ import { RegionsPage } from './components/RegionsPage';
 import { SkinLinesPage } from './components/SkinLinesPage';
 import { SkinLineViewer } from './components/SkinLineViewer';
 import { TeamSkinLinesPage } from './components/TeamSkinLinesPage';
-import { getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug, type RecentSkinSpotlight } from './api';
+import { getAramWardrobeCatalog, getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug, type RecentSkinSpotlight } from './api';
 import type {
+  AramWardrobeChampion,
   ChampionBasic,
   ChampionDetail,
   Skin,
@@ -46,6 +48,7 @@ type ParsedRoute =
   | { mode: 'history' }
   | { mode: 'dev' }
   | { mode: 'regions' }
+  | { mode: 'aram-wardrobe' }
   | { mode: 'skin-lines' }
   | { mode: 'skin-line'; lineSlug: string; championId?: string; skinId?: string }
   | { mode: 'team-skin-lines' }
@@ -60,6 +63,7 @@ function parseRoute(): ParsedRoute {
   if (parts[0] === 'history') return { mode: 'history' };
   if (parts[0] === 'dev') return { mode: 'dev' };
   if (parts[0] === 'regions') return { mode: 'regions' };
+  if (parts[0] === 'aram-wardrobe') return { mode: 'aram-wardrobe' };
   if (parts[0] === 'skin-lines') {
     if (!parts[1]) return { mode: 'skin-lines' };
     return { mode: 'skin-line', lineSlug: parts[1], championId: parts[2], skinId: parts[3] };
@@ -432,9 +436,10 @@ function App() {
   const [companionChromaId, setCompanionChromaId] = useState<number | null>(null);
   const [version, setVersion] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history' | 'regions' | 'skin-lines' | 'skin-line-viewer' | 'team-skin-lines'>('select');
+  const [viewMode, setViewMode] = useState<'select' | 'viewer' | 'companion' | 'dev' | 'history' | 'regions' | 'aram-wardrobe' | 'skin-lines' | 'skin-line-viewer' | 'team-skin-lines'>('select');
   const [historyInitialRiotId, setHistoryInitialRiotId] = useState<string>('');
   const [regions, setRegions] = useState<RegionCategory[]>([]);
+  const [aramWardrobe, setAramWardrobe] = useState<AramWardrobeChampion[]>([]);
   const [skinLines, setSkinLines] = useState<SkinLineCategory[]>([]);
   const [activeSkinLine, setActiveSkinLine] = useState<SkinLineCategory | null>(null);
   const [activeSkinLineMember, setActiveSkinLineMember] = useState<SkinLineMember | null>(null);
@@ -504,6 +509,8 @@ function App() {
       ? 'Search Riot ID and view recent League of Legends match history.'
       : viewMode === 'regions'
         ? 'Browse League of Legends champions grouped by their Runeterra regions.'
+      : viewMode === 'aram-wardrobe'
+        ? 'Browse every skin included in the ARAM Wardrobe subscription, grouped by champion.'
       : viewMode === 'skin-lines'
         ? 'Browse League of Legends skin lines and discover champions by theme.'
         : viewMode === 'team-skin-lines'
@@ -519,6 +526,8 @@ function App() {
     ? '/history'
     : viewMode === 'regions'
       ? '/regions'
+    : viewMode === 'aram-wardrobe'
+      ? '/aram-wardrobe'
     : viewMode === 'skin-lines'
       ? '/skin-lines'
       : viewMode === 'team-skin-lines'
@@ -642,6 +651,10 @@ function App() {
           const regionCatalog = await getRegionCatalog(championsByKey);
           setRegions(regionCatalog);
           setViewMode('regions');
+        } else if (route.mode === 'aram-wardrobe') {
+          const wardrobe = await getAramWardrobeCatalog();
+          setAramWardrobe(wardrobe);
+          setViewMode('aram-wardrobe');
         } else if (route.mode === 'team-skin-lines') {
           const championsByKey = Object.fromEntries(champList.map((champ) => [champ.key, champ]));
           const lines = await getSkinLineCatalog(championsByKey);
@@ -772,6 +785,19 @@ function App() {
         }
         return;
       }
+      if (route.mode === 'aram-wardrobe') {
+        try {
+          if (aramWardrobe.length === 0) {
+            const wardrobe = await getAramWardrobeCatalog();
+            setAramWardrobe(wardrobe);
+          }
+          setViewMode('aram-wardrobe');
+        } catch (err) {
+          console.error('Failed to load ARAM wardrobe route:', err);
+          setViewMode('select');
+        }
+        return;
+      }
       if (route.mode === 'team-skin-lines') {
         try {
           if (skinLines.length === 0 && champions.length > 0) {
@@ -864,7 +890,7 @@ function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [champions, regions, skinLines]);
+  }, [champions, regions, aramWardrobe, skinLines]);
 
   const handleChampionSelect = useCallback(async (champion: ChampionBasic) => {
     setLoading(true);
@@ -931,6 +957,27 @@ function App() {
   }, [champions, regions]);
 
   const handleRegionsBack = useCallback(() => {
+    setViewMode('select');
+    window.history.pushState(null, '', '/');
+  }, []);
+
+  const handleOpenAramWardrobe = useCallback(async () => {
+    try {
+      if (aramWardrobe.length === 0) {
+        setLoading(true);
+        const wardrobe = await getAramWardrobeCatalog();
+        setAramWardrobe(wardrobe);
+      }
+      setViewMode('aram-wardrobe');
+      window.history.pushState(null, '', '/aram-wardrobe');
+    } catch (err) {
+      console.error('Failed to load ARAM wardrobe:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [aramWardrobe]);
+
+  const handleAramWardrobeBack = useCallback(() => {
     setViewMode('select');
     window.history.pushState(null, '', '/');
   }, []);
@@ -1480,6 +1527,7 @@ function App() {
           onOpenSkin={handleOpenSkinSpotlight}
           onCompanion={handleCompanion}
           onRegions={handleOpenRegions}
+          onAramWardrobe={handleOpenAramWardrobe}
           onSkinLines={handleOpenSkinLines}
           onOpenMatchHistory={handleOpenMatchHistory}
           hasLiveGame={!!liveGameData}
@@ -1492,6 +1540,11 @@ function App() {
           version={version}
           onBack={handleRegionsBack}
           onSelectChampion={handleChampionSelect}
+        />
+      ) : viewMode === 'aram-wardrobe' ? (
+        <AramWardrobePage
+          champions={aramWardrobe}
+          onBack={handleAramWardrobeBack}
         />
       ) : viewMode === 'team-skin-lines' ? (
         <TeamSkinLinesPage

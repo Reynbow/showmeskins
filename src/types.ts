@@ -47,6 +47,20 @@ export interface RegionCategory {
   members: RegionMember[];
 }
 
+export interface AramSkin {
+  skinId: string;
+  skinNum: number;
+  skinName: string;
+  cost: number;
+}
+
+export interface AramWardrobeChampion {
+  championId: string;
+  championName: string;
+  championKey: string;
+  skins: AramSkin[];
+}
+
 export interface ChromaInfo {
   id: number;
   name: string;

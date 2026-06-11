@@ -204,10 +204,19 @@ export function SkinLinesPage({
 
       <div className="skin-lines-grid">
         {filtered.map((line) => (
-          <button
+          <div
             key={line.id}
             className="skin-line-card"
+            role="button"
+            tabIndex={0}
             onClick={() => onOpenLine(line)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpenLine(line);
+              }
+            }}
           >
             {previewMembers.get(line.id) && (
               <div className="skin-line-card-preview">
@@ -240,7 +249,7 @@ export function SkinLinesPage({
             >
               {line.members.length}
             </button>
-          </button>
+          </div>
         ))}
       </div>
 

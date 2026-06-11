@@ -97,6 +97,8 @@ interface Props {
   onChromaSelect: (chromaId: number | null) => void;
   /** Active level-form (Kayle ascension, etc.). null = default visibility. */
   levelForm?: import('../api').LevelForm | null;
+  /** Default model-view camera distance (Z). Higher = more zoomed out. */
+  modelCameraZ?: number;
 }
 
 /* ================================================================
@@ -2261,10 +2263,22 @@ function LoadingIndicator() {
 /* ================================================================
    Camera Controller — smoothly moves between view modes
    ================================================================ */
-const DEFAULT_MODEL_CAM = new THREE.Vector3(0, 0.5, 5.5);
+const DEFAULT_MODEL_CAMERA_Z = 5.5;
 const DEFAULT_MODEL_TARGET = new THREE.Vector3(0, -0.3, 0);
 
-function CameraController({ viewMode, rawHeight, resetId, controlsRef }: { viewMode: ViewMode; rawHeight: number; resetId: number; controlsRef: React.RefObject<any> }) {
+function CameraController({
+  viewMode,
+  rawHeight,
+  resetId,
+  controlsRef,
+  modelCameraZ = DEFAULT_MODEL_CAMERA_Z,
+}: {
+  viewMode: ViewMode;
+  rawHeight: number;
+  resetId: number;
+  controlsRef: React.RefObject<any>;
+  modelCameraZ?: number;
+}) {
   const { camera } = useThree();
   const animating = useRef(false);
   const targetPos = useRef(new THREE.Vector3());
@@ -2279,7 +2293,7 @@ function CameraController({ viewMode, rawHeight, resetId, controlsRef }: { viewM
 
     const newTarget = viewMode === 'ingame'
       ? new THREE.Vector3(0, 8.5 * sizeFactor, 4.2 * sizeFactor)
-      : DEFAULT_MODEL_CAM.clone();
+      : new THREE.Vector3(0, 0.5, modelCameraZ);
     targetPos.current.copy(newTarget);
 
     const viewChanged = prevView.current !== viewMode;
@@ -2292,7 +2306,7 @@ function CameraController({ viewMode, rawHeight, resetId, controlsRef }: { viewM
     if (viewChanged || (viewMode === 'ingame' && heightChanged) || resetTriggered) {
       animating.current = true;
     }
-  }, [viewMode, rawHeight, camera, resetId, controlsRef]);
+  }, [viewMode, rawHeight, camera, resetId, controlsRef, modelCameraZ]);
 
   const defaultTarget = useMemo(() => viewMode === 'ingame' ? new THREE.Vector3(0, 0, 0) : DEFAULT_MODEL_TARGET.clone(), [viewMode]);
 
@@ -2452,7 +2466,7 @@ function getAlternateModelSourceUrl(url: string): string | null {
   return null;
 }
 
-export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, mainModelScaleMultiplier = 1, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm }: Props) {
+export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mainModelOffset = ZERO_OFFSET, mainModelScaleMultiplier = 1, chromaTextureUrl, companionChromaTextureUrl, preferredIdleAnimation = null, splashUrl, viewMode, chromas, selectedChromaId, chromaResolving, onChromaSelect, levelForm, modelCameraZ = DEFAULT_MODEL_CAMERA_Z }: Props) {
   const isDevBuild = import.meta.env.DEV;
   const [modelError, setModelError] = useState(false);
   const [mainModelReady, setMainModelReady] = useState(false);
@@ -2589,7 +2603,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
           )}
           <Canvas
             shadows
-            camera={{ position: [0, 0.5, 5.5], fov: 45 }}
+            camera={{ position: [0, 0.5, modelCameraZ], fov: 45 }}
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
@@ -2708,7 +2722,7 @@ export function ModelViewer({ modelUrl, companionModelUrl, extraModels = [], mai
               </>
             )}
 
-            <CameraController viewMode={viewMode} rawHeight={rawModelHeight} resetId={resetCameraId} controlsRef={controlsRef} />
+            <CameraController viewMode={viewMode} rawHeight={rawModelHeight} resetId={resetCameraId} controlsRef={controlsRef} modelCameraZ={modelCameraZ} />
 
             <OrbitControls
               ref={controlsRef}

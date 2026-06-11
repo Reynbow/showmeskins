@@ -14,6 +14,7 @@ interface Props {
   onCompanion: () => void;
   onSkinLines: () => void;
   onRegions: () => void;
+  onAramWardrobe: () => void;
   onOpenMatchHistory: (riotId: string) => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
@@ -31,6 +32,7 @@ export function ChampionSelect({
   onCompanion,
   onSkinLines,
   onRegions,
+  onAramWardrobe,
   onOpenMatchHistory,
   hasLiveGame,
   onLiveGame,
@@ -214,28 +216,47 @@ export function ChampionSelect({
           <RecentSkinsHero skins={recentSkins} onOpenSkin={onOpenSkin} />
         )}
 
+        <div className="cs-page-nav">
+          <button type="button" className="cs-page-nav-btn" onClick={onSkinLines}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4 20 8 12 12 4 8 12 4z" />
+              <path d="M4 12l8 4 8-4" />
+              <path d="M4 16l8 4 8-4" />
+            </svg>
+            Skin Lines
+          </button>
+          <button type="button" className="cs-page-nav-btn" onClick={onRegions}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="7.5" />
+              <path d="M4.5 12h15" />
+              <path d="M12 4.5c2.2 2.4 2.2 12.6 0 15" />
+              <path d="M12 4.5c-2.2 2.4-2.2 12.6 0 15" />
+            </svg>
+            Regions
+          </button>
+          <button type="button" className="cs-page-nav-btn" onClick={onAramWardrobe}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="5" y="4" width="14" height="16" rx="1.5" />
+              <path d="M12 4v16" />
+            </svg>
+            ARAM Wardrobe
+          </button>
+        </div>
+
+      </div>
+
+      <div className="champion-select-filters">
         <div className="role-filters">
           {ROLES.map(role => (
             <button
               key={role}
+              type="button"
               className={`role-btn ${selectedRole === role ? 'active' : ''}`}
               onClick={() => setSelectedRole(role)}
             >
               {role}
             </button>
           ))}
-          <button className="role-btn cs-role-skin-lines-btn" onClick={onSkinLines}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-role-skin-lines-icon">
-              <path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" />
-            </svg>
-            Skin Lines
-          </button>
-          <button className="role-btn cs-role-regions-btn" onClick={onRegions}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="cs-role-regions-icon">
-              <path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z" />
-            </svg>
-            Regions
-          </button>
         </div>
 
         <div className="cs-secondary-actions">

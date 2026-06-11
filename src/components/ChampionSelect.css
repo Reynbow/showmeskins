@@ -150,9 +150,19 @@
   height: 16px;
 }
 
+.champion-select-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 24px 6px;
+  position: relative;
+  z-index: 1;
+}
+
 .cs-secondary-actions {
   width: 100%;
-  max-width: 700px;
+  max-width: 860px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -350,40 +360,54 @@
   color: var(--lol-gold);
 }
 
+/* Alternate pages — separate row above role filters */
+.cs-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 860px;
+  margin-top: 4px;
+}
+
+.cs-page-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  background: rgba(10, 20, 40, 0.55);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold-light);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cs-page-nav-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.cs-page-nav-btn:hover {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
+}
+
 /* Role filters */
 .role-filters {
   display: flex;
   gap: 4px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   width: 100%;
   max-width: 860px;
   justify-content: center;
-  margin-top: 6px;
-}
-
-.cs-role-skin-lines-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 6px;
-  flex-shrink: 0;
-}
-
-.cs-role-skin-lines-icon {
-  width: 13px;
-  height: 13px;
-}
-
-.cs-role-regions-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.cs-role-regions-icon {
-  width: 13px;
-  height: 13px;
 }
 
 .role-btn {
@@ -427,13 +451,9 @@
     grid-template-columns: minmax(0, 1fr) auto 74px;
   }
 
-  .role-filters {
+  .role-filters,
+  .cs-page-nav {
     justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .cs-role-skin-lines-btn {
-    margin-left: 6px;
   }
 }
 
