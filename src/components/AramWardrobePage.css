@@ -1,119 +1,81 @@
 .aram-page {
-  /* Navy stack — same hue family as the rest of the site */
-  --aram-canvas: #010a13;
-  --aram-block: #0a1428;
-  --aram-block-head: #0d1b2e;
-
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--aram-canvas);
+  background: var(--lol-bg-primary);
   position: relative;
   overflow: hidden;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────── */
+/* ── Header — compact version of the home-page masthead ──────────────── */
 .aram-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--lol-border-gold);
-  background: var(--aram-canvas);
+  text-align: center;
+  padding: 14px 24px 0;
+  position: relative;
+  z-index: 1;
 }
 
-.aram-back {
-  display: inline-flex;
+.aram-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.aram-logo-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--lol-gold);
+  filter: drop-shadow(0 0 8px rgba(200, 170, 110, 0.3));
+}
+
+.aram-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  text-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
+}
+
+/* ── Controls — centered like the home search + role filters ─────────── */
+.aram-controls {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--lol-border-gold);
-  background: transparent;
-  color: var(--lol-text-secondary);
-  cursor: pointer;
-}
-
-.aram-back svg {
-  width: 14px;
-  height: 14px;
-}
-
-.aram-back:hover {
-  color: var(--lol-gold);
-  border-color: var(--lol-gold);
-}
-
-.aram-header-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.aram-header-title strong {
-  color: var(--lol-gold-light);
-  font-family: var(--font-heading);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.aram-header-title small {
-  color: var(--lol-text-secondary);
-  font-size: 12px;
-}
-
-/* ── Body split ──────────────────────────────────────────────────────── */
-.aram-body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
-/* ── Left: skin list (now the primary area) ──────────────────────────── */
-.aram-list-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--lol-border-gold);
-  background: var(--aram-canvas);
-}
-
-.aram-list-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--lol-border);
-  background: var(--aram-canvas);
+  padding: 12px 24px 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .aram-search-wrap {
   position: relative;
-  flex: 1;
-  min-width: 200px;
+  width: 100%;
   max-width: 460px;
 }
 
 .aram-search-icon {
   position: absolute;
-  left: 10px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   color: var(--lol-text-dim);
   pointer-events: none;
 }
 
 .aram-search {
   width: 100%;
+  padding: 10px 40px 10px 42px;
   background: var(--lol-bg-panel);
   border: 1px solid var(--lol-border-gold);
   color: var(--lol-text-primary);
-  padding: 9px 34px 9px 32px;
+  font-family: var(--font-body);
+  font-size: 14px;
   outline: none;
+  transition: all 0.2s ease;
 }
 
 .aram-search::placeholder {
@@ -122,15 +84,16 @@
 
 .aram-search:focus {
   border-color: var(--lol-gold);
+  box-shadow: 0 0 12px rgba(200, 170, 110, 0.15), inset 0 0 8px rgba(200, 170, 110, 0.05);
 }
 
 .aram-search-clear {
   position: absolute;
-  right: 6px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: 0;
   background: transparent;
   color: var(--lol-text-dim);
@@ -138,6 +101,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  transition: color 0.2s;
 }
 
 .aram-search-clear:hover {
@@ -145,31 +110,105 @@
 }
 
 .aram-search-clear svg {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
 }
 
-.aram-cost-filter {
+.aram-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
 }
 
-.aram-chip {
-  border: 1px solid var(--lol-border);
-  background: transparent;
-  color: var(--lol-text-secondary);
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  padding: 5px 11px;
+/* Back to champions — matches the home page nav buttons */
+.aram-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  margin-right: 8px;
+  background: rgba(10, 20, 40, 0.55);
+  border: 1px solid var(--lol-border-gold);
+  color: var(--lol-gold-light);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.aram-chip.active,
-.aram-chip:hover {
+.aram-back svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.aram-back:hover {
   border-color: var(--lol-gold);
   color: var(--lol-gold);
-  background: rgba(200, 170, 110, 0.08);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
+}
+
+/* RP tier chips — matches the home page role filters */
+.aram-chip {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid var(--lol-border);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aram-chip:hover {
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
+}
+
+.aram-chip.active {
+  border-color: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.1);
+}
+
+.aram-count {
+  font-size: 12px;
+  color: var(--lol-text-dim);
+  letter-spacing: 1px;
+}
+
+/* ── Body split — gold-framed panels floating on the ambient backdrop ── */
+.aram-body {
+  flex: 1;
+  display: flex;
+  gap: 14px;
+  min-height: 0;
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 24px 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.aram-list-col {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lol-border-gold);
+  background: linear-gradient(180deg, rgba(12, 20, 35, 0.92), rgba(7, 12, 24, 0.95));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .aram-list {
@@ -177,7 +216,6 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0 14px 16px;
-  background: var(--aram-canvas);
 }
 
 .aram-empty {
@@ -188,13 +226,13 @@
 }
 
 .aram-group {
-  margin-top: 16px;
+  margin-top: 14px;
   border: 1px solid rgba(30, 45, 64, 0.85);
-  background: var(--aram-block);
+  background: rgba(10, 20, 40, 0.55);
 }
 
 .aram-group:first-child {
-  margin-top: 8px;
+  margin-top: 14px;
 }
 
 .aram-group-header {
@@ -207,7 +245,7 @@
   gap: 10px;
   padding: 7px 12px;
   border-bottom: 1px solid rgba(30, 45, 64, 0.65);
-  background: var(--aram-block-head);
+  background: #0d1b2e;
   color: var(--lol-gold);
   font-family: var(--font-heading);
   font-size: 11px;
@@ -328,9 +366,12 @@
 .aram-preview {
   flex: 1;
   min-width: 0;
-  position: relative;
   min-height: 0;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lol-border-gold);
   background: #05080d;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .aram-preview-empty {
@@ -347,49 +388,71 @@
   right: 0;
   bottom: 0;
   padding: 16px 18px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.55) 55%, rgba(0, 0, 0, 0) 100%);
+  background: linear-gradient(to top, rgba(1, 10, 19, 0.92) 0%, rgba(1, 10, 19, 0.5) 55%, rgba(1, 10, 19, 0) 100%);
   pointer-events: none;
 }
 
-.aram-preview-name {
-  color: var(--lol-text-primary);
+.aram-preview-kicker {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
   font-family: var(--font-heading);
-  font-size: 19px;
+  margin-bottom: 2px;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.aram-preview-name {
+  color: var(--lol-gold-light);
+  font-family: var(--font-heading);
+  font-size: 20px;
   letter-spacing: 1px;
+  line-height: 1.2;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 2px 8px rgba(0, 0, 0, 0.85);
 }
 
 .aram-preview-meta {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 5px;
-}
-
-.aram-preview-meta > span:first-child {
-  color: var(--lol-text-secondary);
-  font-size: 13px;
+  margin-top: 6px;
 }
 
 .aram-preview-cost {
   color: var(--lol-gold);
   font-size: 12px;
+  letter-spacing: 0.5px;
   border: 1px solid rgba(200, 170, 110, 0.5);
+  background: rgba(4, 11, 20, 0.78);
   padding: 2px 8px;
+}
+
+/* ── Bottom border — same fixed gold bar as the home page ─────────────── */
+.aram-bottom-border {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lol-gold-dark), var(--lol-gold), var(--lol-gold-dark), transparent);
+  z-index: 2;
+  pointer-events: none;
 }
 
 @media (max-width: 820px) {
   .aram-body {
     flex-direction: column;
-  }
-
-  .aram-list-col {
-    border-right: 0;
-    border-bottom: 1px solid var(--lol-border-gold);
+    padding: 0 14px 14px;
   }
 
   .aram-preview {
     width: 100%;
-    height: 50vh;
+    height: 46vh;
     flex: none;
   }
 }

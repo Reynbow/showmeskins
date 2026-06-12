@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getModelUrl, getSplashArt, getSplashArtFallback, getTileArt } from '../api';
 import type { AramWardrobeChampion } from '../types';
+import { AmbientBackground } from './AmbientBackground';
 import { ModelViewer } from './ModelViewer';
 import './AramWardrobePage.css';
 
@@ -104,60 +105,70 @@ export function AramWardrobePage({ champions, onBack }: Props) {
 
   return (
     <div className="aram-page">
+      <AmbientBackground fixed />
+
       <div className="aram-header">
-        <button className="aram-back" onClick={onBack}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
+        <div className="aram-logo">
+          <svg viewBox="0 0 40 40" fill="none" className="aram-logo-icon">
+            <path d="M20 2L37 11v18L20 38 3 29V11L20 2z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            <path d="M20 8L31 14v12L20 32 9 26V14L20 8z" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
           </svg>
-          <span>Champions</span>
-        </button>
-        <div className="aram-header-title">
-          <strong>ARAM Wardrobe</strong>
-          <small>{totalSkins} Skin{totalSkins !== 1 ? 's' : ''} · {groups.length} Champion{groups.length !== 1 ? 's' : ''}</small>
+        </div>
+        <h1 className="aram-title">ARAM Wardrobe</h1>
+      </div>
+
+      <div className="aram-controls">
+        <div className="aram-search-wrap">
+          <svg className="aram-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            className="aram-search"
+            placeholder="Search skins or champions..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {search && (
+            <button className="aram-search-clear" onClick={() => setSearch('')} aria-label="Clear search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <div className="aram-filters">
+          <button type="button" className="aram-back" onClick={onBack}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Champions
+          </button>
+          <button
+            className={`aram-chip${costFilter === 'All' ? ' active' : ''}`}
+            onClick={() => setCostFilter('All')}
+          >
+            All
+          </button>
+          {costTiers.map((tier) => (
+            <button
+              key={tier}
+              className={`aram-chip${costFilter === tier ? ' active' : ''}`}
+              onClick={() => setCostFilter(tier)}
+            >
+              {tier} RP
+            </button>
+          ))}
+        </div>
+
+        <div className="aram-count">
+          {totalSkins} Skin{totalSkins !== 1 ? 's' : ''} · {groups.length} Champion{groups.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       <div className="aram-body">
         <aside className="aram-list-col">
-          <div className="aram-list-controls">
-            <div className="aram-search-wrap">
-              <svg className="aram-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                className="aram-search"
-                placeholder="Search skins or champions..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button className="aram-search-clear" onClick={() => setSearch('')} aria-label="Clear search">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <div className="aram-cost-filter">
-              <button
-                className={`aram-chip${costFilter === 'All' ? ' active' : ''}`}
-                onClick={() => setCostFilter('All')}
-              >
-                All
-              </button>
-              {costTiers.map((tier) => (
-                <button
-                  key={tier}
-                  className={`aram-chip${costFilter === tier ? ' active' : ''}`}
-                  onClick={() => setCostFilter(tier)}
-                >
-                  {tier}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="aram-list">
             {groups.length === 0 && (
               <div className="aram-empty">No skins match your filters.</div>
@@ -222,9 +233,9 @@ export function AramWardrobePage({ champions, onBack }: Props) {
                 modelCameraZ={7}
               />
               <div className="aram-preview-overlay">
+                <span className="aram-preview-kicker">{selected.championName}</span>
                 <div className="aram-preview-name">{selected.skinName}</div>
                 <div className="aram-preview-meta">
-                  <span>{selected.championName}</span>
                   <span className="aram-preview-cost">{selected.cost} RP</span>
                 </div>
               </div>
@@ -234,6 +245,8 @@ export function AramWardrobePage({ champions, onBack }: Props) {
           )}
         </section>
       </div>
+
+      <div className="aram-bottom-border" />
     </div>
   );
 }
