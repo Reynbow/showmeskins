@@ -41,26 +41,38 @@
 
 /* Carousel container */
 .skin-carousel-container {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   padding: 0 8px;
 }
 
-/* Navigation buttons */
+/* Navigation chevrons — fully outside the panel, anchored to the panel
+   (.skin-carousel is the positioned ancestor) so they center on the bar. */
 .skin-nav-btn {
-  flex-shrink: 0;
-  width: 32px;
-  height: 150px;
-  background: rgba(30, 35, 40, 0.6);
-  border: 1px solid var(--lol-border-gold);
-  color: var(--lol-text-secondary);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  background: rgba(10, 14, 22, 0.88);
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  color: var(--lol-gold-light);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
   padding: 0;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Fully outside the panel's width. When the viewport gutter is narrower than
+   the 47px outset, max() pins the button to the screen edge instead.
+   calc((100% - 100vw) / 2) = the viewport edge, relative to the centered panel. */
+.skin-nav-btn--prev {
+  left: max(calc((100% - 100vw) / 2 + 4px), -47px);
+}
+
+.skin-nav-btn--next {
+  right: max(calc((100% - 100vw) / 2 + 4px), -47px);
 }
 
 .skin-nav-btn svg {
@@ -71,7 +83,14 @@
 .skin-nav-btn:hover {
   border-color: var(--lol-gold);
   color: var(--lol-gold);
-  background: rgba(200, 170, 110, 0.08);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.15);
+}
+
+/* Phones: no gutter to float in — hide the chevrons, swipe scrolling covers it */
+@media (max-width: 768px) {
+  .skin-nav-btn {
+    display: none;
+  }
 }
 
 /* Scrollable skin cards */
@@ -196,8 +215,14 @@
   object-position: center;
 }
 
-.skin-card:hover .skin-card-image img {
-  transform: scale(1.05);
+/* Slight zoom on loading-art thumbs hides the black frame baked into the
+   top/bottom edges of the source images. */
+.skin-card:not(.active) .skin-card-image img {
+  transform: scale(1.12);
+}
+
+.skin-card:not(.active):hover .skin-card-image img {
+  transform: scale(1.18);
 }
 
 /* Skin name — overlaid on the image, shown only on active card */

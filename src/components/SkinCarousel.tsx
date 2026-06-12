@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ChampionDetail, Skin } from '../types';
-import { getLoadingArt, getSplashArt, getLoadingArtDdragon, getSplashArtFallback } from '../api';
+import { getCenteredSplashArt, getLoadingArt, getSplashArt, getLoadingArtDdragon, getSplashArtFallback } from '../api';
 import './SkinCarousel.css';
 
 interface Props {
@@ -12,6 +12,23 @@ interface Props {
 export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [canScroll, setCanScroll] = useState(false);
+
+  // Show the nav chevrons (and edge fades) only when the strip overflows.
+  // The 300ms re-check catches the active card's width transition settling.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => setCanScroll(el.scrollWidth > el.clientWidth + 1);
+    update();
+    const timer = setTimeout(update, 300);
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [champion.id, selectedSkin.num]);
 
   const handleImageLoad = useCallback((skinNum: number) => {
     setLoadedImages(prev => {
@@ -50,11 +67,13 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
       </div>
 
       <div className="skin-carousel-container">
-        <button className="skin-nav-btn" onClick={() => scroll('left')} aria-label="Scroll left">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
+        {canScroll && (
+          <button className="skin-nav-btn skin-nav-btn--prev" onClick={() => scroll('left')} aria-label="Scroll left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        )}
 
         <div className="skin-cards" ref={scrollRef}>
           {champion.skins.map((skin, i) => {
@@ -75,16 +94,25 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
                       </div>
                     )}
                     <img
-                      src={isActive ? getSplashArt(champion.id, skin.num) : getLoadingArt(champion.id, skin.num)}
+                      src={isActive ? getCenteredSplashArt(champion.id, skin.num) : getLoadingArt(champion.id, skin.num)}
                       alt=""
                       loading="lazy"
                       className={loadedImages.has(skin.num) ? 'loaded' : ''}
                       onLoad={() => handleImageLoad(skin.num)}
                       onError={(e) => {
                         const img = e.currentTarget;
-                        const fallback = isActive
-                          ? getSplashArtFallback(champion.id, skin.num)
-                          : getLoadingArtDdragon(champion.id, skin.num);
+                        if (isActive) {
+                          // Centered splash → DDragon splash → loading art.
+                          const ddSplash = getSplashArt(champion.id, skin.num);
+                          if (img.src.includes('_splash_centered_')) {
+                            img.src = ddSplash;
+                            return;
+                          }
+                          const fallback = getSplashArtFallback(champion.id, skin.num);
+                          if (img.src !== fallback) img.src = fallback;
+                          return;
+                        }
+                        const fallback = getLoadingArtDdragon(champion.id, skin.num);
                         if (img.src !== fallback) img.src = fallback;
                       }}
                     />
@@ -99,11 +127,13 @@ export function SkinCarousel({ champion, selectedSkin, onSkinSelect }: Props) {
           })}
         </div>
 
-        <button className="skin-nav-btn" onClick={() => scroll('right')} aria-label="Scroll right">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+        {canScroll && (
+          <button className="skin-nav-btn skin-nav-btn--next" onClick={() => scroll('right')} aria-label="Scroll right">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

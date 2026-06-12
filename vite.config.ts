@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // Honor the PORT env var (e.g. when a dev tool assigns a free port);
+    // falls back to Vite's default (5173) when unset.
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
     proxy: {
       // Forward serverless function requests during local Vite dev.
       // Set VITE_API_PROXY_TARGET if your API server runs elsewhere.

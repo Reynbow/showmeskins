@@ -439,6 +439,23 @@ export function getSkinCenteredSplashArt(
   return getSplashArt(member.championId, member.skinNum);
 }
 
+function cdragonSplashUrl(championId: string, skinNum: number, kind: 'centered' | 'uncentered'): string {
+  const alias = championId.toLowerCase();
+  const folder = skinNum === 0 ? 'base' : `skin${String(skinNum).padStart(2, '0')}`;
+  return `/cdragon/latest/plugins/rcp-be-lol-game-data/global/default/assets/characters/${alias}/skins/${folder}/images/${alias}_splash_${kind}_${skinNum}.jpg`;
+}
+
+/** Riot's centered (champion-framed) splash via CommunityDragon — the same
+    hero-focused crop the home page's newest-skins carousel uses. */
+export function getCenteredSplashArt(championId: string, skinNum: number): string {
+  return cdragonSplashUrl(championId, skinNum, 'centered');
+}
+
+/** The full uncropped splash artwork via CommunityDragon. */
+export function getUncenteredSplashArt(championId: string, skinNum: number): string {
+  return cdragonSplashUrl(championId, skinNum, 'uncentered');
+}
+
 export function getSplashArt(championId: string, skinNum: number): string {
   return `${BASE_URL}/cdn/img/champion/splash/${artChampionId(championId)}_${skinNum}.jpg`;
 }

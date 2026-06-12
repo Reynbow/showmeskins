@@ -5,6 +5,7 @@
   background: var(--lol-bg-primary);
   animation: fadeIn 0.3s ease;
   position: relative;
+  overflow-x: clip;
 }
 
 .viewer-bg-splash {
@@ -19,26 +20,69 @@
   transition: background-image 0.5s ease;
 }
 
-/* Header */
-.viewer-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 24px;
-  background: linear-gradient(180deg, rgba(10, 20, 40, 0.95) 0%, rgba(1, 10, 19, 0.8) 100%);
-  border-bottom: 1px solid var(--lol-border-gold);
+/* ── Masthead — compact version of the home-page header ──────────────── */
+.viewer-masthead {
+  text-align: center;
+  padding: 12px 24px 0;
   position: relative;
   z-index: 10;
-  gap: 24px;
+}
+
+.viewer-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.viewer-logo-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--lol-gold);
+  filter: drop-shadow(0 0 8px rgba(200, 170, 110, 0.3));
+}
+
+.viewer-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--lol-gold-light);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  line-height: 1.25;
+  text-shadow: 0 0 30px rgba(200, 170, 110, 0.15);
+}
+
+.viewer-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lol-gold);
+  opacity: 0.8;
+}
+
+/* ── Controls — centered row like the home page nav/filters ──────────── */
+.viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px 12px;
+  position: relative;
+  z-index: 10;
 }
 
 .back-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: transparent;
+  gap: 7px;
+  padding: 7px 16px;
+  background: rgba(10, 20, 40, 0.55);
   border: 1px solid var(--lol-border-gold);
-  color: var(--lol-text-secondary);
+  color: var(--lol-gold-light);
   font-family: var(--font-body);
   font-size: 12px;
   letter-spacing: 1px;
@@ -49,14 +93,15 @@
 }
 
 .back-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .back-btn:hover {
   border-color: var(--lol-gold);
   color: var(--lol-gold);
-  background: rgba(200, 170, 110, 0.05);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
 }
 
 /* ── Live Game button (glowing green when game in progress) ── */
@@ -116,14 +161,13 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  background: transparent;
+  padding: 7px 14px;
+  background: rgba(10, 20, 40, 0.55);
   border: 1px solid var(--lol-border-gold);
-  color: var(--lol-text-secondary);
+  color: var(--lol-gold-light);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: var(--font-heading);
+  font-family: var(--font-body);
   font-size: 12px;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -137,8 +181,9 @@
 
 .champ-nav-btn:hover {
   border-color: var(--lol-gold);
-  color: #1a1a1a;
-  background: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.12);
 }
 
 /* ── Form toggle button (alternate form: spider, cougar, etc.) ── */
@@ -146,18 +191,16 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  background: rgba(1, 10, 19, 0.82);
+  padding: 7px 14px;
+  background: rgba(10, 20, 40, 0.55);
   border: 1px solid var(--lol-border-gold);
-  color: rgba(200, 170, 110, 0.65);
+  color: var(--lol-text-secondary);
   font-family: var(--font-body);
   font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .form-toggle-btn svg {
@@ -167,18 +210,16 @@
 }
 
 .form-toggle-btn:hover {
-  border-color: var(--lol-gold);
-  color: #1a1a1a;
-  background: var(--lol-gold);
+  border-color: var(--lol-gold-dark);
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.05);
 }
 
 .form-toggle-btn.active {
   border-color: var(--lol-gold);
-  color: #1a1a1a;
-  background: var(--lol-gold);
-  box-shadow:
-    0 0 8px rgba(200, 170, 110, 0.3),
-    inset 0 0 6px rgba(255, 255, 255, 0.1);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.1);
 }
 
 /* ── Level-form selector (Kayle ascension, etc.) ── */
@@ -187,10 +228,8 @@
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  background: rgba(1, 10, 19, 0.82);
+  background: rgba(10, 20, 40, 0.55);
   border: 1px solid var(--lol-border-gold);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .level-form-label {
@@ -229,51 +268,17 @@
 }
 
 .level-form-btn.active {
-  color: #1a1a1a;
-  background: var(--lol-gold);
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.1);
   border-color: var(--lol-gold);
-  box-shadow:
-    0 0 6px rgba(200, 170, 110, 0.25),
-    inset 0 0 4px rgba(255, 255, 255, 0.1);
-}
-
-.viewer-skin-badge {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 16px;
-  border: 1px solid var(--lol-border-gold);
-  background: rgba(200, 170, 110, 0.05);
-}
-
-.viewer-skin-name {
-  font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--lol-gold);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.viewer-skin-sep {
-  color: rgba(200, 170, 110, 0.3);
-  font-size: 14px;
-}
-
-.viewer-skin-title {
-  font-family: var(--font-body);
-  font-size: 11px;
-  color: var(--lol-gold);
-  letter-spacing: 1px;
-  text-transform: capitalize;
-  font-style: italic;
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.1);
 }
 
 /* View mode toggle */
 .view-toggle {
   display: flex;
   border: 1px solid var(--lol-border-gold);
+  background: rgba(10, 20, 40, 0.55);
   overflow: hidden;
 }
 
@@ -316,10 +321,16 @@
   box-shadow: inset 0 0 8px rgba(200, 170, 110, 0.08);
 }
 
-/* Main viewer area — split layout */
+/* Main viewer area — split layout, gold-framed panels like the home page */
 .viewer-main {
   flex: 1;
   display: flex;
+  gap: 14px;
+  min-height: 0;
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 24px 14px;
   position: relative;
   overflow: hidden;
   z-index: 1;
@@ -327,12 +338,13 @@
 
 /* Left: splash artwork */
 .viewer-splash-panel {
-  width: 50%;
-  height: 100%;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   position: relative;
   background: #010a13;
-  border-right: 1px solid var(--lol-border-gold);
+  border: 1px solid var(--lol-border-gold);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -352,20 +364,98 @@
   pointer-events: none;
 }
 
+/* Hero / full art toggle — floats at the bottom of the splash frame */
+.splash-art-toggle {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  border: 1px solid rgba(200, 170, 110, 0.45);
+  background: rgba(10, 14, 22, 0.85);
+  cursor: default;
+}
+
+.splash-art-toggle-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid rgba(200, 170, 110, 0.3);
+  color: var(--lol-text-secondary);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.splash-art-toggle-btn:last-child {
+  border-right: none;
+}
+
+.splash-art-toggle-btn:hover {
+  color: var(--lol-gold-light);
+  background: rgba(200, 170, 110, 0.06);
+}
+
+.splash-art-toggle-btn.active {
+  color: var(--lol-gold);
+  background: rgba(200, 170, 110, 0.12);
+  box-shadow: inset 0 0 8px rgba(200, 170, 110, 0.08);
+}
+
 /* Right: 3D model */
 .viewer-model-panel {
-  width: 50%;
-  height: 100%;
+  flex: 1;
+  min-width: 0;
   position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lol-border-gold);
+  background: #05080d;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Skin carousel dock — floats under the panels at the same width ───── */
+.viewer-carousel-dock {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 24px 14px;
+  position: relative;
+  z-index: 10;
+}
+
+.viewer-carousel-dock .skin-carousel {
+  border: 1px solid var(--lol-border-gold);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Bottom border — same fixed gold bar as the home page ─────────────── */
+.viewer-bottom-border {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lol-gold-dark), var(--lol-gold), var(--lol-gold-dark), transparent);
+  z-index: 11;
+  pointer-events: none;
 }
 
 /* ── Mobile: hide splash panel, model takes full width ────── */
 @media (max-width: 768px) {
-  .viewer-splash-panel {
-    display: none;
+  .viewer-main {
+    padding: 0 14px 12px;
   }
 
-  .viewer-model-panel {
-    width: 100%;
+  .viewer-carousel-dock {
+    padding: 0 14px 12px;
+  }
+
+  .viewer-splash-panel {
+    display: none;
   }
 }

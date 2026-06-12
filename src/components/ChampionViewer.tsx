@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ChampionDetail, Skin, ChromaInfo } from '../types';
+import { AmbientBackground } from './AmbientBackground';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
-import { getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, CHAMPION_MODEL_VERSIONS, getModelVersionUrl, getModelVersionTextureUrl, getChampionChromas, resolveChromaTextureUrl, getModelAssetUrl, type ChampionModelVersion } from '../api';
+import { getCenteredSplashArt, getUncenteredSplashArt, getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, CHAMPION_MODEL_VERSIONS, getModelVersionUrl, getModelVersionTextureUrl, getChampionChromas, resolveChromaTextureUrl, getModelAssetUrl, type ChampionModelVersion } from '../api';
 import './ChampionViewer.css';
 
 interface Props {
@@ -410,6 +411,12 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
   const skinName = selectedSkin.num === 0 ? champion.name : selectedSkin.name;
 
   /* ── Draggable splash art ─────────────────────────────────── */
+  // Hero (centered) crop by default; toggleable to the full uncropped splash.
+  const [splashArtMode, setSplashArtMode] = useState<'hero' | 'full'>('hero');
+  const panelArtUrl = splashArtMode === 'hero'
+    ? getCenteredSplashArt(champion.id, selectedSkin.num)
+    : getUncenteredSplashArt(champion.id, selectedSkin.num);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [imgOffset, setImgOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -417,10 +424,10 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
     dragging: false, startX: 0, startY: 0, originX: 0, originY: 0,
   });
 
-  // Reset offset when skin changes
+  // Reset offset when the skin or art variant changes
   useEffect(() => {
     setImgOffset({ x: 0, y: 0 });
-  }, [selectedSkin.id]);
+  }, [selectedSkin.id, splashArtMode]);
 
   /** Clamp offset so the image never reveals empty space at edges */
   const clampOffset = useCallback((ox: number, oy: number): { x: number; y: number } => {
@@ -477,13 +484,28 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
 
   return (
     <div className="champion-viewer">
+      <AmbientBackground fixed />
+
       {/* Background splash - subtle */}
       <div
         className="viewer-bg-splash"
         style={{ backgroundImage: `url(${splashUrl})` }}
       />
 
-      <div className="viewer-header">
+      <div className="viewer-masthead">
+        <div className="viewer-logo">
+          <svg viewBox="0 0 40 40" fill="none" className="viewer-logo-icon">
+            <path d="M20 2L37 11v18L20 38 3 29V11L20 2z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            <path d="M20 8L31 14v12L20 32 9 26V14L20 8z" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.5" />
+          </svg>
+        </div>
+        <h1 className="viewer-title">{skinName}</h1>
+        <span className="viewer-subtitle">
+          {selectedSkin.num === 0 ? champion.title : `${champion.name} · ${champion.title}`}
+        </span>
+      </div>
+
+      <div className="viewer-controls">
         <button className="back-btn" onClick={onBack}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -615,11 +637,6 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           </div>
         )}
 
-        <div className="viewer-skin-badge">
-          <span className="viewer-skin-name">{skinName}</span>
-          <span className="viewer-skin-sep">|</span>
-          <span className="viewer-skin-title">{champion.title}</span>
-        </div>
       </div>
 
       <div className="viewer-main">
@@ -632,8 +649,9 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           onPointerCancel={handlePointerUp}
         >
           <img
+            key={`${selectedSkin.id}-${splashArtMode}`}
             ref={imgRef}
-            src={splashUrl}
+            src={panelArtUrl}
             alt={skinName}
             className="viewer-splash-img"
             style={{
@@ -641,10 +659,30 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
             }}
             draggable={false}
             onError={(e) => {
+              const img = e.currentTarget;
+              // CDragon variant → DDragon splash → loading art.
+              if (img.src.includes('_splash_centered_') || img.src.includes('_splash_uncentered_')) {
+                img.src = getSplashArt(champion.id, selectedSkin.num);
+                return;
+              }
               const fallback = getSplashArtFallback(champion.id, selectedSkin.num);
-              if (e.currentTarget.src !== fallback) e.currentTarget.src = fallback;
+              if (img.src !== fallback) img.src = fallback;
             }}
           />
+          <div className="splash-art-toggle" onPointerDown={(e) => e.stopPropagation()}>
+            <button
+              className={`splash-art-toggle-btn${splashArtMode === 'hero' ? ' active' : ''}`}
+              onClick={() => setSplashArtMode('hero')}
+            >
+              Hero
+            </button>
+            <button
+              className={`splash-art-toggle-btn${splashArtMode === 'full' ? ' active' : ''}`}
+              onClick={() => setSplashArtMode('full')}
+            >
+              Full Art
+            </button>
+          </div>
         </div>
         <div className="viewer-model-panel">
           <ModelViewer
@@ -667,11 +705,15 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
         </div>
       </div>
 
-      <SkinCarousel
-        champion={champion}
-        selectedSkin={selectedSkin}
-        onSkinSelect={onSkinSelect}
-      />
+      <div className="viewer-carousel-dock">
+        <SkinCarousel
+          champion={champion}
+          selectedSkin={selectedSkin}
+          onSkinSelect={onSkinSelect}
+        />
+      </div>
+
+      <div className="viewer-bottom-border" />
     </div>
   );
 }
