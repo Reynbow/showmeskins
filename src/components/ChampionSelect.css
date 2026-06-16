@@ -715,8 +715,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0.1) 20%, rgba(0, 0, 0, 0.55) 72%, rgba(0, 0, 0, 0.82) 100%),
-    linear-gradient(to top, rgba(1, 10, 19, 0.88) 0%, rgba(1, 10, 19, 0.2) 48%, transparent 100%);
+    linear-gradient(to top, rgba(1, 10, 19, 0.92) 0%, rgba(1, 10, 19, 0.72) 18%, rgba(1, 10, 19, 0.25) 40%, transparent 60%);
   pointer-events: none;
 }
 
@@ -731,8 +730,9 @@
   z-index: 1;
   pointer-events: none;
   filter:
-    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.95))
-    drop-shadow(0 0 16px rgba(0, 0, 0, 0.8));
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 1))
+    drop-shadow(0 3px 4px rgba(0, 0, 0, 0.98))
+    drop-shadow(0 5px 6px rgba(0, 0, 0, 0.75));
   opacity: 0.92;
 }
 
@@ -852,7 +852,10 @@
   height: 48px;
   object-fit: contain;
   flex-shrink: 0;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
+  filter:
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 1))
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.98))
+    drop-shadow(0 4px 5px rgba(0, 0, 0, 0.75));
 }
 
 .region-roster-hero-text {
