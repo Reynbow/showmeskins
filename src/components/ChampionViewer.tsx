@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { ChampionDetail, Skin, ChromaInfo } from '../types';
+import type { ChampionDetail, Skin, ChromaInfo, SkinLineMember } from '../types';
 import { AmbientBackground } from './AmbientBackground';
 import { ModelViewer, type ViewMode } from './ModelViewer';
 import { SkinCarousel } from './SkinCarousel';
+import { SkinLineSkinCarousel } from './SkinLineSkinCarousel';
 import { getCenteredSplashArt, getUncenteredSplashArt, getSplashArt, getSplashArtFallback, getModelUrl, getAlternateModelUrl, getAlternateFormTextureUrl, getCompanionModelUrl, COMPANION_MODELS, ALTERNATE_FORMS, LEVEL_FORM_CHAMPIONS, LEVEL_FORM_SKINS, CHAMPION_MODEL_VERSIONS, getModelVersionUrl, getModelVersionTextureUrl, getChampionChromas, resolveChromaTextureUrl, getModelAssetUrl, type ChampionModelVersion } from '../api';
 import './ChampionViewer.css';
 
@@ -11,11 +12,15 @@ interface Props {
   selectedSkin: Skin;
   initialChromaId?: number | null;
   onBack: () => void;
+  backLabel?: string;
   onSkinSelect: (skin: Skin) => void;
   onPrevChampion: () => void;
   onNextChampion: () => void;
   hasLiveGame?: boolean;
   onLiveGame?: () => void;
+  /** When set, the bottom carousel shows the skin line's members (across champions) instead of this champion's skins. */
+  skinLineMembers?: SkinLineMember[];
+  onSkinLineMemberSelect?: (member: SkinLineMember) => void;
 }
 
 type ExtraModel = { url: string; alias: string; positionOffset: [number, number, number]; scaleMultiplier?: number };
@@ -23,7 +28,7 @@ type ExtraModelSpec = { aliases: string[]; positionOffset: [number, number, numb
 type ResolvedModelVersion = ChampionModelVersion & { modelUrl: string; resolvedSkinId: string };
 const EMPTY_MODEL_VERSIONS: ChampionModelVersion[] = [];
 
-export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, onSkinSelect, onPrevChampion, onNextChampion, hasLiveGame, onLiveGame }: Props) {
+export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack, backLabel, onSkinSelect, onPrevChampion, onNextChampion, hasLiveGame, onLiveGame, skinLineMembers, onSkinLineMemberSelect }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('model');
 
   /* ── Chroma data & selection ─────────────────────────────────── */
@@ -510,7 +515,7 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          <span>Champions</span>
+          <span>{backLabel ?? 'Champions'}</span>
         </button>
 
         {hasLiveGame && onLiveGame && (
@@ -706,11 +711,19 @@ export function ChampionViewer({ champion, selectedSkin, initialChromaId, onBack
       </div>
 
       <div className="viewer-carousel-dock">
-        <SkinCarousel
-          champion={champion}
-          selectedSkin={selectedSkin}
-          onSkinSelect={onSkinSelect}
-        />
+        {skinLineMembers && onSkinLineMemberSelect ? (
+          <SkinLineSkinCarousel
+            members={skinLineMembers}
+            selectedSkinId={selectedSkin.id}
+            onSelect={onSkinLineMemberSelect}
+          />
+        ) : (
+          <SkinCarousel
+            champion={champion}
+            selectedSkin={selectedSkin}
+            onSkinSelect={onSkinSelect}
+          />
+        )}
       </div>
 
       <div className="viewer-bottom-border" />

@@ -7,7 +7,6 @@ import { ChampionViewer } from './components/ChampionViewer';
 import { CompanionPage } from './components/CompanionPage';
 import { DevPage, type AccountInfo, type CompanionLiveDebug } from './components/DevPage';
 import { MatchHistoryPage } from './components/MatchHistoryPage';
-import { SkinLineViewer } from './components/SkinLineViewer';
 import { TeamSkinLinesPage } from './components/TeamSkinLinesPage';
 import { getAramWardrobeCatalog, getChampions, getChampionDetail, getLatestVersion, getItems, getRegionCatalog, getSkinLineCatalog, getSplashArt, resolveLcuSkinNum, toUrlSlug, type RecentSkinSpotlight } from './api';
 import type {
@@ -1048,6 +1047,36 @@ function App() {
     window.history.pushState(null, '', '/skin-lines');
   }, []);
 
+  // Skin selection inside the skin-line viewer: keep the skin-line URL in
+  // sync when the chosen skin is part of the active line.
+  const handleSkinLineSkinSelect = useCallback((skin: Skin) => {
+    setSelectedSkin(skin);
+    setCompanionChromaId(null);
+    if (!selectedChampion || !activeSkinLine) return;
+    const member = activeSkinLine.members.find(
+      (m) => m.championId.toLowerCase() === selectedChampion.id.toLowerCase() && m.skinId === skin.id,
+    );
+    if (member) {
+      setActiveSkinLineMember(member);
+      window.history.replaceState(null, '', `/skin-lines/${activeSkinLine.slug}/${member.championId}/${member.skinId}`);
+    }
+  }, [activeSkinLine, selectedChampion]);
+
+  // Prev/Next inside the skin-line viewer walks the line's members
+  // (cross-champion) instead of the global champion list.
+  const navigateSkinLineMember = useCallback((direction: 1 | -1) => {
+    if (!activeSkinLine || !activeSkinLineMember) return;
+    const members = activeSkinLine.members;
+    if (members.length === 0) return;
+    const idx = members.findIndex((m) => m.skinId === activeSkinLineMember.skinId);
+    if (idx === -1) return;
+    const next = members[(idx + direction + members.length) % members.length];
+    void handleSkinLineMemberSelect(activeSkinLine, next);
+  }, [activeSkinLine, activeSkinLineMember, handleSkinLineMemberSelect]);
+
+  const handlePrevSkinLineMember = useCallback(() => navigateSkinLineMember(-1), [navigateSkinLineMember]);
+  const handleNextSkinLineMember = useCallback(() => navigateSkinLineMember(1), [navigateSkinLineMember]);
+
   const handleOpenMatchHistory = useCallback((riotId: string) => {
     setViewMode('history');
     setHistoryInitialRiotId(riotId);
@@ -1547,13 +1576,18 @@ function App() {
           onBack={handleTeamSkinLinesBack}
         />
       ) : viewMode === 'skin-line-viewer' && activeSkinLine && activeSkinLineMember && selectedChampion && selectedSkin ? (
-        <SkinLineViewer
-          skinLine={activeSkinLine}
-          selectedMember={activeSkinLineMember}
+        <ChampionViewer
           champion={selectedChampion}
-          skin={selectedSkin}
-          onBackToLines={handleSkinLineViewerBack}
-          onSelectMember={(member) => handleSkinLineMemberSelect(activeSkinLine, member)}
+          selectedSkin={selectedSkin}
+          onBack={handleSkinLineViewerBack}
+          backLabel="Skin Lines"
+          onSkinSelect={handleSkinLineSkinSelect}
+          onPrevChampion={handlePrevSkinLineMember}
+          onNextChampion={handleNextSkinLineMember}
+          hasLiveGame={!!liveGameData}
+          onLiveGame={handleLiveGameNavigate}
+          skinLineMembers={activeSkinLine.members}
+          onSkinLineMemberSelect={(member) => handleSkinLineMemberSelect(activeSkinLine, member)}
         />
       ) : viewMode === 'history' ? (
         <MatchHistoryPage
